@@ -3,8 +3,9 @@
 # module Fitting
 
 
-using Polynomials
+# using Polynomials
 using Plots
+using DataFrames
 
 F(t) = sqrt(t)
 rho(r) = exp(-r)
@@ -130,7 +131,7 @@ for (ibf,bf) in enumerate(Basis_fct_list)
     end
 end
 
-using DataFrames
+
 df1 = DataFrame( deg = Deg )
 df1[Symbol("Nb_basis_fcts")] = NB_BASIS_FCTS[:,1];
 for k = 1:length(Basis_fct_list)
