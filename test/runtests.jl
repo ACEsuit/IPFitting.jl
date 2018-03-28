@@ -1,5 +1,6 @@
 using ManyBodyIPs
 using Base.Test
+using StaticArrays
 
-# write your own tests here
-@test 1 == 2
+f(r) = prod(r)
+f_d(r::SVector{3,T}) where T = SVector{3,T}(r[2]*r[3], r[1]*r[3], r[1]*r[2])

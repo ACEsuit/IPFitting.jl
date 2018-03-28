@@ -1,13 +1,13 @@
 module ManyBodyIPs
 
-# package code goes here
+using Reexport
 
 include("polynomials.jl")
-@reexport using Polynomials
+# @reexport using Polynomials
 
 include("assembly.jl")
 
 include("fitting.jl")
-@reexport using Fitting
+# @reexport using Fitting
 
 end # module

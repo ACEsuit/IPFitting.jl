@@ -1,8 +1,12 @@
 
 
+using JuLIP, NeighbourLists
 
-import JuLIP.Potentials: evaluate, evaluate_d
+import JuLIP.Potentials: evaluate, evaluate_d, cutoff
 using JuLIP.Potentials: @pot
+
+export NBody
+
 
 @pot struct NBody{N, T, TF, TG}
    _::Val{N}
