@@ -24,8 +24,10 @@ end
 
 # test on some atoms
 at = bulk(:Cu, cubic=true, pbc = false) * 3
+@show V2.f([1.0])
 @show V2(at)
 @show norm(@D V2(at))
+@show V3.f([1.0, 1.6, 0.8])
 @show V3(at)
 @show norm(@D V3(at))
 
@@ -33,3 +35,11 @@ at = bulk(:Cu, cubic=true, pbc = false) * 3
 V = NBodyIP([V2, V3])
 @show energy(V, at)
 @show norm(forces(V, at))
+
+
+# experiments generating the polynomial basis set
+f = ManyBodyIPs.PermPolys(2, 3, ["x[$i]" for i = 1:3])
+b = NBody.(3, f.polys, r->r, 4.1)
+
+rcut = 4.5
+dictionary = [ "r^(-$p) * (r - $rcut)^2" for p = 0:10]
