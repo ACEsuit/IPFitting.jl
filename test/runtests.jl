@@ -43,3 +43,5 @@ b = NBody.(3, f.polys, r->r, 4.1)
 
 rcut = 4.5
 dictionary = [ "r^(-$p) * (r - $rcut)^2" for p = 0:10]
+
+dict(:poly2, 5, 2.0)

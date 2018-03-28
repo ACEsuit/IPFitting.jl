@@ -4,3 +4,6 @@ NeighbourLists
 Reexport
 ForwardDiff
 StaticArrays
+MacroTools
+Combinatorics
+FunctionWrappers
