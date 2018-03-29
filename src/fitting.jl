@@ -1,8 +1,13 @@
 
 
-function get_basis(ord, dict, cutoff)
+
+function get_basis(ord, dict, sym, rcut)
+   exs, fs = psym_polys(ord, dict, sym)
    
+   return NBody.(fs, rcut)
 end
+
+
 
 
 
