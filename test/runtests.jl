@@ -1,22 +1,22 @@
 using ManyBodyIPs
 using JuLIP, Base.Test, StaticArrays
+using BenchmarkTools
 
-pex, pf = ManyBodyIPs.psym_monomial([0,1,2])
+ex, f, df = ManyBodyIPs.psym_monomial([2,0,2], dict(:inv2, 5, 3.0))
 
-dict(:poly, 3)
+b = NBody(3, f, df, 3.0)
+R = 1.0 + @SVector rand(3)
+b.f(R)
+f(R)
 
-
-pex, pf = psym_polys(3, dict(:poly, 3)...)
-
-
-
-
+psym_polys(3, dict(:poly, 5, 3.0)...; simplify = true)
 
 
-qex, qf = psym_polys_tot(3, dict(:poly, 3)...)
-ex = qex[8]
-g = ManyBodyIPs.gen_psym_grad(3, ex, :x)
-
-R = @SVector rand(3)
-@show R
-g(R)
+using Combinatorics
+dim = 3
+deg = 4
+for i in 1:deg
+	for m = 1:dim, alpha in partitions(i, m)
+      @show alpha
+   end
+end

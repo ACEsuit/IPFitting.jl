@@ -15,7 +15,16 @@ export NBody, NBodyIP
    cutoff::T
 end
 
-NBody(N::Integer, f, f_d, cutoff) = NBody(Val(N), f, f_d, cutoff)
+NBody(N::Integer, f, f_d, cutoff; wrap=true) =
+   NBody(Val(N), f, f_d, cutoff, Val(wrap))
+
+NBody(::Val{N}, f, f_d, cutoff, ::Val{true}) where {N} =
+   NBody(Val(N), FWrap{N, Float64}(f), GWrap{N, Float64}(f_d), Float64(cutoff))
+
+NBody(::Val{N}, f, f_d, cutoff, ::Val{false}) where {N} =
+   NBody(Val(N), f, f_d, cutoff)
+
+
 cutoff(V::NBody) = V.cutoff
 
 function evaluate(V::NBody{N}, at::Atoms{T}) where {N, T}
