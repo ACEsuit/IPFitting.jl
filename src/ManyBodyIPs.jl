@@ -13,6 +13,6 @@ include("assembly.jl")
 include("fitting.jl")
 
 # loading data
-include("data.jl")
+# include("data.jl")
 
 end # module

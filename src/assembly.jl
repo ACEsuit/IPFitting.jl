@@ -16,12 +16,12 @@ export NBody, NBodyIP
 end
 
 NBody(N::Integer, f, f_d, cutoff; wrap=true) =
-   NBody(Val(N), f, f_d, cutoff, Val(wrap))
+   NBody(Val(N), Val((N*(N-1))÷2), f, f_d, cutoff, Val(wrap))
 
-NBody(::Val{N}, f, f_d, cutoff, ::Val{true}) where {N} =
-   NBody(Val(N), FWrap{N, Float64}(f), GWrap{N, Float64}(f_d), Float64(cutoff))
+NBody(::Val{N}, ::Val{DIM}, f, f_d, cutoff, ::Val{true}) where {N, DIM} =
+   NBody(Val(N), FWrap{DIM, Float64}(f), GWrap{DIM, Float64}(f_d), Float64(cutoff))
 
-NBody(::Val{N}, f, f_d, cutoff, ::Val{false}) where {N} =
+NBody(::Val{N}, ::Val{DIM}, f, f_d, cutoff, ::Val{false}) where {N, DIM} =
    NBody(Val(N), f, f_d, cutoff)
 
 
