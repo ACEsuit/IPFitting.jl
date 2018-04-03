@@ -1,5 +1,5 @@
 
-using JuLIP
+using JuLIP, ProgressMeter
 
 export get_basis, regression
 
@@ -16,21 +16,30 @@ function get_basis(ord, dict, sym, rcut;
    return NBody.(ord, fs, dfs, rcut)
 end
 
-
-function regression(basis, data; verbose = true)
+function assemble_system(basis, data; verbose=true)
    A = zeros(length(data), length(basis))
    F = zeros(length(data))
-   println("assemble system")
    lenat = 0
+   if verbose
+      pm = Progress(length(data) * length(basis))
+   end
    for (id, d) in enumerate(data)
       at = d[1]::Atoms{Float64, Int}
       lenat = max(lenat, length(at))
       F[id] = d[2]::Float64
       for (ib, b) in enumerate(basis)
-         print(".")
          A[id, ib] = b(at)
+         if verbose
+            next!(pm)
+         end
       end
    end
+   return A, F, lenat
+end
+
+function regression(basis, data; verbose = true)
+   println("assemble system")
+   A, F, lenat = assemble_system(basis, data; verbose = verbose)
    # compute coefficients
    println("solve lsq")
    Q, R = qr(A)
@@ -39,4 +48,17 @@ function regression(basis, data; verbose = true)
    println("rms error on training set: ",
            norm(A * c - F) / sqrt(length(data)) / sqrt(lenat) )
    return c
+end
+
+
+function rms(c, basis, data; verbose = false)
+   A, F, lenat = assemble_system(basis, data; verbose=verbose)
+   return norm(A * c - F) / sqrt(length(data)) / sqrt(lenat)
+end
+
+
+
+
+function fit_nbody(basis, r0, rcut)
+
 end
