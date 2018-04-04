@@ -29,8 +29,14 @@ function assemble_system(basis, data; verbose=true)
       at = d[1]
       lenat = max(lenat, length(at))
       F[id] = d[2]::Float64
+      # extract the force from the data:
+      f = d[3]::JVecsF    # a vector of short vectors
+      f_vec = mat(f)[:]   # convert it into a single long vector
       for (ib, b) in enumerate(basis)
          A[id, ib] = b(at)
+         # compute the forces
+         # fb = - @D b(at)
+         # fb_vec = mat(fb)[:]
          if verbose
             next!(pm)
          end
