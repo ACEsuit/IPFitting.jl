@@ -3,6 +3,8 @@ using JuLIP, ProgressMeter
 
 export get_basis, regression
 
+Base.norm(F::JVecsF) = norm(norm.(F))
+
 function get_basis(ord, dict, sym, rcut;
                    degree=:default, kwargs...)
    dim = (ord * (ord-1)) ÷ 2
@@ -21,7 +23,7 @@ function assemble_system(basis, data; verbose=true)
    F = zeros(length(data))
    lenat = 0
    if verbose
-      pm = Progress(length(data) * length(basis))
+      pm = Progress(length(data) * length(basis), desc="assemble LSQ system")
    end
    for (id, d) in enumerate(data)
       at = d[1]
@@ -38,10 +40,9 @@ function assemble_system(basis, data; verbose=true)
 end
 
 function regression(basis, data; verbose = true)
-   verbose && println("assemble system")
    A, F, lenat = assemble_system(basis, data; verbose = verbose)
    # compute coefficients
-   verbose && println("solve lsq")
+   verbose && println("solve $(size(A)) LSQ system using QR factorisation")
    Q, R = qr(A)
    c = R \ (Q' * F)
    # check error on training set
