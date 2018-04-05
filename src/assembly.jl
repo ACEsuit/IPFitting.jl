@@ -55,7 +55,7 @@ function evaluate(V::NBodies{N, T}, at::Atoms{T}) where {N, T}
       nlist = neighbourlist(at, cutoff(V))::PairList
       fill!(temp, 0.0)
       maptosites!(V.f[n], temp, nbodies(N, nlist))
-      E += c[n] * sum_kbn(temp)
+      E += V.c[n] * sum_kbn(temp)
    end
    return E
 end
@@ -67,7 +67,7 @@ function evaluate_d(V::NBodies{N}, at::Atoms{T}) where {N, T}
    for n = 1:length(V)
       fill!(temp, zero(JVec{T}))
       maptosites_d!(V.f_d[n], temp, nbodies(N, nlist))
-      dE .+= c[n] .* temp
+      dE .+= V.c[n] .* temp
    end
    return dE
 end

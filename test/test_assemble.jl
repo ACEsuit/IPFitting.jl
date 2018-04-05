@@ -22,15 +22,23 @@ end
 
 # test on some atoms
 at = bulk(:Cu, cubic=true, pbc = false) * 3
-@show V2.f([1.0])
-@show V2(at)
-@show norm(@D V2(at))
-@show V3.f([1.0, 1.6, 0.8])
-@show V3(at)
-@show norm(@D V3(at))
+try
+   @show V2(at)
+   @show norm(@D V2(at))
+   @show V3(at)
+   @show norm(@D V3(at))
+   @test true
+catch
+   @test false
+end
 
 # assemble into an interatomic potential
 V = NBodyIP([V2, V3])
-@show energy(V, at)
-@show norm(forces(V, at))
-JuLIP.Testing.fdtest(V, at)
+try
+   @show energy(V, at)
+   @show norm(forces(V, at))
+   @test true
+   @test JuLIP.Testing.fdtest(V, at)
+catch
+   @test false
+end

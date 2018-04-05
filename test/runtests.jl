@@ -4,8 +4,12 @@ using BenchmarkTools
 
 
 @testset "ManyBodyIPs" begin
-   @testset "Polynomials" begin include("test_polynomials.jl") end
-   @testset "Assembly" begin include("test_assemble.jl") end
+   @testset "Polynomials" begin
+      include("test_polynomials.jl")
+   end
+   @testset "Assembly" begin
+      include("test_assemble.jl")
+   end
 end
 
 
