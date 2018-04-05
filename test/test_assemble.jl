@@ -1,4 +1,4 @@
-using JuLIP, ManyBodyIPs, StaticArrays
+using JuLIP, NBodyIPs, StaticArrays
 
 # here is a little code snippet that shows how to use
 # the methods defined in `assembly.jl`

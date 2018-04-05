@@ -1,11 +1,11 @@
-# ManyBodyIPs.jl
+# NBodyIPs.jl
 
 <!--
-[![Build Status](https://travis-ci.org/cortner/ManyBodyIPs.jl.svg?branch=master)](https://travis-ci.org/cortner/ManyBodyIPs.jl)
+[![Build Status](https://travis-ci.org/cortner/NBodyIPs.jl.svg?branch=master)](https://travis-ci.org/cortner/NBodyIPs.jl)
 
-[![Coverage Status](https://coveralls.io/repos/cortner/ManyBodyIPs.jl/badge.svg?branch=master&service=github)](https://coveralls.io/github/cortner/ManyBodyIPs.jl?branch=master)
+[![Coverage Status](https://coveralls.io/repos/cortner/NBodyIPs.jl/badge.svg?branch=master&service=github)](https://coveralls.io/github/cortner/NBodyIPs.jl?branch=master)
 
-[![codecov.io](http://codecov.io/github/cortner/ManyBodyIPs.jl/coverage.svg?branch=master)](http://codecov.io/github/cortner/ManyBodyIPs.jl?branch=master)
+[![codecov.io](http://codecov.io/github/cortner/NBodyIPs.jl/coverage.svg?branch=master)](http://codecov.io/github/cortner/NBodyIPs.jl?branch=master)
 -->
 
 

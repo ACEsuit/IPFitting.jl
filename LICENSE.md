@@ -1,4 +1,4 @@
-The ManyBodyIPs.jl package is licensed under the MIT "Expat" License:
+The NBodyIPs.jl package is licensed under the MIT "Expat" License:
 
 > Copyright (c) 2018: Christoph Ortner.
 >

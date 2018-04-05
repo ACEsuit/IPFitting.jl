@@ -1,4 +1,4 @@
-module ManyBodyIPs
+module NBodyIPs
 
 using Reexport
 

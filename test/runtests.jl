@@ -1,9 +1,9 @@
-using ManyBodyIPs
+using NBodyIPs
 using JuLIP, Base.Test, StaticArrays
 using BenchmarkTools
 
 
-@testset "ManyBodyIPs" begin
+@testset "NBodyIPs" begin
    @testset "Polynomials" begin
       include("test_polynomials.jl")
    end
@@ -13,7 +13,7 @@ using BenchmarkTools
 end
 
 
-# ex, f, df = ManyBodyIPs.psym_monomial([2,0,2], dict(:inv2, 5, 3.0))
+# ex, f, df = NBodyIPs.psym_monomial([2,0,2], dict(:inv2, 5, 3.0))
 #
 # b = NBody(4, f, df, 3.0)
 # R = 1.0 + @SVector rand(3)
