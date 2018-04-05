@@ -35,6 +35,7 @@ function assemble_system(basis, data; verbose=true, nforces=0)
          f = d[3]::JVecsF    # a vector of short vectors
          If = rand(1:length(f), nforces)   # random subset of forces
          f_vec = mat(f[If])[:]   # convert it into a single long vector
+         @assert !any(isnan.(f_vec))
          F[(i0+1):(i0+3*nforces)] = f_vec    # put force data into rhs
       end
       for (ib, b) in enumerate(basis)
@@ -43,6 +44,7 @@ function assemble_system(basis, data; verbose=true, nforces=0)
          if nforces > 0
             fb = - @D b(at)
             fb_vec = mat(fb[If])[:]
+            @assert !any(isnan.(fb_vec))
             A[(i0+1):(i0+3*nforces), ib] = fb_vec
          end
       end
@@ -56,6 +58,9 @@ end
 function regression(basis, data; verbose = true, nforces=0)
    A, F, lenat = assemble_system(basis, data;
                      verbose = verbose, nforces = nforces)
+   if any(isnan(A))
+      error("found NAN in system matrix A")
+   end
    # compute coefficients
    verbose && println("solve $(size(A)) LSQ system using QR factorisation")
    Q, R = qr(A)
@@ -68,7 +73,7 @@ end
 
 
 function rms(c, basis, data; verbose = false)
-   # TODO: rewrite this to separately compute energy and force errors 
+   # TODO: rewrite this to separately compute energy and force errors
    A, F, lenat = assemble_system(basis, data; verbose=verbose)
    return norm(A * c - F) / sqrt(length(data)) / sqrt(lenat)
 end
