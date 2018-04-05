@@ -18,35 +18,44 @@ function get_basis(ord, dict, sym, rcut;
    return NBody.(ord, fs, dfs, rcut)
 end
 
-function assemble_system(basis, data; verbose=true)
-   A = zeros(length(data), length(basis))
-   F = zeros(length(data))
+function assemble_system(basis, data; verbose=true, nforces=0)
+   A = zeros(length(data) * (1+3*nforces), length(basis))
+   F = zeros(length(data) * (1+3*nforces))
    lenat = 0
    if verbose
-      pm = Progress(length(data) * length(basis), desc="assemble LSQ system")
+      pm = Progress(length(data), desc="assemble LSQ system")
    end
    for (id, d) in enumerate(data)
+      i0 = (id-1) * (1+3*nforces) + 1
       at = d[1]
       lenat = max(lenat, length(at))
-      F[id] = d[2]::Float64
-      # extract the force from the data:
-      f = d[3]::JVecsF    # a vector of short vectors
-      f_vec = mat(f)[:]   # convert it into a single long vector
+      F[i0] = d[2]::Float64     # put in energy data
+      if nforces > 0
+         # extract the force from the data:
+         f = d[3]::JVecsF    # a vector of short vectors
+         If = rand(1:length(f), nforces)   # random subset of forces
+         f_vec = mat(f[If])[:]   # convert it into a single long vector
+         F[(i0+1):(i0+3*nforces)] = f_vec    # put force data into rhs
+      end
       for (ib, b) in enumerate(basis)
-         A[id, ib] = b(at)
+         A[i0, ib] = b(at)
          # compute the forces
-         # fb = - @D b(at)
-         # fb_vec = mat(fb)[:]
-         if verbose
-            next!(pm)
+         if nforces > 0
+            fb = - @D b(at)
+            fb_vec = mat(fb[If])[:]
+            A[(i0+1):(i0+3*nforces), ib] = fb_vec
          end
+      end
+      if verbose
+         next!(pm)
       end
    end
    return A, F, lenat
 end
 
-function regression(basis, data; verbose = true)
-   A, F, lenat = assemble_system(basis, data; verbose = verbose)
+function regression(basis, data; verbose = true, nforces=0)
+   A, F, lenat = assemble_system(basis, data;
+                     verbose = verbose, nforces = nforces)
    # compute coefficients
    verbose && println("solve $(size(A)) LSQ system using QR factorisation")
    Q, R = qr(A)
@@ -59,6 +68,7 @@ end
 
 
 function rms(c, basis, data; verbose = false)
+   # TODO: rewrite this to separately compute energy and force errors 
    A, F, lenat = assemble_system(basis, data; verbose=verbose)
    return norm(A * c - F) / sqrt(length(data)) / sqrt(lenat)
 end
