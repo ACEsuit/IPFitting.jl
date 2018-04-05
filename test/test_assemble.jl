@@ -1,4 +1,4 @@
-
+using JuLIP, ManyBodyIPs, StaticArrays
 
 # here is a little code snippet that shows how to use
 # the methods defined in `assembly.jl`
@@ -7,7 +7,7 @@ rcut = 4.1
 
 # define the two-body terms
 V2 = let lj = LennardJones() * C2Shift(rcut), rcut = rcut
-   NBody(2, r->lj(r[1]), r -> (@D lj(r[1])), rcut)
+   NBody(2, r->lj(r[1]), r -> (@D lj(r[1])), rcut, wrap=false)
 end
 
 # define the three-body terms
@@ -17,7 +17,7 @@ V3 = let rcut = rcut
       SVector{3,T}( 2 * (r[1]-rcut)   * (r[2]-rcut)^2 * (r[3]-rcut)^2,
                     2 * (r[1]-rcut)^2 * (r[2]-rcut)   * (r[3]-rcut)^2,
                     2 * (r[1]-rcut)^2 * (r[2]-rcut)^2 * (r[3]-rcut)    )
-   NBody(3, f, f_d, 4.1)
+   NBody(3, f, f_d, 4.1, wrap = false)
 end
 
 # test on some atoms
@@ -33,3 +33,4 @@ at = bulk(:Cu, cubic=true, pbc = false) * 3
 V = NBodyIP([V2, V3])
 @show energy(V, at)
 @show norm(forces(V, at))
+JuLIP.Testing.fdtest(V, at)
