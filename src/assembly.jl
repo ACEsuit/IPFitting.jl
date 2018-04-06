@@ -54,11 +54,11 @@ cutoff(V::NBodies) = V.cutoff
 function evaluate(V::NBodies{N, T}, at::Atoms{T}) where {N, T}
    E = 0.0
    temp = zeros(T, length(at))
+   nlist = neighbourlist(at, cutoff(V))::PairList
    for n = 1:length(V)
-      nlist = neighbourlist(at, cutoff(V))::PairList
       fill!(temp, 0.0)
-      maptosites!(V.f[n], temp, nbodies(N, nlist))
-      E += V.c[n] * sum_kbn(temp)
+      maptosites!(V.f[n], temp, nbodies(N, nlist))   # compute site energies
+      E += V.c[n] * sum_kbn(temp)    # E = ∑ c[n] * basis[n](at)
    end
    return E
 end

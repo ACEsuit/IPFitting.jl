@@ -18,7 +18,7 @@ function get_basis(ord, dict, sym, rcut;
    return NBody.(ord, fs, dfs, rcut)
 end
 
-function assemble_system(basis, data; verbose=true, nforces=0)
+function assemble_lsq(basis, data; verbose=true, nforces=0)
    A = zeros(length(data) * (1+3*nforces), length(basis))
    F = zeros(length(data) * (1+3*nforces))
    lenat = 0
@@ -56,7 +56,7 @@ function assemble_system(basis, data; verbose=true, nforces=0)
 end
 
 function regression(basis, data; verbose = true, nforces=0)
-   A, F, lenat = assemble_system(basis, data;
+   A, F, lenat = assemble_lsq(basis, data;
                      verbose = verbose, nforces = nforces)
    @assert !any(isnan.(A))
    # compute coefficients
