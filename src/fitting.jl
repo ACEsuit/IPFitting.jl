@@ -1,7 +1,7 @@
 
 using JuLIP, ProgressMeter
 
-export get_basis, regression
+export get_basis, regression, rms
 
 Base.norm(F::JVecsF) = norm(norm.(F))
 
@@ -70,8 +70,39 @@ function regression(basis, data; verbose = true, nforces=0)
 end
 
 
-function rms(c, basis, data; verbose = false)
-   # TODO: rewrite this to separately compute energy and force errors
-   A, F, lenat = assemble_system(basis, data; verbose=verbose)
-   return norm(A * c - F) / sqrt(length(data)) / sqrt(lenat)
+function rms(V, data)
+   NE = 0
+   NF = 0
+   errE = 0.0
+   errF = 0.0
+   for (at, E, F) in data
+      # energy error
+      Ex = energy(V, at)
+      errE += (Ex - E)^2
+      NE += 1
+      # force error
+      Fx = forces(V, at)
+      errF += sum( norm.(Fx - F)^2 )
+      NF += length(Fx)
+   end
+   return sqrt(errE/NE), sqrt(errF/NF)
+end
+
+
+function mae(V, data)
+   NE = 0
+   NF = 0
+   errE = 0.0
+   errF = 0.0
+   for (at, E, F) in data
+      # energy error
+      Ex = energy(V, at)
+      errE += abs(Ex - E)
+      NE += 1
+      # force error
+      Fx = forces(V, at)
+      errF += sum( abs.(Fx - F) )
+      NF += length(Fx)
+   end
+   return errE / NE, errF / NF
 end

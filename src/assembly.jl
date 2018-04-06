@@ -44,6 +44,9 @@ function NBodies(valN::Val{N}, ::Val{DIM}, c, fs, fs_d, cutoff, wrap) where {N, 
    return NBodies(valN, c, fs, fs_d, cutoff)
 end
 
+
+bodyorder(b::NBodies{N}) where {N} = N
+
 Base.length(V::NBodies) = length(V.c)
 
 cutoff(V::NBodies) = V.cutoff
@@ -81,7 +84,35 @@ struct NBodyIP <: AbstractCalculator
    orders::Vector{NBodies}
 end
 
-NBodyIP(args...) = NBodyIP( [args...] )
+# NBodyIP(args...) = NBodyIP( [args...] )
 cutoff(V::NBodyIP) = maximum( cutoff.(V.orders) )
 energy(V::NBodyIP, at::Atoms) = sum( Vn(at)  for Vn in V.orders )
 forces(V::NBodyIP, at::Atoms) = - sum( (@D Vn(at))  for Vn in V.orders )
+
+
+"""
+```
+function NBodies( basis::AbstractVector{TB <: NBodies},
+                  coeffs::AbstractVector{T <: AbstractFloat} )
+```
+convert a basis - i.e. a vector of length-1 `NBodies` (=an `NBody`) into a
+single `NBodies term with coefficients.
+"""
+@noinline function NBodies(basis, coeffs)
+   # check that what we are given here is really a meaningful basis with
+   # a consistent body-order
+   rcut = cutoff(basis[1])
+   bo = bodyorder(basis[1])
+   @assert all(length(b) == 1 for b in basis)
+   @assert all(b.c[1] == 1.0 for b in basis)
+   @assert all(cutoff(b) == rcut for b in basis)
+   @assert all(bodyorder(b) == bo for b in basis)
+   # collect into a single `NBodies`
+   return NBodies(bo,
+                  coeffs,
+                  [b.f for b in basis],
+                  [b.f_d for b in basis],
+                  rcut)
+end
+
+@noinline NBodyIP(basis, coeffs) = NBodyIP([NBodies(basis, coeffs)])
