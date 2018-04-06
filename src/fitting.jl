@@ -58,9 +58,7 @@ end
 function regression(basis, data; verbose = true, nforces=0)
    A, F, lenat = assemble_system(basis, data;
                      verbose = verbose, nforces = nforces)
-   if any(isnan(A))
-      error("found NAN in system matrix A")
-   end
+   @assert !any(isnan.(A))
    # compute coefficients
    verbose && println("solve $(size(A)) LSQ system using QR factorisation")
    Q, R = qr(A)
