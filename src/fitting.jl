@@ -65,7 +65,7 @@ function regression(basis, data; verbose = true, nforces=0)
    c = R \ (Q' * F)
    # check error on training set
    verbose && println("rms error on training set: ",
-                       norm(A * c - F) / sqrt(length(data)) / sqrt(lenat) )
+                       norm(A * c - F) / sqrt(length(data)) )
    return c
 end
 
@@ -79,30 +79,11 @@ function rms(V, data)
       # energy error
       Ex = energy(V, at)
       errE += (Ex - E)^2
-      NE += 1
+      NE += length(at)   # number of site energies
       # force error
       Fx = forces(V, at)
-      errF += sum( norm.(Fx - F)^2 )
-      NF += length(Fx)
+      errF += sum( norm.(Fx - F).^2 )
+      NF += length(Fx)   # number of forces
    end
    return sqrt(errE/NE), sqrt(errF/NF)
-end
-
-
-function mae(V, data)
-   NE = 0
-   NF = 0
-   errE = 0.0
-   errF = 0.0
-   for (at, E, F) in data
-      # energy error
-      Ex = energy(V, at)
-      errE += abs(Ex - E)
-      NE += 1
-      # force error
-      Fx = forces(V, at)
-      errF += sum( abs.(Fx - F) )
-      NF += length(Fx)
-   end
-   return errE / NE, errF / NF
 end

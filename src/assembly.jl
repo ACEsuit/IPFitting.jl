@@ -51,6 +51,8 @@ Base.length(V::NBodies) = length(V.c)
 
 cutoff(V::NBodies) = V.cutoff
 
+# TODO: this evaluate should be optimised to make the loop over basis
+#       functions INSIDE the maptosites!
 function evaluate(V::NBodies{N, T}, at::Atoms{T}) where {N, T}
    E = 0.0
    temp = zeros(T, length(at))
@@ -110,8 +112,8 @@ single `NBodies term with coefficients.
    # collect into a single `NBodies`
    return NBodies(bo,
                   coeffs,
-                  [b.f for b in basis],
-                  [b.f_d for b in basis],
+                  [b.f[1] for b in basis],
+                  [b.f_d[1] for b in basis],
                   rcut)
 end
 
