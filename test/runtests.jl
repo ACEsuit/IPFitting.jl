@@ -3,14 +3,20 @@ using JuLIP, Base.Test, StaticArrays
 using BenchmarkTools
 
 
-@testset "NBodyIPs" begin
-   @testset "Polynomials" begin
-      include("test_polynomials.jl")
-   end
-   @testset "Assembly" begin
-      include("test_assemble.jl")
-   end
-end
+# @testset "NBodyIPs" begin
+#    @testset "Polynomials" begin
+#       include("test_polynomials.jl")
+#    end
+#    @testset "Assembly" begin
+#       include("test_assemble.jl")
+#    end
+# end
+
+
+D = dict(:poly, 4)
+ex, _, _ = NBodyIPs.psym_polys_nbody(3, D...; simplify=false)
+
+
 
 
 # ex, f, df = NBodyIPs.psym_monomial([2,0,2], dict(:inv2, 5, 3.0))
