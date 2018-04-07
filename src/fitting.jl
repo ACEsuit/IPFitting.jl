@@ -54,6 +54,8 @@ function assemble_lsq(basis, data; verbose=true, nforces=0)
    else
       LSQ = [assemble_lsq_block(d, basis, nforces) for d in data]
    end
+   # lsq_block = d -> assemble_lsq_block(d, basis, nforces)
+   # LSQ = pmap(lsq_block, data, distributed=false)
    # combine the local matrices into a big global matrix
    for id = 1:length(data)
       i0 = (id-1) * (1+3*nforces) + 1
