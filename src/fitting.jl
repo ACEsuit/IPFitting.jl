@@ -1,4 +1,3 @@
-
 using JuLIP, ProgressMeter
 
 export get_basis, regression, rms
@@ -18,39 +17,51 @@ function get_basis(ord, dict, sym, rcut;
    return NBody.(ord, fs, dfs, rcut)
 end
 
+function assemble_lsq_block(d, basis, nforces)
+   F = zeros(1 + 3*nforces)
+   A = zeros(1 + 3*nforces, length(basis))
+   at = d[1]::Atoms
+   # ---- fill the data vector -------------------
+   F[1] = d[2]::Float64     # put in energy data
+   if nforces > 0
+      # extract the forces from the data:
+      f = d[3]::JVecsF                  # a vector of short vectors
+      If = rand(1:length(f), nforces)   # random subset of forces
+      f_vec = mat(f[If])[:]             # convert it into a single long vector
+      F[2:end] = f_vec                  # put force data into rhs
+   end
+   # ------- fill the LSQ system, i.e. evaluate basis at data points -------
+   for (ib, b) in enumerate(basis)
+      A[1, ib] = b(at)
+      # compute the forces
+      if nforces > 0
+         fb = - @D b(at)
+         fb_vec = mat(fb[If])[:]
+         A[2:end, ib] = fb_vec
+      end
+   end
+   return (A, F, length(at))
+end
+
 function assemble_lsq(basis, data; verbose=true, nforces=0)
    A = zeros(length(data) * (1+3*nforces), length(basis))
    F = zeros(length(data) * (1+3*nforces))
    lenat = 0
+   # generate many matrix blocks, one for each piece of data
+   #  ==> this should be switch to pmap!
    if verbose
-      pm = Progress(length(data), desc="assemble LSQ system")
+      LSQ = @showprogress [assemble_lsq_block(d, basis, nforces) for d in data]
+   else
+      LSQ = [assemble_lsq_block(d, basis, nforces) for d in data]
    end
-   for (id, d) in enumerate(data)
+   # combine the local matrices into a big global matrix
+   for id = 1:length(data)
       i0 = (id-1) * (1+3*nforces) + 1
-      at = d[1]
-      lenat = max(lenat, length(at))
-      F[i0] = d[2]::Float64     # put in energy data
-      if nforces > 0
-         # extract the force from the data:
-         f = d[3]::JVecsF    # a vector of short vectors
-         If = rand(1:length(f), nforces)   # random subset of forces
-         f_vec = mat(f[If])[:]   # convert it into a single long vector
-         @assert !any(isnan.(f_vec))
-         F[(i0+1):(i0+3*nforces)] = f_vec    # put force data into rhs
-      end
-      for (ib, b) in enumerate(basis)
-         A[i0, ib] = b(at)
-         # compute the forces
-         if nforces > 0
-            fb = - @D b(at)
-            fb_vec = mat(fb[If])[:]
-            @assert !any(isnan.(fb_vec))
-            A[(i0+1):(i0+3*nforces), ib] = fb_vec
-         end
-      end
-      if verbose
-         next!(pm)
-      end
+      rows = i0:(i0+3*nforces)
+      A_::Matrix{Float64}, F_::Vector{Float64}, lenat_::Int = LSQ[id]
+      lenat = max(lenat, lenat_)
+      A[rows, :] = A_
+      F[rows] = F_
    end
    return A, F, lenat
 end
