@@ -3,21 +3,17 @@ using JuLIP, Base.Test, StaticArrays
 using BenchmarkTools
 
 
-# @testset "NBodyIPs" begin
-#    @testset "Polynomials" begin
-#       include("test_polynomials.jl")
-#    end
-#    @testset "Assembly" begin
-#       include("test_assemble.jl")
-#    end
-# end
+@testset "NBodyIPs" begin
+   @testset "Polynomials" begin include("test_polynomials.jl") end
+   @testset "Assembly" begin include("test_assemble.jl") end
+end
 
 
-D = dict(:poly, 4)
-ex, _, _ = NBodyIPs.psym_polys_nbody(3, D...; simplify=false)
-
-
-
+# D = dict(:poly, 10)
+# ex2, _, _ = NBodyIPs.psym_polys_nbody(2, dict(:poly, 14)...; simplify=false)
+# ex3, _, _ = NBodyIPs.psym_polys_nbody(3, D...; simplify=false)
+# ex4, _, _ = NBodyIPs.psym_polys_nbody(4, D...; simplify=false)
+# ex5, _, _ = NBodyIPs.psym_polys_nbody(5, D...; simplify=false)
 
 # ex, f, df = NBodyIPs.psym_monomial([2,0,2], dict(:inv2, 5, 3.0))
 #
