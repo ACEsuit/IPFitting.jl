@@ -18,5 +18,4 @@ ex, f, df = NBodyIPs.gen_fun(B[4], D...)
 
 D = dict(:poly, 4)
 
-
-B = NBodyIPs.polys_fourbody(10)
+B = NBodyIPs.polys_fourbody2(3)
