@@ -1,11 +1,12 @@
 
 
-using JuLIP, NeighbourLists, StaticArrays
+using JuLIP, NeighbourLists, StaticArrays, FunctionWrappers
 
 import JuLIP.Potentials: evaluate, evaluate_d, cutoff, energy, forces
 using JuLIP.Potentials: @pot
 
 export NBody, NBodies, NBodyIP
+
 
 """
 `NBody` : this turns a function f defined on an N-simplex into a
@@ -117,4 +118,14 @@ single `NBodies term with coefficients.
                   rcut)
 end
 
-@noinline NBodyIP(basis, coeffs) = NBodyIP([NBodies(basis, coeffs)])
+
+
+function NBodyIP(basis, coeffs)
+   orders = NBodies[]
+   bos = bodyorder.(basis)
+   for bo = 2:maximum(bos)
+      Ibo = find(bos .== bo)
+      push!(orders, NBodies(basis[Ibo], coeffs[Ibo]))
+   end
+   return NBodyIP(orders)
+end

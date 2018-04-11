@@ -4,22 +4,43 @@ export get_basis, regression, rms
 
 Base.norm(F::JVecsF) = norm(norm.(F))
 
-function get_basis(ord, dict, sym, rcut;
-                   degree=:default, kwargs...)
-   dim = (ord * (ord-1)) ÷ 2
-   if degree == :default
-      _, fs, dfs = psym_polys(dim, dict, sym; kwargs...)
-   elseif degree == :total
-      _, fs, dfs = psym_polys_tot(dim, dict, sym; kwargs...)
-   else
-      error("unkown degree type")
+# function get_basis(ord, dict, sym, rcut;
+#                    degree=:default, kwargs...)
+#    dim = (ord * (ord-1)) ÷ 2
+#    if degree == :default
+#       _, fs, dfs = psym_polys(dim, dict, sym; kwargs...)
+#    elseif degree == :total
+#       _, fs, dfs = psym_polys_tot(dim, dict, sym; kwargs...)
+#    else
+#       error("unkown degree type")
+#    end
+#    return NBody.(ord, fs, dfs, rcut)
+# end
+
+"""
+`get_basis(dict_sym, degrees, rcuts; kwargs...)`
+
+* `dict_sym` is a symbol defining the dictionary; to try a new dictionary
+just add it to `dictionaries.jl`
+* `degrees` : vector of "polymomial degrees" i.e. number of basis functions
+to be used for each body-order, starting with order 2
+* `rcuts` : vector of cutoff radii
+"""
+function get_basis(dsym, degrees, rcuts; kwargs...)
+   @assert length(degrees) == length(rcuts) <= 3
+   B = []
+   for (n, (deg, rcut)) in enumerate(zip(degrees, rcuts))
+      D = dict(dsym, deg, rcut)
+      exs, fs, dfs = parse(nbody_tuples(n+1, deg), D...; wrap=true)
+      push!(B, NBody.(n+1, fs, dfs, rcut))
    end
-   return NBody.(ord, fs, dfs, rcut)
+   return B
 end
 
+
 function assemble_lsq_block(d, basis, nforces)
-   F = zeros(1 + 3*nforces)
-   A = zeros(1 + 3*nforces, length(basis))
+   F = zeros(1 + 3 * nforces)
+   A = zeros(1 + 3 * nforces, length(basis))
    at = d[1]::Atoms
    # ---- fill the data vector -------------------
    F[1] = d[2]::Float64     # put in energy data
