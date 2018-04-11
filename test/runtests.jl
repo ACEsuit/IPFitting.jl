@@ -9,10 +9,10 @@ using BenchmarkTools
 end
 
 
-BB = get_basis(:inv2, [12, 10, 8], [10.0, 8.0, 6.0])
-B = vcat(BB...)
-c = rand(length(B))
-NBodyIP(B, c)
+# BB = get_basis(:inv2, [12, 10, 8], [10.0, 8.0, 6.0])
+# B = vcat(BB...)
+# c = rand(length(B))
+# NBodyIP(B, c)
 
 # D = dict(:poly, 10)
 # ex2, _, _ = NBodyIPs.psym_polys_nbody(2, dict(:poly, 14)...; simplify=false)

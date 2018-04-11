@@ -89,6 +89,7 @@ function assemble_lsq(basis, data; verbose=true, nforces=0)
    return A, F, lenat
 end
 
+# TODO: parallelise!
 function regression(basis, data; verbose = true, nforces=0)
    A, F, lenat = assemble_lsq(basis, data;
                      verbose = verbose, nforces = nforces)
@@ -103,13 +104,14 @@ function regression(basis, data; verbose = true, nforces=0)
    return c
 end
 
-
+# TODO: parallelise!
 function rms(V, data)
    NE = 0
    NF = 0
    errE = 0.0
    errF = 0.0
-   for (at, E, F) in data
+   @showprogress for n = 1:length(data)
+      at, E, F = data[n]
       # energy error
       Ex = energy(V, at)
       errE += (Ex - E)^2
