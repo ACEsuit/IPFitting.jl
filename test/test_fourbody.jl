@@ -2,20 +2,10 @@
 using NBodyIPs
 using JuLIP, Base.Test, StaticArrays, BenchmarkTools, Combinatorics
 
-D = dict(:poly, 8)
-B = NBodyIPs.polys_fourbody(D...)
-Bsym = NBodyIPs.psym_polys_nbody(4, D...)
-
-# D = dict(:poly, 10)
-# B = NBodyIPs.polys_fourbody(D...)
-# Bsym = NBodyIPs.psym_polys_nbody(4, D...)
-
-
-display(B[4])
-ex, f, df = NBodyIPs.gen_fun(B[4], D...)
-
-
-
-B = NBodyIPs.polys_fourbody(10)
-
-B = NBodyIPs.polys_fourbody2(10)
+for len in 4:10
+   Ball = NBodyIPs.nbody_alltuples(4, len)
+   B2 = NBodyIPs.nbody_tuples(2, len)
+   B3 = NBodyIPs.nbody_tuples(3, len)
+   B4 = NBodyIPs.nbody_tuples(4, len)
+   @test length(Ball) == length([B2; B3; B4])
+end
