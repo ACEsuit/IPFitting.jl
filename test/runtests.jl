@@ -2,12 +2,16 @@ using NBodyIPs
 using JuLIP, Base.Test, StaticArrays
 using BenchmarkTools
 
-
 @testset "NBodyIPs" begin
-   @testset "Polynomials" begin include("test_polynomials.jl") end
-   @testset "Assembly" begin include("test_assemble.jl") end
+   @testset "Invariants" begin include("test_invariants.jl") end
 end
 
+
+
+# @testset "Assembly" begin include("test_assemble.jl") end
+
+# r = rand(SVector{3,Float64})
+# Inv = NBodyIPs.Invariants.InvInvariants()
 
 # BB = get_basis(:inv2, [12, 10, 8], [10.0, 8.0, 6.0])
 # B = vcat(BB...)

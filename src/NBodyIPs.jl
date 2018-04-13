@@ -2,9 +2,8 @@ module NBodyIPs
 
 export bodyorder
 
-
 # prototypes
-function bodyorder
+function bodyorder end
 
 # different standard dictionaries to use
 include("dictionaries.jl")
