@@ -14,7 +14,7 @@ Base.ntuple(n::Integer, ::Val{M}) where {M} = ntuple(_->n, M)
 include("dictionaries.jl")
 
 # code for permutation invariant functions (usually polynomials of some sort)
-include("polynomials.jl")
+# include("polynomials.jl")
 
 # describe basis functions in terms of symmetry invariants
 include("invariants.jl")
