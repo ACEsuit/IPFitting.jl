@@ -1,31 +1,23 @@
 module NBodyIPs
 
+# some generically useful code that
+# could be used across different n-body basis function implementations
+# TODO: move some codes from Invariants submodule to here
+#       or maybe other parts of the package 
 include("misc.jl")
-
-export bodyorder
-
-# prototypes
-function bodyorder end
-
-# miscallaneous
-Base.ntuple(n::Integer, ::Val{M}) where {M} = ntuple(_->n, M)
-
-
-
 
 # different standard dictionaries to use
 include("dictionaries.jl")
 
-# code for permutation invariant functions (usually polynomials of some sort)
-# include("polynomials.jl")
-
 # describe basis functions in terms of symmetry invariants
 include("invariants.jl")
+@reexport using NBodyIPs.Invariants
 
 # fitting from data (e.g., least squares)
 include("fitting.jl")
 
 # loading data
+# TODO: move the codes from the examples in here
 # include("data.jl")
 
 end # module

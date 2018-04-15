@@ -1,5 +1,20 @@
 using Combinatorics, StaticArrays
 
+
+# ---------------- PROTOTYPES -------------------
+export bodyorder
+
+# prototypes
+function bodyorder end
+
+# miscallaneous
+Base.ntuple(n::Integer, ::Val{M}) where {M} = ntuple(_->n, M)
+
+
+# --------------- helpful functions to connect ---------------
+#                 permutations of corners and edges
+
+
 # 4-body = 4-simplex has 4 corners (atom positions) and 6 edges  rᵢⱼ
 #
 # edge index : A[1]  A[2]  A[3]  A[4]  A[5]  A[6]

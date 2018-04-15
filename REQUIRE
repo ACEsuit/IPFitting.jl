@@ -4,7 +4,10 @@ NeighbourLists
 Reexport
 ForwardDiff
 StaticArrays
-MacroTools
 Combinatorics
 FunctionWrappers
-Calculus 
+Calculus
+ProgressMeter
+PyCall
+ASE
+BenchmarkTools

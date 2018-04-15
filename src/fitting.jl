@@ -1,6 +1,6 @@
 using JuLIP, ProgressMeter
 
-export get_basis, regression, rms, mae 
+export get_basis, regression, rms, mae
 
 Base.norm(F::JVecsF) = norm(norm.(F))
 
@@ -72,7 +72,9 @@ function regression(basis, data; verbose = true, nforces=0)
    return c
 end
 
-# TODO: parallelise!
+# TODO:
+#  - parallelise!
+#  - combine rms and mae into one function 
 function rms(V, data)
    NE = 0
    NF = 0
