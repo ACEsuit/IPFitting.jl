@@ -1,5 +1,7 @@
 module NBodyIPs
 
+include("misc.jl")
+
 export bodyorder
 
 # prototypes
@@ -7,6 +9,7 @@ function bodyorder end
 
 # miscallaneous
 Base.ntuple(n::Integer, ::Val{M}) where {M} = ntuple(_->n, M)
+
 
 
 
