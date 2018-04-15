@@ -1,6 +1,6 @@
 using JuLIP, ProgressMeter
 
-export get_basis, regression, rms
+export get_basis, regression, rms, mae 
 
 Base.norm(F::JVecsF) = norm(norm.(F))
 
@@ -90,4 +90,25 @@ function rms(V, data)
       NF += length(Fx)   # number of forces
    end
    return sqrt(errE/NE), sqrt(errF/NF)
+end
+
+
+# TODO: parallelise!
+function mae(V, data)
+   NE = 0
+   NF = 0
+   errE = 0.0
+   errF = 0.0
+   @showprogress for n = 1:length(data)
+      at, E, F = data[n]
+      # energy error
+      Ex = energy(V, at)
+      errE += abs(Ex - E)
+      NE += length(at)   # number of site energies
+      # force error
+      Fx = forces(V, at)
+      errF += sum( norm.(Fx - F) )
+      NF += length(Fx)   # number of forces
+   end
+   return errE/NE, errF/NF
 end
