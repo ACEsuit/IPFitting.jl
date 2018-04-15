@@ -1,13 +1,12 @@
 module NBodyIPs
 
+using Reexport
+
 # some generically useful code that
 # could be used across different n-body basis function implementations
 # TODO: move some codes from Invariants submodule to here
-#       or maybe other parts of the package 
+#       or maybe other parts of the package
 include("misc.jl")
-
-# different standard dictionaries to use
-include("dictionaries.jl")
 
 # describe basis functions in terms of symmetry invariants
 include("invariants.jl")
