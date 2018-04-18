@@ -58,14 +58,18 @@ function assemble_lsq(basis, data; verbose=true, nforces=0)
 end
 
 # TODO: parallelise!
-function regression(basis, data; verbose = true, nforces=0)
+function regression(basis, data; verbose = true, nforces=0, stab=1e-3)
    A, F, lenat = assemble_lsq(basis, data;
                      verbose = verbose, nforces = nforces)
    @assert !any(isnan.(A))
    # compute coefficients
    verbose && println("solve $(size(A)) LSQ system using QR factorisation")
-   Q, R = qr(A)
-   c = R \ (Q' * F)
+   if stab == 0.0
+      Q, R = qr(A)
+      c = R \ (Q' * F)
+   else
+      c = (A' * A + stab * I) \ (A' * F)
+   end
    # check error on training set
    verbose && println("rms error on training set: ",
                        norm(A * c - F) / sqrt(length(F)) )
@@ -74,7 +78,7 @@ end
 
 # TODO:
 #  - parallelise!
-#  - combine rms and mae into one function 
+#  - combine rms and mae into one function
 function rms(V, data)
    NE = 0
    NF = 0
@@ -84,8 +88,8 @@ function rms(V, data)
       at, E, F = data[n]
       # energy error
       Ex = energy(V, at)
-      errE += (Ex - E)^2
-      NE += length(at)   # number of site energies
+      errE += (Ex - E)^2/length(at)^2
+      NE += 1  # number of energies
       # force error
       Fx = forces(V, at)
       errF += sum( norm.(Fx - F).^2 )
