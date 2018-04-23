@@ -16,7 +16,7 @@ include("polynomials.jl")
 include("fitting.jl")
 
 # loading data
-# TODO: move the codes from the examples in here
+# TODO: move codes from the examples in here
 # include("data.jl")
 
 end # module
