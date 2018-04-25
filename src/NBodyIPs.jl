@@ -9,14 +9,14 @@ using Reexport
 include("misc.jl")
 
 # describe basis functions in terms of symmetry invariants
-include("invariants.jl")
-@reexport using NBodyIPs.Invariants
+include("polynomials.jl")
+@reexport using NBodyIPs.Polynomials
 
 # fitting from data (e.g., least squares)
 include("fitting.jl")
 
 # loading data
-# TODO: move the codes from the examples in here
+# TODO: move codes from the examples in here
 # include("data.jl")
 
 end # module
