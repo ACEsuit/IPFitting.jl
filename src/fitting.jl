@@ -1,6 +1,6 @@
 using JuLIP, ProgressMeter
 
-export get_basis, regression, rms, mae
+export get_basis, regression, rms, mae, naive_sparsify
 
 Base.norm(F::JVecsF) = norm(norm.(F))
 
@@ -10,8 +10,9 @@ function assemble_lsq_block(d, basis, nforces)
    F = zeros(1 + 3 * nforces)
    A = zeros(1 + 3 * nforces, length(basis))
    at = d[1]::Atoms
+   len = length(at)
    # ---- fill the data vector -------------------
-   F[1] = d[2]::Float64     # put in energy data
+   F[1] = (d[2]::Float64)/len     # put in energy data
    if nforces > 0
       # extract the forces from the data:
       f = d[3]::JVecsF                  # a vector of short vectors
@@ -21,7 +22,7 @@ function assemble_lsq_block(d, basis, nforces)
    end
    # ------- fill the LSQ system, i.e. evaluate basis at data points -------
    for (ib, b) in enumerate(basis)
-      A[1, ib] = energy(b, at)
+      A[1, ib] = energy(b, at)/len
       # compute the forces
       if nforces > 0
          fb = forces(b, at)
@@ -39,7 +40,7 @@ function assemble_lsq(basis, data; verbose=true, nforces=0)
    # generate many matrix blocks, one for each piece of data
    #  ==> this should be switched to pmap!
    if verbose
-      LSQ = @showprogress [assemble_lsq_block(d, basis, nforces) for d in data]
+      LSQ = @showprogress "assemble LSQ" [assemble_lsq_block(d, basis, nforces) for d in data]
    else
       LSQ = [assemble_lsq_block(d, basis, nforces) for d in data]
    end
@@ -84,7 +85,7 @@ function rms(V, data)
    NF = 0
    errE = 0.0
    errF = 0.0
-   @showprogress for n = 1:length(data)
+   @showprogress "rms" for n = 1:length(data)
       at, E, F = data[n]
       # energy error
       Ex = energy(V, at)
@@ -105,7 +106,7 @@ function mae(V, data)
    NF = 0
    errE = 0.0
    errF = 0.0
-   @showprogress for n = 1:length(data)
+   @showprogress "mae" for n = 1:length(data)
       at, E, F = data[n]
       # energy error
       Ex = energy(V, at)
@@ -117,4 +118,41 @@ function mae(V, data)
       NF += length(Fx)   # number of forces
    end
    return errE/NE, errF/NF
+end
+
+
+"""
+computes the maximum force over all configurations
+in `data`
+"""
+function force_norm(b, data)
+   out = 0.0
+   for d in data
+      at = d[1]
+      f = forces(b, at)
+      out = max(out, maximum(norm.(f)))
+   end
+   return out
+end
+
+"""
+remove a fraction `p` of normalised basis functions with the smallest
+normalised coefficients.
+
+NB: this returns complete *crap*.
+"""
+function naive_sparsify(B, c, data, p::AbstractFloat)
+   # get normalisation constants for the basis functions
+   nrmB = @showprogress "sparsify" [ force_norm(b, data) for b in B ]
+   # normalised contributions
+   cnrm = c .* nrmB
+   @show nrmB
+   # get the dominant contributions
+   I = sortperm(abs.(cnrm))
+   @show cnrm[I]
+   quit 
+   # get the subset of indices to keep
+   deleteat!(I, 1:floor(Int,length(B)*p))
+   # return the sparse basis and corresponding coefficients
+   return B[I], c[I]
 end
