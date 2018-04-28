@@ -150,7 +150,6 @@ function naive_sparsify(B, c, data, p::AbstractFloat)
    # get the dominant contributions
    I = sortperm(abs.(cnrm))
    @show cnrm[I]
-   quit 
    # get the subset of indices to keep
    deleteat!(I, 1:floor(Int,length(B)*p))
    # return the sparse basis and corresponding coefficients

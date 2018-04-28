@@ -2,6 +2,10 @@ module NBodyIPs
 
 using Reexport
 
+include("common.jl")
+
+
+
 # some generically useful code that
 # could be used across different n-body basis function implementations
 # TODO: move some codes from Invariants submodule to here
