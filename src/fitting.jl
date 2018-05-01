@@ -1,6 +1,6 @@
 using JuLIP, ProgressMeter
 
-export get_basis, regression, rms, mae, naive_sparsify
+export get_basis, regression, rms, mae, naive_sparsify, normalize_basis!
 
 Base.norm(F::JVecsF) = norm(norm.(F))
 
@@ -120,19 +120,31 @@ function mae(V, data)
    return errE/NE, errF/NF
 end
 
-
 """
 computes the maximum force over all configurations
 in `data`
 """
-function force_norm(b, data)
+function max_force(b, data)
    out = 0.0
    for d in data
-      at = d[1]
-      f = forces(b, at)
+      f = forces(b, d[1])
       out = max(out, maximum(norm.(f)))
    end
    return out
+end
+
+function normalize_basis!(B, data)
+   for b in B
+      @assert (length(b.c) == 1)
+      maxfrc = max_force(b, data)
+      if maxfrc > 0
+         b.c[1] /= maxfrc
+      end
+      if 0 < maxfrc < 1e-8
+         warn("encountered a very small maxfrc = $maxfrc")
+      end
+   end
+   return B
 end
 
 """
