@@ -15,7 +15,7 @@
 # Molien/Hilbert Series from Degree 0, and sums:
 # [ 1, 1, 3, 7, 17, 35, 76, 149, 291, 539 ]
 # [ 1, 2, 5, 12, 29, 64, 140, 289, 580, 1119 ]
-using StaticPolynomials, StaticArrays, BenchmarkTools
+using StaticPolynomials, StaticArrays, BenchmarkTools, ForwardDiff
 import DynamicPolynomials: @polyvar
 @polyvar x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13 x14 x15 x16 x17 x18 x19 x20
 
@@ -38,7 +38,6 @@ evaluate(F, [2.0, 3.0])
 
 x= [1.0, 1.0, 1., 1., 1.0, 1.0, 1., 1., 1., 1.]
 
-evaluate(FF, x)
 
 2;
 
@@ -1373,20 +1372,20 @@ function invariants_Q10(x::SVector{10, T}) where {T}
    4*sum(XD1.*(XD2.*XD3).*(XD4.*XD5)),
    12*sum(x5),
    12*sum(x6)
-       )
-       # ,
-       #  SVector{54, T}(
-       #  1.0,
-       #  pv0,
-       #  pv1,
-       #  pv2,
-       #  pv3,
-       #  pv4,
-       #  pv5,
-       #  pv6,
-       #  pv7,
-       #  pv8,
-       #  pv9,
+       ) ,
+        # SVector{54, T}(
+        SVector{11, T}(
+        1.0,
+        pv0,
+        pv1,
+        pv2,
+        pv3,
+        pv4,
+        pv5,
+        pv6,
+        pv7,
+        pv8,
+        pv9,
        #  pv10,
        #  pv11,
        #  pv12,
@@ -1430,7 +1429,7 @@ function invariants_Q10(x::SVector{10, T}) where {T}
        #  pv37,
        #  pv38,
        #  pv39
-       # )
+       )
 
 end
 
@@ -1439,5 +1438,14 @@ end
 #
 # test_function2(x) = sum(x[1].*x[1]+)
 
+function invariants_d(r::SVector{10, T}) where {T}
+   J12 = ForwardDiff.jacobian( r_ -> vcat(invariants_Q10(r_)...), r )
+   return J12
+end
+
 x = @SVector rand(10)
 @btime invariants_Q10($x)
+
+@btime invariants_d($x)
+
+invariants_d(x)
