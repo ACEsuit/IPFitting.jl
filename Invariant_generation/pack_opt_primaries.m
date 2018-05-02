@@ -353,7 +353,7 @@ elif n eq 4 then
 elif n eq 5 then
  Prims0:=[d,e^2,d^2,e^3,d^3,e^4,d^4,e^5,d^5,d^6];
  //hopefully shorter primaries
- Prims0:=[d/12,R.1*R.2/4,d^2/12,R.1*R.2*R.4/6,d^3/12,R.1*R.2*R.3*R.10/12,d^4/12,R.1*R.2*R.3*R.5*R.8,d^5/12,d^6/12];
+ Prims0:=[d/12,R.1*R.2/4,d^2/12,R.1*R.2*R.4/6,d^3/12,R.1*R.2*R.3*R.10/12,d^4/12,R.1*R.2*R.3*R.5*R.9,d^5/12,d^6/12];
 elif n eq 6 then
 // just guessing ...
  Prims0:=[d,e^2,d^2,e^3,d^3,R.1^2*R.2,R.1*R.2*R.3,
