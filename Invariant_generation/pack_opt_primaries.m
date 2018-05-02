@@ -205,7 +205,8 @@ intrinsic MolInvF95PrintIrrSecs
   IrrSecs::[RngMPolElt])
 {Print IrrSecs for editing into F95 code}
 for i:=0 to #IrrSecs-1 do
- printf " pv[%o] = SYM %o\n",
+ // printf " pv[%o] = SYM %o\n",
+ printf " pv[%o] = %o\n",
    // base0+i, LeadingMonomial(IrrSecs[i+1]);
    base0+i, IrrSecs[i+1];
 end for;
