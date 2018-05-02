@@ -188,11 +188,14 @@ intrinsic MolInvF95PrintReps
 {Print RedSecsReps for editing into F95 code}
 for i:=0 to #Reps-1 do
  if #Reps[i+1] eq 0 then
-  printf " v[%o] = 1\n", base+i;
+  //printf " v[%o] = 1\n", base+i;
+  printf " v[%o] = 1\n", base+i+1;
  else
-  printf " v[%o] = pv[%o]", base+i, Reps[i+1][1]-1;
+  // printf " v[%o] = pv[%o]", base+i, Reps[i+1][1]-1;
+  printf " v[%o] = pv[%o]", base+i+1, Reps[i+1][1];
   for j:=2 to #Reps[i+1] do
-   printf "*pv[%o]", Reps[i+1][j]-1;
+   //printf "*pv[%o]", Reps[i+1][j]-1;
+   printf "*pv[%o]", Reps[i+1][j];
   end for;
   printf "\n";
  end if;
@@ -208,11 +211,13 @@ for i:=0 to #IrrSecs-1 do
  // printf " pv[%o] = SYM %o\n",
  printf " pv[%o] = %o\n",
    // base0+i, LeadingMonomial(IrrSecs[i+1]);
-   base0+i, IrrSecs[i+1];
+   // base0+i, IrrSecs[i+1];
+   base0+i+1, IrrSecs[i+1];
 end for;
 if 0 lt #IrrSecs then
  printf " v[%o:%o] = pv[%o:%o]\n",
-   base1, base1+#IrrSecs-1, base0, base0+#IrrSecs-1;
+   // base1, base1+#IrrSecs-1, base0, base0+#IrrSecs-1;
+    base1+1, base1+#IrrSecs, base0+1, base0+#IrrSecs;
 end if;
 end intrinsic;
 
