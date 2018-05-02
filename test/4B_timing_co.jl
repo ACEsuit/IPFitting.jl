@@ -95,6 +95,8 @@ function invariants_co(x::SVector{6, T}) where {T}
    PV1 = x2' * A * x
    PV2 = x3' * A * x
 
+   # incomplete - I didn't generate the last two
+
    return SVector(
       sum(x), I2, sum(x2), I4, sum(x3), sum(x4), 1.0, PV1, PV2, sum(x5)
    )
@@ -111,6 +113,8 @@ function invariants_co_d(x::SVector{6, T}) where {T}
 
    ∇PV1 = A * x2 + 2 * (x .* (A*x))
    ∇PV2 = A * x3 + 3 * (x2 .* (A*x))
+
+   # incomplete - I didn't generate the last two
 
    return hcat(o, I2d, 2*x, I4d, 3*x2, 4*x3, z, ∇PV1, ∇PV2, 5 * x4)'
 end
