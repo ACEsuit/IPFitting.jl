@@ -3,7 +3,7 @@
 nbody := NBODY;
 
 //Degree (up to)
-deg := 10;
+deg := 6;
 
 //Outputfile name
 // outputfile := "Nbody_output.txt";

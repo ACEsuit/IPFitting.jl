@@ -1,9 +1,9 @@
 
 //Group symmetry - body order ([4] for 4-body, [5] for 5-body, etc.)
-nbody := NBODY;
+nbody := 5;
 
 //Degree (up to)
-deg := DEGREE;
+deg := 6;
 
 //Outputfile name
 // outputfile := "Nbody_output.txt";

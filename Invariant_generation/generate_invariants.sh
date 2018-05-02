@@ -1,9 +1,10 @@
 #!/bin/bash
 
-NBODY=4
+NBODY=5
 NBlengths=$((($NBODY*($NBODY-1))/2))
-NBsecondaries=6
-DEGREE=10
+NBsecondaries=31
+# TODO: compute automatically the number of secondaries
+DEGREE=6
 
 ECHO Nbody order= $NBODY
 ECHO Nb of lengths= $NBlengths
@@ -20,20 +21,20 @@ ECHO $fn_jl_check
 
 cp Nbody_inv_auto_generation.m Nbody_run.m;
 
-# sed -i -e "s/DEGREE/$DEGREE/g" NBody_run.m;
-# sed -i -e "s/NBODY/$NBODY/g" NBody_run.m;
-#
-# scp pack_opt_primaries.m dusson@galois.warwick.ac.uk:magma_invariants;
-# scp Nbody_run.m dusson@galois.warwick.ac.uk:magma_invariants;
-#
-# ssh dusson@galois.warwick.ac.uk << EOF
-# cd magma_invariants
-# magma Nbody_run.m
-# EOF
-#
-# scp dusson@galois.warwick.ac.uk:magma_invariants/logNbody_output.txt .;
-#
-# mv logNbody_output.txt $filename_log
+sed -i -e "s/DEGREE/$DEGREE/g" NBody_run.m;
+sed -i -e "s/NBODY/$NBODY/g" NBody_run.m;
+
+scp pack_opt_primaries.m dusson@galois.warwick.ac.uk:magma_invariants;
+scp Nbody_run.m dusson@galois.warwick.ac.uk:magma_invariants;
+
+ssh dusson@galois.warwick.ac.uk << EOF
+cd magma_invariants
+magma Nbody_run.m
+EOF
+
+scp dusson@galois.warwick.ac.uk:magma_invariants/logNbody_output.txt .;
+
+mv logNbody_output.txt $filename_log
 
 # Generate julia file with function computing primary and secondary invariants (not efficient but hopefully correct)
 # Pick lines with primaries, irreducible secondaries and secondaries
@@ -75,15 +76,7 @@ echo "return Primary_invariants, v"  >> $fn_jl_check
 echo "" >> $fn_jl_check
 echo "end" >> $fn_jl_check
 echo "x = rand($NBlengths"")"  >> $fn_jl_check
-echo "display(invariants_Q6_check(x))"  >> $fn_jl_check
+echo "display(invariants_Q$NBlengths""_check(x))"  >> $fn_jl_check
 
-# # sed '/Primary_invariants/{n;N;N;N;N;d}' $fn_jl_check
-# sed -i '' '/Primary/1/{N;d;}' $fn_jl_check
-#
-# sed s/day/night/ <old >new
-# # sed -i $'s/\r//' $fn_jl_check
-# # sed -i '' 's/ /\'$'\n/g' $fn_jl_check
-# # sed -i '' '1s/^/<added text> \n/' '\n' $fn_jl_check
-# # sed -i '' '1i\' $fn_jl_check
-#
-# # sed -i '' '1s/^/Secondary_invariants /' $fn_jl_check
+#TODO: put lines in Primary invariants as a single line (otherwise doesnt work.)
+#Shortcut cmd+j then cmd+shift+j
