@@ -69,7 +69,5 @@ x = @SVector rand(6)
 @btime invariants_Q6($x)
 @btime invariants_d11($x)
 
-invariants_d(x)
 
 @btime invariants($x)
-@btime invariants_d($x)

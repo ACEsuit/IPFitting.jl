@@ -99,6 +99,9 @@ PSI`PrimaryInvariants;
 // M<t> := MolienSeries(G);
 // Write(outputfile, "Molien series");
 // Write(outputfile, M);
+Sec := PSI`SecondaryInvariants;
 
+printf " Nb_secondary_invariants=";
+#Sec;
 
 exit;

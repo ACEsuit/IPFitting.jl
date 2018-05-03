@@ -24,6 +24,7 @@ d(i0,i3)^2*d(i1,i3) + d(i0,i1)*d(i1,i3)^2 + d(i1,i2)*d(i1,i3)^2 +
 d(i0,i3)*d(i1,i3)^2 + d(i0,i2)^2*d(i2,i3) + d(i1,i2)^2*d(i2,i3) + 
 d(i0,i3)^2*d(i2,i3) + d(i1,i3)^2*d(i2,i3) + d(i0,i2)*d(i2,i3)^2 + 
 d(i1,i2)*d(i2,i3)^2 + d(i0,i3)*d(i2,i3)^2 + d(i1,i3)*d(i2,i3)^2
+ pv[1] = SYM d(i0,i1)^2*d(i0,i2)
  v[2:2] = pv[1:1]
  pv[2] = d(i0,i1)^3*d(i0,i2) + d(i0,i1)*d(i0,i2)^3 + d(i0,i1)^3*d(i1,i2) + 
 d(i0,i2)^3*d(i1,i2) + d(i0,i1)*d(i1,i2)^3 + d(i0,i2)*d(i1,i2)^3 + 
@@ -33,9 +34,11 @@ d(i0,i3)^3*d(i1,i3) + d(i0,i1)*d(i1,i3)^3 + d(i1,i2)*d(i1,i3)^3 +
 d(i0,i3)*d(i1,i3)^3 + d(i0,i2)^3*d(i2,i3) + d(i1,i2)^3*d(i2,i3) + 
 d(i0,i3)^3*d(i2,i3) + d(i1,i3)^3*d(i2,i3) + d(i0,i2)*d(i2,i3)^3 + 
 d(i1,i2)*d(i2,i3)^3 + d(i0,i3)*d(i2,i3)^3 + d(i1,i3)*d(i2,i3)^3
+ pv[2] = SYM d(i0,i1)^3*d(i0,i2)
  v[3:3] = pv[2:2]
  pv[3] = d(i0,i1)^5 + d(i0,i2)^5 + d(i1,i2)^5 + d(i0,i3)^5 + d(i1,i3)^5 + 
 d(i2,i3)^5
+ pv[3] = SYM d(i0,i1)^5
  v[4:4] = pv[3:3]
  v[5] = pv[1]*pv[1]
  v[6] = pv[2]*pv[3]
@@ -48,5 +51,6 @@ d(i2,i3)^5
     x1^3 + x2^3 + x3^3 + x4^3 + x5^3 + x6^3,
     x1^4 + x2^4 + x3^4 + x4^4 + x5^4 + x6^4
 ]
+ Nb_secondary_invariants=6
 
-Total time: 1.000 seconds, Total memory usage: 32.09MB
+Total time: 0.800 seconds, Total memory usage: 32.09MB

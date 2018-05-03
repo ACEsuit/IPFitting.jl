@@ -213,6 +213,8 @@ for i:=0 to #IrrSecs-1 do
    // base0+i, LeadingMonomial(IrrSecs[i+1]);
    // base0+i, IrrSecs[i+1];
    base0+i+1, IrrSecs[i+1];
+   printf " pv[%o] = SYM %o\n",
+     base0+i+1,  LeadingMonomial(IrrSecs[i+1]);
 end for;
 if 0 lt #IrrSecs then
  printf " v[%o:%o] = pv[%o:%o]\n",
