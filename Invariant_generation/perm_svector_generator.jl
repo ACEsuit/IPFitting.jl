@@ -1,6 +1,13 @@
-using Combinatorics, StaticArrays
+using Combinatorics, StaticArrays, NBodyIPs
+
 
 include("misc.jl")
+
+include("inva_matrix_generation.jl")
+
+generate_monomials_irr_sec(4,10)
+x = @SVector rand(3)
+simplex_permutations(x)
 
 NBody = 4;
 NBlengths = NBody*(NBody-1)/2;
@@ -45,14 +52,8 @@ function indice_2_file(Ind,filename,pref)
    return Output
 end
 
-# function monomial_2_file(Perms,Permsref,filename,pref)
-filename = "test2.jl";
-pref = "PV1";
-x = @SVector [3,1,0,0,0,0]
-xref = @SVector [1,1,0,0,0,0]
-Permsref = xref
-Perms = x
 
+function generate_file_1_perm(Perms,Permsref,filename,pref)
    # nb of non-zero coefficients
    perm_deg = sum(Permsref)
    nb_diff_coef = length(unique(Perms))-1
@@ -111,19 +112,24 @@ Perms = x
    else
       error("not implemented yet")
    end
-# end
+end
 
 x = @SVector [2,1,0,0,0,0]
 xref = @SVector [1,1,0,0,0,0]
 
-# y = unique(simplex_permutations(x))
-# length(y)
-# sum(y[1])
-# M = length(y[1])
-# DD = find(y[1])
-# Ind = perm_2_indice(y)
-#
-#
-# indice_2_file(Ind,"test.jl","I4")
+# function monomial_2_file(Perms,Permsref,filename,pref)
 
-monomial_2_file(x,xref,"test2.jl","PV1")
+
+
+ NBody = 4;
+ Deg = 10;
+
+ (NB_sec_inv,Monomials,Monomials_simple) = generate_monomials_irr_sec(NBody,Deg)
+
+for j=1:NB_sec_inv
+   filename = "test2.jl";
+   pref = "PV$j";
+   Perms = SVector(Monomials[j,:]...)
+   Permsref = SVector(Monomials_simple[j,:]...)
+   generate_file_1_perm(Perms,Permsref,filename,pref)
+end

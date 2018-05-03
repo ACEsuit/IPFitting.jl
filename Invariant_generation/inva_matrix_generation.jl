@@ -1,10 +1,3 @@
-using Combinatorics, StaticArrays
-
-include("misc.jl")
-include("perm_svector_generator.jl")
-
-NBody = 5;
-Deg = 6;
 
 # TODO: code this function in a nicer way
 function generate_monomials_irr_sec(NBody,Deg)
@@ -37,7 +30,5 @@ function generate_monomials_irr_sec(NBody,Deg)
             end
         end
     end
-    return Monomials,Monomials_simple
+    return NB_sec_inv,Monomials,Monomials_simple
 end
-
-generate_monomials_irr_sec(NBody,Deg)
