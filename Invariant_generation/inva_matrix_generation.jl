@@ -9,9 +9,10 @@ NBlengths = Int(NBody*(NBody-1)/2);
 
 NB_sec_inv = countlines("Invariant_generation/NBody_$NBody""_deg_$Deg""_invariants.jl");
 
-Monomials = zeros(NB_sec_inv,NBlengths);
+Monomials = Array{Int64, 2}(NB_sec_inv,NBlengths);
+Monomials[:] = 0;
 
-file = open("Invariant_generation/NBody_4_deg_10_invariants.jl")
+file = open("Invariant_generation/NBody_$NBody""_deg_$Deg""_invariants.jl")
 line = readlines(file)
 
 
