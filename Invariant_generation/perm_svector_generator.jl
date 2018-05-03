@@ -1,16 +1,43 @@
 using Combinatorics, StaticArrays, NBodyIPs
 
+# include("misc.jl")
 
-include("misc.jl")
 
-include("inva_matrix_generation.jl")
 
-generate_monomials_irr_sec(4,10)
-x = @SVector rand(3)
-simplex_permutations(x)
+# TODO: code this function in a nicer way
+function generate_monomials_irr_sec(NBody,Deg)
+    NBlengths = Int(NBody*(NBody-1)/2);
+    NB_sec_inv = countlines("Invariant_generation/NBody_$NBody""_deg_$Deg""_invariants.jl");
 
-NBody = 4;
-NBlengths = NBody*(NBody-1)/2;
+    Monomials = Array{Int64, 2}(NB_sec_inv,NBlengths);
+    Monomials[:] = 0;
+
+    Monomials_simple = Array{Int64, 2}(NB_sec_inv,NBlengths);
+    Monomials_simple[:] = 0;
+
+    file = open("Invariant_generation/NBody_$NBody""_deg_$Deg""_invariants.jl")
+    line = readlines(file)
+
+    for i=1:length(line)
+        for j=1:NBlengths
+            if contains(line[i], "x[$j]")
+                if contains(line[i], "x[$j]^")
+                    for k=1:Deg
+                        if contains(line[i], "x[$j]^$k")
+                            Monomials[i,j] = k
+                            Monomials_simple[i,j] = 1
+                        end
+                    end
+                else
+                    Monomials[i,j] = 1
+                    Monomials_simple[i,j] = 1
+                end
+            end
+        end
+    end
+    return NB_sec_inv,Monomials,Monomials_simple
+end
+
 
 function perm_2_indice(Perms)
    L = length(Perms);
@@ -114,22 +141,25 @@ function generate_file_1_perm(Perms,Permsref,filename,pref)
    end
 end
 
-x = @SVector [2,1,0,0,0,0]
-xref = @SVector [1,1,0,0,0,0]
-
-# function monomial_2_file(Perms,Permsref,filename,pref)
 
 
 
- NBody = 4;
- Deg = 10;
-
- (NB_sec_inv,Monomials,Monomials_simple) = generate_monomials_irr_sec(NBody,Deg)
-
-for j=1:NB_sec_inv
-   filename = "test2.jl";
-   pref = "PV$j";
-   Perms = SVector(Monomials[j,:]...)
-   Permsref = SVector(Monomials_simple[j,:]...)
-   generate_file_1_perm(Perms,Permsref,filename,pref)
+function generate_all_irr_sec(NBody,Deg)
+   (NB_sec_inv,Monomials,Monomials_simple) = generate_monomials_irr_sec(NBody,Deg)
+   filename = "NBody_$NBody"*"irr_sec_deg_$Deg.jl";
+   open(filename, "w") do f
+      write(f, "# Irreducible secondaries for NBody=$NBody"*"and deg=$Deg \n")
+   end
+   for j=1:NB_sec_inv
+      pref = "PV$j";
+      Perms = SVector(Monomials[j,:]...)
+      Permsref = SVector(Monomials_simple[j,:]...)
+      generate_file_1_perm(Perms,Permsref,filename,pref)
+   end
+   return 0
 end
+
+
+NBody = 4;
+Deg = 10;
+generate_all_irr_sec(NBody,Deg)

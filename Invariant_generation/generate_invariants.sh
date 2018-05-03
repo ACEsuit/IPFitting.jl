@@ -92,3 +92,5 @@ echo "display(invariants_Q$NBlengths""_check(x))"  >> $fn_jl_check
 # ---------------------------------------------------------
 sed -i '' '/SYM/!d' $fn_jl_inv
 sed -i '' 's/SYM/ /' $fn_jl_inv
+
+/Applications/Julia-0.6.app/Contents/Resources/julia/bin/julia include(perm_svector_generator.jl)
