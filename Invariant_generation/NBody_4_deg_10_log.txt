@@ -53,4 +53,4 @@ d(i2,i3)^5
 ]
  Nb_secondary_invariants=6
 
-Total time: 0.800 seconds, Total memory usage: 32.09MB
+Total time: 1.010 seconds, Total memory usage: 32.09MB

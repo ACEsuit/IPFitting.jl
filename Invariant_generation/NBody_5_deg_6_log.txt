@@ -842,4 +842,4 @@ d(i0,i3)*d(i2,i4)^2*d(i3,i4)^3 + d(i1,i3)*d(i2,i4)^2*d(i3,i4)^3
 ]
  Nb_secondary_invariants=31
 
-Total time: 0.350 seconds, Total memory usage: 32.09MB
+Total time: 0.400 seconds, Total memory usage: 32.09MB

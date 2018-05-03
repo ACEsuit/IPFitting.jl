@@ -24,17 +24,17 @@ cp Nbody_inv_auto_generation.m Nbody_run.m;
 sed -i -e "s/DEGREE/$DEGREE/g" NBody_run.m;
 sed -i -e "s/NBODY/$NBODY/g" NBody_run.m;
 
-scp pack_opt_primaries.m dusson@galois.warwick.ac.uk:magma_invariants;
-scp Nbody_run.m dusson@galois.warwick.ac.uk:magma_invariants;
-
-ssh dusson@galois.warwick.ac.uk << EOF
-cd magma_invariants
-magma Nbody_run.m
-EOF
-
-scp dusson@galois.warwick.ac.uk:magma_invariants/logNbody_output.txt .;
-
-mv logNbody_output.txt $filename_log
+# scp pack_opt_primaries.m dusson@galois.warwick.ac.uk:magma_invariants;
+# scp Nbody_run.m dusson@galois.warwick.ac.uk:magma_invariants;
+#
+# ssh dusson@galois.warwick.ac.uk << EOF
+# cd magma_invariants
+# magma Nbody_run.m
+# EOF
+#
+# scp dusson@galois.warwick.ac.uk:magma_invariants/logNbody_output.txt .;
+#
+# mv logNbody_output.txt $filename_log
 
 # Generate julia file with function computing primary and secondary invariants (not efficient but hopefully correct)
 # Pick lines with primaries, irreducible secondaries and secondaries
@@ -80,7 +80,7 @@ echo "pv=zeros($NBsecondaries"",1);" | cat - $fn_jl_check > /tmp/tempfile && mv 
 echo "function invariants_Q$NBlengths""_check(x)" | cat - $fn_jl_check > /tmp/tempfile && mv /tmp/tempfile $fn_jl_check
 
 
-echo "return Primary_invariants, v"  >> $fn_jl_check
+echo "return Primary_invariants, v, pv"  >> $fn_jl_check
 echo "" >> $fn_jl_check
 echo "end" >> $fn_jl_check
 echo "x = rand($NBlengths"")"  >> $fn_jl_check
@@ -93,4 +93,10 @@ echo "display(invariants_Q$NBlengths""_check(x))"  >> $fn_jl_check
 sed -i '' '/SYM/!d' $fn_jl_inv
 sed -i '' 's/SYM/ /' $fn_jl_inv
 
-/Applications/Julia-0.6.app/Contents/Resources/julia/bin/julia include(perm_svector_generator.jl)
+# ----------------------------------
+cp generate_irr_secondaries.jl irr_sec_run.jl;
+
+sed -i -e "s/DEGREE/$DEGREE/g" irr_sec_run.jl;
+sed -i -e "s/NBODY/$NBODY/g" irr_sec_run.jl;
+#
+/Applications/Julia-0.6.app/Contents/Resources/julia/bin/julia irr_sec_run.jl

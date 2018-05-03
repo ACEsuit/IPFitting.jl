@@ -7,7 +7,7 @@ using Combinatorics, StaticArrays, NBodyIPs
 # TODO: code this function in a nicer way
 function generate_monomials_irr_sec(NBody,Deg)
     NBlengths = Int(NBody*(NBody-1)/2);
-    NB_sec_inv = countlines("Invariant_generation/NBody_$NBody""_deg_$Deg""_invariants.jl");
+    NB_sec_inv = countlines("NBody_$NBody""_deg_$Deg""_invariants.jl");
 
     Monomials = Array{Int64, 2}(NB_sec_inv,NBlengths);
     Monomials[:] = 0;
@@ -15,7 +15,7 @@ function generate_monomials_irr_sec(NBody,Deg)
     Monomials_simple = Array{Int64, 2}(NB_sec_inv,NBlengths);
     Monomials_simple[:] = 0;
 
-    file = open("Invariant_generation/NBody_$NBody""_deg_$Deg""_invariants.jl")
+    file = open("NBody_$NBody""_deg_$Deg""_invariants.jl")
     line = readlines(file)
 
     for i=1:length(line)
@@ -118,7 +118,7 @@ function generate_file_1_perm(Perms,Permsref,filename,pref)
          write(f, " = ")
          write(f, "dot("*Names[1]*".*"Names[2]","*Names[3]".*"*Names[4]".*"*Names[5]")\n")
       end
-   elseif (Decreasing_coef[1]==2)&(perm_deg==2)
+   elseif (Decreasing_coef[1]==2)&(Decreasing_coef[2]==1)&(perm_deg==2)
       open(filename, "a") do f
          write(f,Names[1],"_2 =",Names[1],".*",Names[1],"\n")
          write(f,Names[2],"_2 =",Names[2],".*",Names[2],"\n")
@@ -136,8 +136,182 @@ function generate_file_1_perm(Perms,Permsref,filename,pref)
          write(f, " = ")
          write(f, "dot("*Names[1]*"_3,"*Names[2]*")+dot("*Names[1]","Names[2]"_3)\n")
       end
+   elseif (Decreasing_coef[1]==4)&(Decreasing_coef[2]==1)&(perm_deg==2)
+      open(filename, "a") do f
+         write(f,Names[1],"_2 =",Names[1],".*",Names[1],"\n")
+         write(f,Names[2],"_2 =",Names[2],".*",Names[2],"\n")
+         write(f,Names[1],"_3 =",Names[1],"_2.*",Names[1],"\n")
+         write(f,Names[2],"_3 =",Names[2],"_2.*",Names[2],"\n")
+         write(f,Names[1],"_4 =",Names[1],"_3.*",Names[1],"\n")
+         write(f,Names[2],"_4 =",Names[2],"_3.*",Names[2],"\n")
+         write(f, pref)
+         write(f, " = ")
+         write(f, "dot("*Names[1]*"_4,"*Names[2]*")+dot("*Names[1]","Names[2]"_4)\n")
+      end
+   elseif (Decreasing_coef[1]==5)&(Decreasing_coef[2]==1)&(perm_deg==2)
+      open(filename, "a") do f
+         write(f,Names[1],"_2 =",Names[1],".*",Names[1],"\n")
+         write(f,Names[2],"_2 =",Names[2],".*",Names[2],"\n")
+         write(f,Names[1],"_3 =",Names[1],"_2.*",Names[1],"\n")
+         write(f,Names[2],"_3 =",Names[2],"_2.*",Names[2],"\n")
+         write(f,Names[1],"_4 =",Names[1],"_3.*",Names[1],"\n")
+         write(f,Names[2],"_4 =",Names[2],"_3.*",Names[2],"\n")
+         write(f,Names[1],"_5 =",Names[1],"_4.*",Names[1],"\n")
+         write(f,Names[2],"_5 =",Names[2],"_4.*",Names[2],"\n")
+         write(f, pref)
+         write(f, " = ")
+         write(f, "dot("*Names[1]*"_5,"*Names[2]*")+dot("*Names[1]","Names[2]"_5)\n")
+      end
+   elseif (Decreasing_coef[1]==6)&(Decreasing_coef[2]==1)&(perm_deg==2)
+      open(filename, "a") do f
+         write(f,Names[1],"_2 =",Names[1],".*",Names[1],"\n")
+         write(f,Names[2],"_2 =",Names[2],".*",Names[2],"\n")
+         write(f,Names[1],"_3 =",Names[1],"_2.*",Names[1],"\n")
+         write(f,Names[2],"_3 =",Names[2],"_2.*",Names[2],"\n")
+         write(f,Names[1],"_4 =",Names[1],"_3.*",Names[1],"\n")
+         write(f,Names[2],"_4 =",Names[2],"_3.*",Names[2],"\n")
+         write(f,Names[1],"_5 =",Names[1],"_4.*",Names[1],"\n")
+         write(f,Names[2],"_5 =",Names[2],"_4.*",Names[2],"\n")
+         write(f,Names[1],"_6 =",Names[1],"_5.*",Names[1],"\n")
+         write(f,Names[2],"_6 =",Names[2],"_5.*",Names[2],"\n")
+         write(f, pref)
+         write(f, " = ")
+         write(f, "dot("*Names[1]*"_6,"*Names[2]*")+dot("*Names[1]","Names[2]"_6)\n")
+      end
+   elseif (Decreasing_coef[1]==2)&(Decreasing_coef[2]==2)&(perm_deg==2)
+      open(filename, "a") do f
+         write(f,Names[1],"_2 =",Names[1],".*",Names[1],"\n")
+         write(f,Names[2],"_2 =",Names[2],".*",Names[2],"\n")
+         write(f, pref)
+         write(f, " = ")
+         write(f, "dot("*Names[1]*"_2,"*Names[2]*"_2)\n")
+      end
+   elseif (Decreasing_coef[1]==2)&(Decreasing_coef[2]==1)&(Decreasing_coef[3]==1)&(perm_deg==3)
+      open(filename, "a") do f
+         write(f,Names[1],"_2 =",Names[1],".*",Names[1],"\n")
+         write(f,Names[2],"_2 =",Names[2],".*",Names[2],"\n")
+         write(f,Names[3],"_2 =",Names[3],".*",Names[3],"\n")
+         write(f, pref)
+         write(f, " = ")
+         write(f, "dot("*Names[1]*"_2.*"Names[2]","*Names[3]")+dot("*Names[1]*".*"Names[2]"_2,"*Names[3]")+dot("*Names[1]*".*"Names[2]","*Names[3]"_2)\n")
+      end
+   elseif (Decreasing_coef[1]==3)&(Decreasing_coef[2]==2)&(perm_deg==2)
+      open(filename, "a") do f
+         write(f,Names[1],"_2 =",Names[1],".*",Names[1],"\n")
+         write(f,Names[2],"_2 =",Names[2],".*",Names[2],"\n")
+         write(f,Names[1],"_3 =",Names[1],"_2.*",Names[1],"\n")
+         write(f,Names[2],"_3 =",Names[2],"_2.*",Names[2],"\n")
+         write(f, pref)
+         write(f, " = ")
+         write(f, "dot("*Names[1]*"_2,"Names[2]"_3)+dot("*Names[1]*"_3,"Names[2]"_2)\n")
+      end
+   elseif (Decreasing_coef[1]==3)&(Decreasing_coef[2]==1)&(Decreasing_coef[3]==1)&(perm_deg==3)
+      open(filename, "a") do f
+         write(f,Names[1],"_2 =",Names[1],".*",Names[1],"\n")
+         write(f,Names[2],"_2 =",Names[2],".*",Names[2],"\n")
+         write(f,Names[3],"_2 =",Names[3],".*",Names[3],"\n")
+         write(f,Names[1],"_3 =",Names[1],"_2.*",Names[1],"\n")
+         write(f,Names[2],"_3 =",Names[2],"_2.*",Names[2],"\n")
+         write(f,Names[3],"_3 =",Names[3],"_2.*",Names[3],"\n")
+         write(f, pref)
+         write(f, " = ")
+         write(f, "dot("*Names[1]*"_3.*"Names[2]","*Names[3]")+dot("*Names[1]*".*"Names[2]"_3,"*Names[3]")+dot("*Names[1]*".*"Names[2]","*Names[3]"_3)\n")
+      end
+   elseif (Decreasing_coef[1]==2)&(Decreasing_coef[2]==2)&(Decreasing_coef[3]==1)&(perm_deg==3)
+      open(filename, "a") do f
+         write(f,Names[1],"_2 =",Names[1],".*",Names[1],"\n")
+         write(f,Names[2],"_2 =",Names[2],".*",Names[2],"\n")
+         write(f,Names[3],"_2 =",Names[3],".*",Names[3],"\n")
+         write(f, pref)
+         write(f, " = ")
+         write(f, "dot("*Names[1]*"_2.*"Names[2]"_2,"*Names[3]")+dot("*Names[1]*"_2.*"Names[2]","*Names[3]"_2)+dot("*Names[1]*".*"Names[2]"_2,"*Names[3]"_2)\n")
+      end
+   elseif (Decreasing_coef[1]==4)&(Decreasing_coef[2]==2)&(perm_deg==2)
+      open(filename, "a") do f
+         write(f,Names[1],"_2 =",Names[1],".*",Names[1],"\n")
+         write(f,Names[2],"_2 =",Names[2],".*",Names[2],"\n")
+         write(f,Names[1],"_3 =",Names[1],"_2.*",Names[1],"\n")
+         write(f,Names[2],"_3 =",Names[2],"_2.*",Names[2],"\n")
+         write(f,Names[1],"_4 =",Names[1],"_3.*",Names[1],"\n")
+         write(f,Names[2],"_4 =",Names[2],"_3.*",Names[2],"\n")
+         write(f, pref)
+         write(f, " = ")
+         write(f, "dot("*Names[1]*"_4,"*Names[2]*"_2)+dot("*Names[1]"_2,"Names[2]"_4)\n")
+      end
+   elseif (Decreasing_coef[1]==3)&(Decreasing_coef[2]==3)&(perm_deg==2)
+      open(filename, "a") do f
+         write(f,Names[1],"_2 =",Names[1],".*",Names[1],"\n")
+         write(f,Names[2],"_2 =",Names[2],".*",Names[2],"\n")
+         write(f,Names[1],"_3 =",Names[1],"_2.*",Names[1],"\n")
+         write(f,Names[2],"_3 =",Names[2],"_2.*",Names[2],"\n")
+         write(f, pref)
+         write(f, " = ")
+         write(f, "dot("*Names[1]*"_3,"*Names[2]*"_3)\n")
+      end
+   elseif (Decreasing_coef[1]==4)&(Decreasing_coef[2]==1)&(Decreasing_coef[3]==1)&(perm_deg==3)
+      open(filename, "a") do f
+         write(f,Names[1],"_2 =",Names[1],".*",Names[1],"\n")
+         write(f,Names[2],"_2 =",Names[2],".*",Names[2],"\n")
+         write(f,Names[3],"_2 =",Names[3],".*",Names[3],"\n")
+         write(f,Names[1],"_3 =",Names[1],"_2.*",Names[1],"\n")
+         write(f,Names[2],"_3 =",Names[2],"_2.*",Names[2],"\n")
+         write(f,Names[3],"_3 =",Names[3],"_2.*",Names[3],"\n")
+         write(f,Names[1],"_4 =",Names[1],"_3.*",Names[1],"\n")
+         write(f,Names[2],"_4 =",Names[2],"_3.*",Names[2],"\n")
+         write(f,Names[3],"_4 =",Names[3],"_3.*",Names[3],"\n")
+         write(f, pref)
+         write(f, " = ")
+         write(f, "dot("*Names[1]*"_4.*"Names[2]","*Names[3]")+dot("*Names[1]*".*"Names[2]"_4,"*Names[3]")+dot("*Names[1]*".*"Names[2]","*Names[3]"_4)\n")
+      end
+   elseif (Decreasing_coef[1]==3)&(Decreasing_coef[2]==2)&(Decreasing_coef[3]==1)&(perm_deg==3)
+      open(filename, "a") do f
+         write(f,Names[1],"_2 =",Names[1],".*",Names[1],"\n")
+         write(f,Names[2],"_2 =",Names[2],".*",Names[2],"\n")
+         write(f,Names[3],"_2 =",Names[3],".*",Names[3],"\n")
+         write(f,Names[1],"_3 =",Names[1],"_2.*",Names[1],"\n")
+         write(f,Names[2],"_3 =",Names[2],"_2.*",Names[2],"\n")
+         write(f,Names[3],"_3 =",Names[3],"_2.*",Names[3],"\n")
+         write(f, pref)
+         write(f, " = ")
+         write(f, "dot("*Names[1]*".*"Names[2]"_2,"*Names[3]"_3)+dot("*Names[1]*".*"Names[2]"_3,"*Names[3]"_2)+dot("*Names[1]*"_2.*"Names[2]","*Names[3]"_3) +dot("*Names[1]*"_2.*"*Names[2]*"_3,"*Names[3]*")+dot("*Names[1]*"_3.*"Names[2]","*Names[3]"_2)+dot("*Names[1]*"_3.*"Names[2]"_2,"*Names[3]*")\n")
+      end
+   elseif (Decreasing_coef[1]==2)&(Decreasing_coef[2]==2)&(Decreasing_coef[3]==2)&(perm_deg==3)
+      open(filename, "a") do f
+         write(f,Names[1],"_2 =",Names[1],".*",Names[1],"\n")
+         write(f,Names[2],"_2 =",Names[2],".*",Names[2],"\n")
+         write(f,Names[3],"_2 =",Names[3],".*",Names[3],"\n")
+         write(f, pref)
+         write(f, " = ")
+         write(f, "dot("*Names[1]*"_2.*"*Names[2]*"_2,"*Names[3]*"_2)\n")
+      end
+   elseif (Decreasing_coef[1]==3)&(Decreasing_coef[2]==1)&(Decreasing_coef[3]==1)&(Decreasing_coef[4]==1)&(perm_deg==4)
+      open(filename, "a") do f
+         write(f,Names[1],"_2 =",Names[1],".*",Names[1],"\n")
+         write(f,Names[2],"_2 =",Names[2],".*",Names[2],"\n")
+         write(f,Names[3],"_2 =",Names[3],".*",Names[3],"\n")
+         write(f,Names[4],"_2 =",Names[4],".*",Names[4],"\n")
+         write(f,Names[1],"_3 =",Names[1],"_2.*",Names[1],"\n")
+         write(f,Names[2],"_3 =",Names[2],"_2.*",Names[2],"\n")
+         write(f,Names[3],"_3 =",Names[3],"_2.*",Names[3],"\n")
+         write(f,Names[4],"_3 =",Names[4],"_2.*",Names[4],"\n")
+         write(f, pref)
+         write(f, " = ")
+         write(f, "dot("*Names[1]*"_3.*"*Names[2]*","*Names[3]*".*"*Names[4]*")
+         +dot("*Names[1]*".*"*Names[2]*"_3,"*Names[3]*".*"*Names[4]*") +dot("*Names[1]*".*"*Names[2]*","*Names[3]*"_3.*"*Names[4]*") +dot("*Names[1]*".*"*Names[2]*","*Names[3]*".*"*Names[4]*"_3)\n")
+      end
+   elseif (Decreasing_coef[1]==2)&(Decreasing_coef[2]==2)&(Decreasing_coef[3]==1)&(Decreasing_coef[4]==1)&(perm_deg==4)
+      open(filename, "a") do f
+         write(f,Names[1],"_2 =",Names[1],".*",Names[1],"\n")
+         write(f,Names[2],"_2 =",Names[2],".*",Names[2],"\n")
+         write(f,Names[3],"_2 =",Names[3],".*",Names[3],"\n")
+         write(f,Names[4],"_2 =",Names[4],".*",Names[4],"\n")
+         write(f, pref)
+         write(f, " = ")
+         write(f, "dot("*Names[1]*".*"*Names[2]*","*Names[3]*"_2.*"*Names[4]*"_2)    +dot("*Names[1]*".*"*Names[2]*"_2,"*Names[3]*"_2.*"*Names[4]*")
+         +dot("*Names[1]*".*"*Names[2]*"_2,"*Names[3]*".*"*Names[4]*"_2)         +dot("*Names[1]*"_2.*"*Names[2]*","*Names[3]*".*"*Names[4]*"_2) +dot("*Names[1]*"_2.*"*Names[2]*","*Names[3]*"_2.*"*Names[4]*") +dot("*Names[1]*"_2.*"*Names[2]*"_2,"*Names[3]*".*"*Names[4]*") \n")
+      end
    else
-      error("not implemented yet")
+      error("not implemented yet (perm_svector_generator)")
    end
 end
 
@@ -158,8 +332,3 @@ function generate_all_irr_sec(NBody,Deg)
    end
    return 0
 end
-
-
-NBody = 4;
-Deg = 10;
-generate_all_irr_sec(NBody,Deg)
