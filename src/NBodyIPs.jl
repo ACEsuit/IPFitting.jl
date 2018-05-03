@@ -12,6 +12,9 @@ include("common.jl")
 #       or maybe other parts of the package
 include("misc.jl")
 
+include("invariants.jl")
+@reexport using NBodyIPs.Invariants
+
 # describe basis functions in terms of symmetry invariants
 include("polynomials.jl")
 @reexport using NBodyIPs.Polynomials
