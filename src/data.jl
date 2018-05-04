@@ -1,5 +1,20 @@
 
+"""
+# `module Data`
 
+Provides methods to read files containing simulation data. At present, only
+`.xyz` is supported, via the ASE interface:
+```
+data = NBodyIPs.Data.read("mydata.xyz")
+```
+where `mydata.xyz` contains multiple configurations, will read in those
+configurations, then convert them into a `JuLIP.Atoms` object, extract
+energies, forces, etc store each configuration in a `Dat` and return them
+as a `Vector{Dat}`.
+
+If `d::Dat`, then one can call `energy(d), forces(d)`, etc to extract the
+loaded information.
+"""
 module Data
 
 using JuLIP, ASE, ProgressMeter
@@ -11,7 +26,17 @@ using PyCall
 
 
 """
-`Dat`: store one simulation data point
+`Dat`: store one simulation data point. If `d::Dat`, to obtain the data, use
+```
+energy(d)
+forces(d)
+length(d)    # number of atoms
+```
+
+## TODO
+```
+stress(d)
+```
 """
 struct Dat{T}
    at::Atoms

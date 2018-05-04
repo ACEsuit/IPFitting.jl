@@ -1,3 +1,17 @@
+
+"""
+# `NBodyIPs.jl`
+
+Package for defining and fitting interatomic potentials based on the
+N-Body expansion (ANOVA, HDMR, ...). The main exported type is
+`NBodyIP` which is a `JuLIP` calculator.
+
+See `?...` on how to
+* `?NBodyIPs.Polynomials` : specify a polynomial basis set
+* `?NBodyIPs.Fitting` : fit an `NBodyIP`
+* `?NBodyIPs.Data` : load data sets
+* `?NBodyIPs.IO` : write and read an `NBodyIP`
+"""
 module NBodyIPs
 
 using Reexport
