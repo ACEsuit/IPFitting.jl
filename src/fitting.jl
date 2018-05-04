@@ -1,124 +1,134 @@
 using JuLIP, ProgressMeter
 
-export get_basis, regression, rms, mae, naive_sparsify, normalize_basis!
+export get_basis, regression, naive_sparsify,
+       normalize_basis!, fiterrors
 
 Base.norm(F::JVecsF) = norm(norm.(F))
 
-# split off the inner assembly loop to
-# prepare for parallelising
+
+"""
+split off the inner assembly loop to
+prepare for parallelising
+
+* `d` : one data point
+* `basis` : all basis functions
+* `nforces` : randomly choose nforces
+"""
 function assemble_lsq_block(d, basis, nforces)
-   F = zeros(1 + 3 * nforces)
-   A = zeros(1 + 3 * nforces, length(basis))
    at = d[1]::Atoms
    len = length(at)
-   # ---- fill the data vector -------------------
-   F[1] = (d[2]::Float64)/len     # put in energy data
+   nforces = Int(min(nforces, len))
+   # allocate observations (sub-) vector
+   Y = zeros(1 + 3 * nforces)
+   # allocate (sub-) matrix of basis functions
+   Ψ = zeros(1 + 3 * nforces, length(basis))
+   # ------- fill the data/observations vector -------------------
+   Y[1] = (d[2]::Float64)/len     # put in energy data
    if nforces > 0
       # extract the forces from the data:
       f = d[3]::JVecsF                  # a vector of short vectors
       If = rand(1:length(f), nforces)   # random subset of forces
       f_vec = mat(f[If])[:]             # convert it into a single long vector
-      F[2:end] = f_vec                  # put force data into rhs
+      Y[2:end] = f_vec                  # put force data into rhs
    end
    # ------- fill the LSQ system, i.e. evaluate basis at data points -------
    for (ib, b) in enumerate(basis)
-      A[1, ib] = energy(b, at)/len
+      Ψ[1, ib] = energy(b, at)/len
       # compute the forces
       if nforces > 0
          fb = forces(b, at)
          fb_vec = mat(fb[If])[:]
-         A[2:end, ib] = fb_vec
+         Ψ[2:end, ib] = fb_vec
       end
    end
-   return (A, F, length(at))
-end
-
-function assemble_lsq(basis, data; verbose=true, nforces=0)
-   A = zeros(length(data) * (1+3*nforces), length(basis))
-   F = zeros(length(data) * (1+3*nforces))
-   lenat = 0
-   # generate many matrix blocks, one for each piece of data
-   #  ==> this should be switched to pmap!
-   if verbose
-      LSQ = @showprogress "assemble LSQ" [assemble_lsq_block(d, basis, nforces) for d in data]
-   else
-      LSQ = [assemble_lsq_block(d, basis, nforces) for d in data]
-   end
-   # lsq_block = d -> assemble_lsq_block(d, basis, nforces)
-   # LSQ = pmap(lsq_block, data, distributed=false)
-   # combine the local matrices into a big global matrix
-   for id = 1:length(data)
-      i0 = (id-1) * (1+3*nforces) + 1
-      rows = i0:(i0+3*nforces)
-      A_::Matrix{Float64}, F_::Vector{Float64}, lenat_::Int = LSQ[id]
-      lenat = max(lenat, lenat_)
-      A[rows, :] = A_
-      F[rows] = F_
-   end
-   return A, F, lenat
+   # -------- what about the weight vector ------------
+   return Ψ, Y
 end
 
 # TODO: parallelise!
-function regression(basis, data; verbose = true, nforces=0, stab=1e-3)
-   A, F, lenat = assemble_lsq(basis, data;
-                     verbose = verbose, nforces = nforces)
-   @assert !any(isnan.(A))
+function assemble_lsq(basis, data; verbose=true, nforces=0,
+                      dt = verbose ? 0.5 : Inf)
+   # generate many matrix blocks, one for each piece of data
+   #  ==> this should be switched to pmap, or @parallel
+   LSQ = @showprogress(dt, "assemble LSQ",
+                  [assemble_lsq_block(d, basis, nforces) for d in data])
+   # combine the local matrices into a big global matrix
+   nY = sum(length(block[2]) for block in LSQ)
+   Ψ = zeros(nY, length(basis))
+   Y = zeros(nY)
+   i0 = 0
+   for id = 1:length(data)
+      Ψi::Matrix{Float64}, Yi::Vector{Float64} = LSQ[id]
+      rows = (i0+1):(i0+length(Yi))
+      Ψ[rows, :] = Ψi
+      Y[rows] = Yi
+      i0 += length(Yi)
+   end
+   W = speye(length(Y))
+   return Ψ, Y, I
+end
+
+
+function regression(basis, data;
+                    verbose = true,
+                    nforces=0, usestress=false,
+                    stabstyle=:basis, stab=1e-3,
+                    weights=:I)
+
+   Ψ, Y, W = assemble_lsq(basis, data; verbose = verbose, nforces = nforces)
+   if any(isnan, Ψ) || any(isnan, Y)
+      error("discovered NaNs - something went wrong in the assembly")
+   end
+
+   @assert stabstyle == :basis
+
    # compute coefficients
-   verbose && println("solve $(size(A)) LSQ system using QR factorisation")
-   if stab == 0.0
-      Q, R = qr(A)
-      c = R \ (Q' * F)
+   verbose && println("solve $(size(Ψ)) LSQ system using QR factorisation")
+   Q, R = qr(Ψ)
+   if W == I
+      c = (R \ (Q' * Y)) ./ (1+stab)
    else
-      c = (A' * A + stab * I) \ (A' * F)
+      A = Q' * (W * Q) + stab * eye(size(R, 1))
+      b = Q' * (W * y)
+      c = R \ (A \ b)
    end
    # check error on training set
-   verbose && println("rms error on training set: ",
-                       norm(A * c - F) / sqrt(length(F)) )
+   z = Ψ * c - Y
+   rms = sqrt(dot(W * z, z) / length(Y))
+   verbose && println("naive rms error on training set: ", rms)
    return c
 end
 
 # TODO:
 #  - parallelise!
 #  - combine rms and mae into one function
-function rms(V, data)
+function fiterrors(V, data; verbose=true,
+                   dt = verbose ? 0.5 : Inf)
    NE = 0
    NF = 0
-   errE = 0.0
-   errF = 0.0
-   @showprogress "rms" for n = 1:length(data)
+   rmsE = 0.0
+   rmsF = 0.0
+   maeE = 0.0
+   maeF = 0.0
+   @showprogress dt "test" for n = 1:length(data)
       at, E, F = data[n]
       # energy error
       Ex = energy(V, at)
-      errE += (Ex - E)^2/length(at)^2
+      rmsE += (Ex - E)^2/length(at)^2
+      maeE += abs(Ex-E) / length(at)
       NE += 1  # number of energies
       # force error
       Fx = forces(V, at)
-      errF += sum( norm.(Fx - F).^2 )
+      rmsF += sum( norm.(Fx - F).^2 )
+      maeF += sum( norm.(Fx-F) )
       NF += length(Fx)   # number of forces
    end
-   return sqrt(errE/NE), sqrt(errF/NF)
+   return sqrt(rmsE/NE), sqrt(rmsF/NF), maeE/NE, maeF / NF
 end
 
 
-# TODO: parallelise!
-function mae(V, data)
-   NE = 0
-   NF = 0
-   errE = 0.0
-   errF = 0.0
-   @showprogress "mae" for n = 1:length(data)
-      at, E, F = data[n]
-      # energy error
-      Ex = energy(V, at)
-      errE += abs(Ex - E)
-      NE += length(at)   # number of site energies
-      # force error
-      Fx = forces(V, at)
-      errF += sum( norm.(Fx - F) )
-      NF += length(Fx)   # number of forces
-   end
-   return errE/NE, errF/NF
-end
+
+
 
 """
 computes the maximum force over all configurations
