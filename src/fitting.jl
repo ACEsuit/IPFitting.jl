@@ -1,7 +1,7 @@
 using JuLIP, ProgressMeter
 
 export get_basis, regression, naive_sparsify,
-       normalize_basis!, fiterrors
+       normalize_basis!, fiterrors, scatter_data
 
 Base.norm(F::JVecsF) = norm(norm.(F))
 
@@ -110,7 +110,7 @@ function fiterrors(V, data; verbose=true,
    rmsF = 0.0
    maeE = 0.0
    maeF = 0.0
-   @showprogress dt "test" for d in data
+   @showprogress dt "fiterrors" for d in data
       at, E, F = Atoms(d), energy(d), forces(d)
       # energy error
       Ex = energy(V, at)
@@ -121,7 +121,7 @@ function fiterrors(V, data; verbose=true,
       Fx = forces(V, at)
       rmsF += sum( norm.(Fx - F).^2 )
       maeF += sum( norm.(Fx-F) )
-      NF += length(Fx)   # number of forces
+      NF += 3*length(Fx)   # number of forces
    end
    return sqrt(rmsE/NE), sqrt(rmsF/NF), maeE/NE, maeF / NF
 end
@@ -176,4 +176,22 @@ function naive_sparsify(B, c, data, p::AbstractFloat)
    deleteat!(I, 1:floor(Int,length(B)*p))
    # return the sparse basis and corresponding coefficients
    return B[I], c[I]
+end
+
+
+
+function scatter_data(IP, data)
+   E_data = Float64[]
+   E_fit = Float64[]
+   F_data = Float64[]
+   F_fit = Float64[]
+   for d in data
+      at = Atoms(d)
+      len = length(at)
+      push!(E_data, energy(d))
+      append!(F_data, mat(forces(d))[:])
+      push!(E_fit, energy(IP, at))
+      append!(F_fit, mat(forces(IP, at))[:])
+   end
+   return E_data, E_fit, F_data, F_fit
 end
