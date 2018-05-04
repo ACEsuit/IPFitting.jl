@@ -126,7 +126,6 @@ function generate_invariants(filenamedata,filename,NBlengths,Deg,preword)
 
        else # (perm_deg>2)
            for s=1:perm_deg
-               exp = Perm_inv[s]
                Ind = perm_2_indice(unique(simplex_permutations(Perms)))
                open(filename, "a") do f
                    # First vector
@@ -134,25 +133,28 @@ function generate_invariants(filenamedata,filename,NBlengths,Deg,preword)
                    write(f, "@SVector [")
                    for j = 1:size(Ind,1)
                        k = Ind[j,s]
-                       write(f, "x$exp[$k],")
+                       # write(f, "x$exp[$k],")
+                       write(f, "$k,")
                    end
                    write(f, "] \n")
                end
            end
            if (perm_deg == 3)
+               exp1 = Perm_inv[1]
+               exp2 = Perm_inv[2]
+               exp3 = Perm_inv[3]
                open(filename, "a") do f
                    write(f, pref, " = ")
-                   write(f, "dot(", pref, "_1.*", pref, "_2,", pref, "_3)\n \n")
+                   write(f, "dot(x$exp1[", pref, "_1].* x$exp2[", pref, "_2],x$exp3[", pref, "_3])\n \n")
                end
            elseif (perm_deg == 4)
+               exp1 = Perm_inv[1]
+               exp2 = Perm_inv[2]
+               exp3 = Perm_inv[3]
+               exp4 = Perm_inv[4]
                open(filename, "a") do f
                    write(f, pref, " = ")
-                   write(f, "dot(", pref, "_1.*", pref, "_2,", pref, "_3.*", pref, "_4)\n \n")
-               end
-           elseif     (perm_deg == 5)
-               open(filename, "a") do f
-                   write(f, pref, " = ")
-                   write(f, "dot(", pref, "_1.*", pref, "_2.*", pref, "_3,", pref, "_4.*", pref, "_5)\n \n")
+                   write(f, "dot(x$exp1[", pref, "_1].* x$exp2[", pref, "_2],x$exp3[", pref, "_3].* x$exp4[", pref, "_4])\n \n")
                end
            else
                error("not implemented (perm_deg larger than 5)")
