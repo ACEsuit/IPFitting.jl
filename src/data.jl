@@ -2,9 +2,9 @@
 
 module Data
 
-using JuLIP, ASE
+using JuLIP, ASE, ProgressMeter
 import JuLIP: energy, forces
-import Base: read, length
+import Base: length
 
 using PyCall
 @pyimport ase.io as ase_io
@@ -24,13 +24,14 @@ forces(d::Dat) = d.F
 length(d::Dat) = length(d.at)
 
 
-function read_xyz(fname; index = ":", verbose=true)
+function read_xyz(fname; index = ":", verbose=true,
+                  dt = verbose ? 0.5 : Inf )
    if verbose
       println("Reading in $fname ...")
    end
    at_list = ase_io.read(fname, index=index)
    data = Dat{Float64}[]
-   for atpy in at_list
+   @showprogress dt "Processing ..." for atpy in at_list
       E = atpy[:get_potential_energy]()
       F = atpy[:get_array]("force")' |> vecs
       at = Atoms(ASEAtoms(atpy))
@@ -41,7 +42,7 @@ end
 
 
 
-function Base.read(fname; kwargs...)
+function read(fname; kwargs...)
    if fname[end-3:end] == ".xyz"
       return read_xyz(fname; kwargs...)
    end
