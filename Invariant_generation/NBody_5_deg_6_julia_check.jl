@@ -1,5 +1,5 @@
 function invariants_Q10_check(x)
-pv=zeros(31,1);
+pv=zeros(27,1);
 
 v=zeros(31,1);
  v[1] = 1

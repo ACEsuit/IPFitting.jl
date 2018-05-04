@@ -118,48 +118,39 @@ function generate_all_irr_sec(NBody,Deg)
              write(f, "\n\n")
           end
 
-      elseif (perm_deg==3)
+      else # (perm_deg>2)
           for s=1:perm_deg
-          exp = Perm_inv[s]
-          Ind = perm_2_indice(unique(simplex_permutations(Perms)))
-          exp1 = Perm_inv[1];
-          exp2 = Perm_inv[2];
-          exp3 = Perm_inv[3];
-          open(filename, "a") do f
-              # First vector
-              write(f, pref, "_1 = ")
-              write(f, "@SVector [")
-              for j = 1:size(Ind,1)-1
-                  k = Ind[j,1]
-                  write(f, "x$exp1[$k],")
+              exp = Perm_inv[s]
+              Ind = perm_2_indice(unique(simplex_permutations(Perms)))
+              open(filename, "a") do f
+                  # First vector
+                  write(f, pref, "_$s = ")
+                  write(f, "@SVector [")
+                  for j = 1:size(Ind,1)
+                      k = Ind[j,s]
+                      write(f, "x$exp[$k],")
+                  end
+                  write(f, "] \n")
               end
-              write(f, "] \n")
-              # Second vector
-              write(f, pref, "_2 = ")
-              write(f, "@SVector [")
-              for j = 1:size(Ind,1)-1
-                  k = Ind[j,2]
-                  write(f, "x$exp2[$k],")
+          end
+          if (perm_deg == 3)
+              open(filename, "a") do f
+                  write(f, pref, " = ")
+                  write(f, "dot(", pref, "_1.*", pref, "_2,", pref, "_3)\n \n")
               end
-              write(f, "] \n")
-              # Third vector
-              write(f, pref, "_3 = ")
-              write(f, "@SVector [")
-              for j = 1:size(Ind,1)-1
-                  k = Ind[j,3]
-                  write(f, "x$exp3[$k],")
+          elseif (perm_deg == 4)
+              open(filename, "a") do f
+                  write(f, pref, " = ")
+                  write(f, "dot(", pref, "_1.*", pref, "_2,", pref, "_3.*", pref, "_4)\n \n")
               end
-              write(f, "] \n")
-              write(f, pref, " = ")
-              write(f, "dot(", pref, "_1.*", pref, "_2,", pref, "_3)\n \n")
-         end
-
-      elseif (perm_deg==4)
-
-      elseif (perm_deg==5)
-
-      else
-          error("not implemented (perm_deg too large)")
+          elseif     (perm_deg == 5)
+              open(filename, "a") do f
+                  write(f, pref, " = ")
+                  write(f, "dot(", pref, "_1.*", pref, "_2.*", pref, "_3,", pref, "_4.*", pref, "_5)\n \n")
+              end
+          else
+              error("not implemented (perm_deg larger than 5)")
+          end
       end
    end
    return 0
