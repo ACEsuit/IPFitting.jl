@@ -9,15 +9,17 @@ ECHO Nb of lengths= $NBlengths
 ECHO Polynomial degree= $DEGREE
 
 # filename_output="NBody_$NBODY""_deg_$DEGREE""_output.txt"
-filename_log="NBody_$NBODY""_deg_$DEGREE""_log.txt"
-fn_jl_check="NBody_$NBODY""_deg_$DEGREE""_julia_check.jl"
-fn_jl_inv="NBody_$NBODY""_deg_$DEGREE""_invariants.jl"
+filename_log="NB_$NBODY""_deg_$DEGREE""_log.txt"
+fn_jl_check="NB_$NBODY""_deg_$DEGREE""_non_efficient_invariants.jl"
+fn_jl_irr_inv="NB_$NBODY""_deg_$DEGREE""_irr_invariants.jl"
+fn_jl_prim_inv="NB_$NBODY""_deg_$DEGREE""_prim_invariants.jl"
+fn_jl_sec_rel_inv="NB_$NBODY""_deg_$DEGREE""_sec_relations_invariants.jl"
 
 ECHO Output files:
 
 ECHO $filename_log
 ECHO $fn_jl_check
-ECHO $fn_jl_inv
+ECHO $fn_jl_irr_inv
 
 cp Nbody_inv_auto_generation.m Nbody_run.m;
 
@@ -31,6 +33,8 @@ ssh dusson@galois.warwick.ac.uk << EOF
 cd magma_invariants
 magma Nbody_run.m
 EOF
+
+rm Nbody_run.m;
 
 scp dusson@galois.warwick.ac.uk:magma_invariants/logNbody_output.txt .;
 
@@ -70,7 +74,8 @@ for a in `seq $(($NBODY-2)) -1 0`; do
 	done
 done
 
-cp $fn_jl_check $fn_jl_inv
+cp $fn_jl_check $fn_jl_irr_inv
+cp $fn_jl_check $fn_jl_prim_inv
 
 sed -i '' '/SYM/d' $fn_jl_check
 
@@ -88,15 +93,31 @@ echo "display(invariants_Q$NBlengths""_check(x))"  >> $fn_jl_check
 
 #TODO: put lines in Primary invariants as a single line (otherwise doesnt work.)
 #Shortcut cmd+j then cmd+shift+j
+#TODO: check that no lines start by + (otherwise wring invariants are computed)
 
+# Generate a file with only monomials of irreducible secondaries
 # ---------------------------------------------------------
-sed -i '' '/SYM/!d' $fn_jl_inv
-sed -i '' 's/SYM/ /' $fn_jl_inv
+sed -i '' '/SYM/!d' $fn_jl_irr_inv
+sed -i '' 's/SYM/ /' $fn_jl_irr_inv
 
-# ----------------------------------
-cp generate_irr_secondaries.jl irr_sec_run.jl;
+# Generate a file with only monomials of primaries
+# ---------------------------------------------------------
+sed -i '' '/Primary/,$!d' $fn_jl_prim_inv
 
-sed -i -e "s/DEGREE/$DEGREE/g" irr_sec_run.jl;
-sed -i -e "s/NBODY/$NBODY/g" irr_sec_run.jl;
+mv $filename_log ../data_temp/$filename_log
+mv $fn_jl_check ../data_temp/$fn_jl_check
+mv $fn_jl_irr_inv ../data_temp/$fn_jl_irr_inv
+mv $fn_jl_prim_inv ../data_temp/$fn_jl_prim_inv
+# mv $fn_jl_sec_rel_inv ../data_temp/$fn_jl_sec_rel_inv
+
+rm NBody_run.m-e
+
+# # ----------------------------------
+# cp generate_irr_secondaries.jl irr_sec_run.jl;
 #
-/Applications/Julia-0.6.app/Contents/Resources/julia/bin/julia irr_sec_run.jl
+# sed -i -e "s/DEGREE/$DEGREE/g" irr_sec_run.jl;
+# sed -i -e "s/NBODY/$NBODY/g" irr_sec_run.jl;
+# #
+# /Applications/Julia-0.6.app/Contents/Resources/julia/bin/julia irr_sec_run.jl
+#
+# rm irr_sec_run.jl

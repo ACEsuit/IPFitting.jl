@@ -38,10 +38,10 @@ end
 
 
 
-function generate_monomials_irr_sec(NBody,Deg)
-    NBlengths = Int(NBody*(NBody-1)/2);
-    return generate_monomials("Invariant_generation/NBody_$NBody""_deg_$Deg""_invariants.jl",NBlengths)
-end
+# function generate_monomials_irr_sec(NBody,Deg)
+#     NBlengths = Int(NBody*(NBody-1)/2);
+#     return generate_monomials("data/NB_$NBody""_deg_$Deg""_irr_invariants.jl",NBlengths)
+# end
 
 
 function printmatrix(filename,A)
@@ -75,14 +75,15 @@ function _generate_matrix_Deg_2(NBlengths,Perms)
     return A
 end
 
-function generate_all_irr_sec(NBody,Deg)
-    NBlengths = Int(NBody*(NBody-1)/2);
-    filename = "Invariant_generation/NBody_$NBody"*"irr_sec_deg_$Deg.jl";
-    filenamedata = "Invariant_generation/NBody_$NBody""_deg_$Deg""_invariants.jl"
-    preword = "# Irreducible secondaries for NBody=$NBody"*"and deg=$Deg \n"
-    return generate_invariants(filenamedata,filename,NBlengths,Deg,preword)
-
-end
+# function generate_all_irr_sec(NBody,Deg)
+#     NBlengths = Int(NBody*(NBody-1)/2);
+#     filename = "data/NB_$NBody"*"_deg_$Deg"*"_irr_sec_text.jl";
+#     # filenamedata = "../data/NB_$NBody""_deg_$Deg""_irr_invariants.jl";
+#     filenamedata = "data/NB_$NBody""_deg_$Deg""_irr_invariants.jl";
+#     preword = "# Irreducible secondaries for NBody=$NBody"*"and deg=$Deg \n"
+#     return generate_invariants(filenamedata,filename,NBlengths,Deg,preword)
+#
+# end
 
 function generate_invariants(filenamedata,filename,NBlengths,Deg,preword)
     (NB_sec_inv,Monomials,Monomials_simple) = generate_monomials(filenamedata,NBlengths,Deg)
@@ -105,7 +106,7 @@ function generate_invariants(filenamedata,filename,NBlengths,Deg,preword)
               exponent = Perm_inv[1];
               write(f, pref)
               write(f, " = ")
-              write(f, "sum(x$exponent)\n")
+              write(f, "sum(x$exponent)\n\n")
            end
 
        elseif (perm_deg==2)
@@ -156,6 +157,16 @@ function generate_invariants(filenamedata,filename,NBlengths,Deg,preword)
                    write(f, pref, " = ")
                    write(f, "dot(x$exp1[", pref, "_1].* x$exp2[", pref, "_2],x$exp3[", pref, "_3].* x$exp4[", pref, "_4])\n \n")
                end
+           elseif (perm_deg == 5)
+               exp1 = Perm_inv[1]
+               exp2 = Perm_inv[2]
+               exp3 = Perm_inv[3]
+               exp4 = Perm_inv[4]
+               exp5 = Perm_inv[5]
+               open(filename, "a") do f
+                   write(f, pref, " = ")
+                   write(f, "dot(x$exp1[", pref, "_1].* x$exp2[", pref, "_2],x$exp3[", pref, "_3].* x$exp4[", pref, "_4].* x$exp5[", pref ,"])\n \n")
+               end
            else
                error("not implemented (perm_deg larger than 5)")
            end
@@ -180,7 +191,3 @@ function perm_2_indice(Perms)
       end
    return Indices
 end
-
-
-
-generate_all_irr_sec(5,6)

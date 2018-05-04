@@ -1,0 +1,19 @@
+# TO DO: Not automatized yet.
+
+1 - run generate_invariants.sh with wanted Nbody and degree parameters.
+This creates files in data_temp
+
+2 - copy the files
+a - NB_?_deg_?_irr_invariants.jl
+b - NB_?_deg_?_prim_invariants.jl
+c - NB_?_deg_?_non_efficient_invariants.jl
+into the data folder
+
+3 - do the following manipulations on these files :
+In NB_?_deg_?_non_efficient_invariants.jl
+a - change the definition of pv = zeros(?,1); by putting the right number.
+b - write the primary invariants on a single line (cmd+j, cmd+shift+j)
+c - check that no line starts with a + (otherwise wring computation of the invariants - check in particular pv[17] and pv[18]), and if there is, move the + to the previous line.
+In NB_?_deg_?_prim_invariants.jl
+a - keep only the leading monomials
+b - check that the number of lines corresponds to the number of primary invariants
