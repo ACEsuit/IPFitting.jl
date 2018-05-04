@@ -21,10 +21,8 @@ include("polynomials.jl")
 # fitting from data (e.g., least squares)
 include("fitting.jl")
 
-
-
 # loading data
-# TODO: move codes from the examples in here
-# include("data.jl")
+include("data.jl")
+
 
 end # module
