@@ -24,3 +24,5 @@ a - NB_?_deg_?_prim_text.jl which contains part of the text (the primary invaria
 b - NB_?_deg_?_irr_sec_text.jl which contains part of the text (the secondary invariants) for the generation of the invariants
 
 5 - copy-paste the definition of the invariants into the corresponding file in test and use the relations between irreducible secondaries and secondaries to compute all of them.
+
+6 - you can run test_invariants.jl to test them. For the moment, 4 primary invariants are not right.

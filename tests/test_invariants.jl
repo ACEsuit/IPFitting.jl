@@ -16,6 +16,7 @@ x = @SVector rand(10)
 # Primary comparison
 Primary - Primary_inv
 maximum(abs.(SVector(Primary...) - Primary_inv))
+#dont match yet...dont know why.
 
 # Secondary comparison
 SVector(Sec_Inv...) - Sec

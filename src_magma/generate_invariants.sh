@@ -23,14 +23,13 @@ ECHO $fn_jl_irr_inv
 
 cp Nbody_inv_auto_generation.m Nbody_run.m;
 
-sed -i -e "s/DEGREE/$DEGREE/g" NBody_run.m;
-sed -i -e "s/NBODY/$NBODY/g" NBody_run.m;
+sed -i -e "s/DEGREE/$DEGREE/g" Nbody_run.m;
+sed -i -e "s/NBODY/$NBODY/g" Nbody_run.m;
 
-scp pack_opt_primaries.m dusson@galois.warwick.ac.uk:magma_invariants;
-scp Nbody_run.m dusson@galois.warwick.ac.uk:magma_invariants;
+scp pack_opt_primaries.m dusson@galois.warwick.ac.uk: ;
+scp Nbody_run.m dusson@galois.warwick.ac.uk: ;
 
 ssh dusson@galois.warwick.ac.uk << EOF
-cd magma_invariants
 magma Nbody_run.m
 EOF
 
