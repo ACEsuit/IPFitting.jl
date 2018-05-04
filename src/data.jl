@@ -18,7 +18,7 @@ loaded information.
 module Data
 
 using JuLIP, ASE, ProgressMeter
-import JuLIP: energy, forces
+import JuLIP: Atoms, energy, forces
 import Base: length
 
 using PyCall
@@ -28,6 +28,7 @@ using PyCall
 """
 `Dat`: store one simulation data point. If `d::Dat`, to obtain the data, use
 ```
+Atoms(d)
 energy(d)
 forces(d)
 length(d)    # number of atoms
@@ -44,6 +45,7 @@ struct Dat{T}
    F::JVecs{T}
 end
 
+Atoms(d) = d.at 
 energy(d::Dat) = d.E
 forces(d::Dat) = d.F
 length(d::Dat) = length(d.at)

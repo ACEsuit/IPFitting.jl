@@ -15,18 +15,18 @@ prepare for parallelising
 * `nforces` : randomly choose nforces
 """
 function assemble_lsq_block(d, basis, nforces)
-   at = d[1]::Atoms
-   len = length(at)
+   at = Atoms(d)
+   len = length(d)
    nforces = Int(min(nforces, len))
    # allocate observations (sub-) vector
    Y = zeros(1 + 3 * nforces)
    # allocate (sub-) matrix of basis functions
    Ψ = zeros(1 + 3 * nforces, length(basis))
    # ------- fill the data/observations vector -------------------
-   Y[1] = (d[2]::Float64)/len     # put in energy data
+   Y[1] = energy(d)/len     # put in energy data
    if nforces > 0
       # extract the forces from the data:
-      f = d[3]::JVecsF                  # a vector of short vectors
+      f = forces(d)
       If = rand(1:length(f), nforces)   # random subset of forces
       f_vec = mat(f[If])[:]             # convert it into a single long vector
       Y[2:end] = f_vec                  # put force data into rhs
@@ -110,8 +110,8 @@ function fiterrors(V, data; verbose=true,
    rmsF = 0.0
    maeE = 0.0
    maeF = 0.0
-   @showprogress dt "test" for n = 1:length(data)
-      at, E, F = data[n]
+   @showprogress dt "test" for d in data
+      at, E, F = Atoms(d), energy(d), forces(d)
       # energy error
       Ex = energy(V, at)
       rmsE += (Ex - E)^2/length(at)^2
@@ -137,7 +137,7 @@ in `data`
 function max_force(b, data)
    out = 0.0
    for d in data
-      f = forces(b, d[1])
+      f = forces(b, Atoms(d))
       out = max(out, maximum(norm.(f)))
    end
    return out
