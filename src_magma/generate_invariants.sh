@@ -13,7 +13,7 @@ filename_log="NB_$NBODY""_deg_$DEGREE""_log.txt"
 fn_jl_check="NB_$NBODY""_deg_$DEGREE""_non_efficient_invariants.jl"
 fn_jl_irr_inv="NB_$NBODY""_deg_$DEGREE""_irr_invariants.jl"
 fn_jl_prim_inv="NB_$NBODY""_deg_$DEGREE""_prim_invariants.jl"
-fn_jl_sec_rel_inv="NB_$NBODY""_deg_$DEGREE""_sec_relations_invariants.jl"
+fn_jl_sec_rel_inv="NB_$NBODY""_deg_$DEGREE""_relations_invariants.jl"
 
 ECHO Output files:
 
@@ -76,6 +76,7 @@ done
 
 cp $fn_jl_check $fn_jl_irr_inv
 cp $fn_jl_check $fn_jl_prim_inv
+cp $fn_jl_check $fn_jl_sec_rel_inv
 
 sed -i '' '/SYM/d' $fn_jl_check
 
@@ -104,11 +105,15 @@ sed -i '' 's/SYM/ /' $fn_jl_irr_inv
 # ---------------------------------------------------------
 sed -i '' '/Primary/,$!d' $fn_jl_prim_inv
 
+# Generate a file with relations between irreducible and secondary invariants
+# ---------------------------------------------------------
+sed -i '' '/ v\[/!d' $fn_jl_sec_rel_inv
+
 mv $filename_log ../data_temp/$filename_log
 mv $fn_jl_check ../data_temp/$fn_jl_check
 mv $fn_jl_irr_inv ../data_temp/$fn_jl_irr_inv
 mv $fn_jl_prim_inv ../data_temp/$fn_jl_prim_inv
-# mv $fn_jl_sec_rel_inv ../data_temp/$fn_jl_sec_rel_inv
+mv $fn_jl_sec_rel_inv ../data_temp/$fn_jl_sec_rel_inv
 
 rm NBody_run.m-e
 

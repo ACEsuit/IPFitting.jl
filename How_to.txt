@@ -7,6 +7,7 @@ This creates files in data_temp
 a - NB_?_deg_?_irr_invariants.jl
 b - NB_?_deg_?_prim_invariants.jl
 c - NB_?_deg_?_non_efficient_invariants.jl
+d - NB_?_deg_?_relations_invariants.jl
 into the data folder
 
 3 - do the following manipulations on these files :
@@ -17,3 +18,9 @@ c - check that no line starts with a + (otherwise wring computation of the invar
 In NB_?_deg_?_prim_invariants.jl
 a - keep only the leading monomials
 b - check that the number of lines corresponds to the number of primary invariants
+
+4 - run src_jl/generate_text_invariants.jl. This generates two files:
+a - NB_?_deg_?_prim_text.jl which contains part of the text (the primary invariants) for the julia function of the invariants
+b - NB_?_deg_?_irr_sec_text.jl which contains part of the text (the secondary invariants) for the generation of the invariants
+
+5 - copy-paste the definition of the invariants into the corresponding file in test and use the relations between irreducible secondaries and secondaries to compute all of them.

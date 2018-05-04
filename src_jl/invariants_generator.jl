@@ -85,13 +85,13 @@ end
 #
 # end
 
-function generate_invariants(filenamedata,filename,NBlengths,Deg,preword)
+function generate_invariants(filenamedata,filename,NBlengths,Deg,preword,preff)
     (NB_sec_inv,Monomials,Monomials_simple) = generate_monomials(filenamedata,NBlengths,Deg)
     open(filename, "w") do f
        write(f, preword )
     end
     for j=1:NB_sec_inv
-       pref = "PV$j";
+       pref = preff*"$j";
        Perms = SVector(Monomials[j]...)
        Permsref = SVector(Monomials_simple[j]...)
        perm_deg = sum(Permsref)
@@ -114,14 +114,14 @@ function generate_invariants(filenamedata,filename,NBlengths,Deg,preword)
            exp1 = Perm_inv[1];
            exp2 = Perm_inv[2];
            open(filename, "a") do f
-              write(f, "A$j=")
+              write(f, preff,"A$j=")
           end
               printmatrix(filename,A)
           open(filename, "a") do f
               write(f,"\n")
               write(f, pref)
               write(f, " = ")
-              write(f, "x$exp1","'*","A$j","*"," x$exp2")
+              write(f, "x$exp1","'*",preff,"A$j","*"," x$exp2")
               write(f, "\n\n")
            end
 
@@ -165,7 +165,7 @@ function generate_invariants(filenamedata,filename,NBlengths,Deg,preword)
                exp5 = Perm_inv[5]
                open(filename, "a") do f
                    write(f, pref, " = ")
-                   write(f, "dot(x$exp1[", pref, "_1].* x$exp2[", pref, "_2],x$exp3[", pref, "_3].* x$exp4[", pref, "_4].* x$exp5[", pref ,"])\n \n")
+                   write(f, "dot(x$exp1[", pref, "_1].* x$exp2[", pref, "_2],x$exp3[", pref, "_3].* x$exp4[", pref, "_4].* x$exp5[", pref ,"_5])\n \n")
                end
            else
                error("not implemented (perm_deg larger than 5)")
