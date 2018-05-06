@@ -24,6 +24,7 @@ const P8_4 = (4,4,4,4,4,4,7,7,7,8,8,8,9,8,9,9,9,9,6,6,6,8,8,8,9,8,9,8,8,9,)
 const P8_5 = (8,9,10,6,7,5,8,9,10,9,9,10,10,10,10,10,10,10,7,7,7,9,9,10,10,10,10,9,10,10,)
 const P8 = Val((P8_1, P8_2, P8_3, P8_4, P8_5))
 
+const SUM10 = Val(((1,2,3,4,5,6,7,8,9,10),))
 
 function invariants(x1::SVector{10, T}) where {T}
     x2 = x1.*x1
@@ -32,16 +33,16 @@ function invariants(x1::SVector{10, T}) where {T}
     x5 = x4.*x1
     x6 = x5.*x1
 
-    P1 = sum(x1)
+    P1 = fpoly((x1,), Main.SUM10)
     P2 = dot(x1, PA2 * x1)
-    P3 = sum(x2)
+    P3 = fpoly((x2,), Main.SUM10)
     P4 = fpoly((x1, x1, x1), Main.P4)
-    P5 = sum(x3)
+    P5 = fpoly((x3,), Main.SUM10)
     P6 = fpoly((x1, x1, x1, x1), Main.P6)
-    P7 = sum(x4)
+    P7 = fpoly((x4,), Main.SUM10)
     P8 = fpoly((x1, x1, x1, x1, x1), Main.P8)
-    P9 = sum(x5)
-    P10 = sum(x6)
+    P9 = fpoly((x5,), Main.SUM10)
+    P10 = fpoly((x6,), Main.SUM10)
     return SVector(P1, P2, P3, P4, P5, P6, P7, P8, P9, P10)
 end
 
