@@ -107,6 +107,7 @@ TODO: write documentation
       push!(exprs, _mon_muladd_(I))
    end
    quote
+      $(Expr(:meta, :inline))
       @inbounds $(Expr(:block, exprs...))
       return m
    end
@@ -148,6 +149,7 @@ TODO: write documentation
    # collect the dm variables into an SVector
    coll = "SVector(" * prod("dm_$n, " for n = 1:N) * ")"
    quote
+      $(Expr(:meta, :inline))
       @inbounds $(Expr(:block, exprs...))
       $(parse(coll))
    end
