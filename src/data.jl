@@ -34,6 +34,9 @@ forces(d)
 length(d)    # number of atoms
 ```
 
+if information is missing, the relevant function will return `nothing` instead
+(TODO for J v1.0: change `nothing` to `missing`)
+
 ## TODO
 ```
 stress(d)
@@ -41,13 +44,15 @@ stress(d)
 """
 struct Dat{T}
    at::Atoms
-   E::T
-   F::JVecs{T}
+   E::Union{Void,T}         # energy
+   F::Union{Void,JVecs{T}}  # forces
+   S::Union{Void,JMat{T}}   # stress
 end
 
-Atoms(d) = d.at 
+Atoms(d) = d.at
 energy(d::Dat) = d.E
 forces(d::Dat) = d.F
+stress(d::Dat) = d.S
 length(d::Dat) = length(d.at)
 
 
@@ -59,10 +64,23 @@ function read_xyz(fname; index = ":", verbose=true,
    at_list = ase_io.read(fname, index=index)
    data = Dat{Float64}[]
    @showprogress dt "Processing ..." for atpy in at_list
-      E = atpy[:get_potential_energy]()
-      F = atpy[:get_array]("force")' |> vecs
+      try
+         E = atpy[:get_potential_energy]()
+      catch
+         E = nothing
+      end
+      try
+         F = atpy[:get_array]("force")' |> vecs
+      catch
+         F = nothing
+      end
+      try
+         S = JMat(atpy[:get_stress]()...)
+      catch
+         S = nothing
+      end
       at = Atoms(ASEAtoms(atpy))
-      push!(data, Dat(at, E, F))
+      push!(data, Dat(at, E, F, S))
    end
    return data
 end
