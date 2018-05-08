@@ -52,7 +52,7 @@ end
 Atoms(d) = d.at
 energy(d::Dat) = d.E
 forces(d::Dat) = d.F
-stress(d::Dat) = d.S
+virial(d::Dat) = d.S
 length(d::Dat) = length(d.at)
 
 
@@ -78,7 +78,7 @@ function read_xyz(fname; index = ":", verbose=true,
          F = nothing
       end
       try
-         S = JMat(atpy[:get_stress]()...)
+         S = JMat(atpy[:info]["virial"]...)
       catch
          S = nothing
       end
