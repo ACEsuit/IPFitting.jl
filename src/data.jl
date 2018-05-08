@@ -64,6 +64,9 @@ function read_xyz(fname; index = ":", verbose=true,
    at_list = ase_io.read(fname, index=index)
    data = Dat{Float64}[]
    @showprogress dt "Processing ..." for atpy in at_list
+      E = 0.0
+      F = JVecF[]
+      S = zero(JMatF)
       try
          E = atpy[:get_potential_energy]()
       catch
