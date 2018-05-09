@@ -49,14 +49,14 @@ function assemble_lsq_block(d, basis, nforces)
       if forces(d) != nothing
          fb = forces(b, at)
          fb_vec = mat(fb[If])[:]
-         Ψ[(i0+1):(i0+length(fb)), ib] = fb_vec
+         Ψ[(i0+1):(i0+length(fb_vec)), ib] = fb_vec
          i0 += length(fb)
       end
       # compute the virials
       if virial(d) != nothing
          Sb = virial(b, at)
-         Ψ[(i0+1):(i0+length(_IS), ib] = Sb[_IS]
-      end 
+         Ψ[(i0+1):(i0+length(_IS)), ib] = Sb[_IS]/len
+      end
    end
    # -------- what about the weight vector ------------
    return Ψ, Y

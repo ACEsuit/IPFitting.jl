@@ -18,7 +18,7 @@ loaded information.
 module Data
 
 using JuLIP, ASE, ProgressMeter
-import JuLIP: Atoms, energy, forces
+import JuLIP: Atoms, energy, forces, virial
 import Base: length
 
 using PyCall
