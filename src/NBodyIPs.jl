@@ -7,7 +7,7 @@ N-Body expansion (ANOVA, HDMR, ...). The main exported type is
 `NBodyIP` which is a `JuLIP` calculator.
 
 See `?...` on how to
-* `?NBodyIPs.Polynomials` : specify a polynomial basis set
+* `?NBodyIPs.Polys` : specify a polynomial basis set
 * `?NBodyIPs.Fitting` : fit an `NBodyIP`
 * `?NBodyIPs.Data` : load data sets
 * `?NBodyIPs.IO` : write and read an `NBodyIP`
@@ -29,7 +29,7 @@ include("invariants.jl")
 
 # describe basis functions in terms of symmetry invariants
 include("polynomials.jl")
-@reexport using NBodyIPs.Polynomials
+@reexport using NBodyIPs.Polys
 
 # fitting from data (e.g., least squares)
 include("fitting.jl")
