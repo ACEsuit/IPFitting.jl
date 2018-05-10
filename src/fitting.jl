@@ -5,6 +5,8 @@ export get_basis, regression, naive_sparsify,
 
 Base.norm(F::JVecsF) = norm(norm.(F))
 
+# components of the stress (up to symmetry)
+const _IS = SVector(1,2,3,5,6,9)
 
 """
 split off the inner assembly loop to
@@ -15,30 +17,45 @@ prepare for parallelising
 * `nforces` : randomly choose nforces
 """
 function assemble_lsq_block(d, basis, nforces)
-   at = Atoms(d)
    len = length(d)
    nforces = Int(min(nforces, len))
-   # allocate observations (sub-) vector
-   Y = zeros(1 + 3 * nforces)
-   # allocate (sub-) matrix of basis functions
-   Ψ = zeros(1 + 3 * nforces, length(basis))
    # ------- fill the data/observations vector -------------------
-   Y[1] = energy(d)/len     # put in energy data
-   if nforces > 0
-      # extract the forces from the data:
+   Y = Float64[]
+   # energy
+   push!(Y, energy(d) / len)
+   # forces
+   if forces(d) != nothing
       f = forces(d)
       If = rand(1:length(f), nforces)   # random subset of forces
       f_vec = mat(f[If])[:]             # convert it into a single long vector
-      Y[2:end] = f_vec                  # put force data into rhs
+      append!(Y, f_vec)                 # put force data into rhs
    end
+   # stress / virial
+   if virial(d) != nothing
+      S = virial(d)
+      append!(Y, S[_IS] / len)
+   end
+
    # ------- fill the LSQ system, i.e. evaluate basis at data points -------
+   # allocate (sub-) matrix of basis functions
+   Ψ = zeros(length(Y), length(basis))
+   # loop through basis functions
+   at = Atoms(d)
    for (ib, b) in enumerate(basis)
-      Ψ[1, ib] = energy(b, at)/len
+      i0 = 0
+      Ψ[i0+1, ib] = energy(b, at)/len
+      i0 += 1
       # compute the forces
-      if nforces > 0
+      if forces(d) != nothing
          fb = forces(b, at)
          fb_vec = mat(fb[If])[:]
-         Ψ[2:end, ib] = fb_vec
+         Ψ[(i0+1):(i0+length(fb_vec)), ib] = fb_vec
+         i0 += length(fb)
+      end
+      # compute the virials
+      if virial(d) != nothing
+         Sb = virial(b, at)
+         Ψ[(i0+1):(i0+length(_IS)), ib] = Sb[_IS]/len
       end
    end
    # -------- what about the weight vector ------------

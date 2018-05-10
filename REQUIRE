@@ -5,10 +5,8 @@ Reexport
 ForwardDiff
 StaticArrays
 Combinatorics
-FunctionWrappers
-Calculus
 ProgressMeter
 PyCall
 ASE
 BenchmarkTools
-Calculus 
+JLD

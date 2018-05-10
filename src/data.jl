@@ -18,7 +18,7 @@ loaded information.
 module Data
 
 using JuLIP, ASE, ProgressMeter
-import JuLIP: Atoms, energy, forces
+import JuLIP: Atoms, energy, forces, virial
 import Base: length
 
 using PyCall
@@ -52,7 +52,7 @@ end
 Atoms(d) = d.at
 energy(d::Dat) = d.E
 forces(d::Dat) = d.F
-stress(d::Dat) = d.S
+virial(d::Dat) = d.S
 length(d::Dat) = length(d.at)
 
 
@@ -64,6 +64,9 @@ function read_xyz(fname; index = ":", verbose=true,
    at_list = ase_io.read(fname, index=index)
    data = Dat{Float64}[]
    @showprogress dt "Processing ..." for atpy in at_list
+      E = 0.0
+      F = JVecF[]
+      S = zero(JMatF)
       try
          E = atpy[:get_potential_energy]()
       catch
@@ -75,7 +78,7 @@ function read_xyz(fname; index = ":", verbose=true,
          F = nothing
       end
       try
-         S = JMat(atpy[:get_stress]()...)
+         S = JMat(atpy[:info]["virial"]...)
       catch
          S = nothing
       end
