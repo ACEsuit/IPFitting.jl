@@ -10,3 +10,4 @@ PyCall
 ASE
 BenchmarkTools
 JLD
+StaticPolynomials
