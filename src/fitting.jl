@@ -62,6 +62,7 @@ function assemble_lsq_block(d, basis, nforces)
    return Ψ, Y
 end
 
+
 # TODO: parallelise!
 function assemble_lsq(basis, data; verbose=true, nforces=0,
                       dt = verbose ? 0.5 : Inf)
@@ -89,8 +90,9 @@ end
 function regression(basis, data;
                     verbose = true,
                     nforces=0, usestress=false,
-                    stabstyle=:basis, stab=1e-3,
-                    weights=:I)
+                    stabstyle=:basis, cstab=1e-3,
+                    weights=:I,
+                    regulariser = nothing)
 
    Ψ, Y, W = assemble_lsq(basis, data; verbose = verbose, nforces = nforces)
    if any(isnan, Ψ) || any(isnan, Y)
@@ -102,12 +104,17 @@ function regression(basis, data;
    # compute coefficients
    verbose && println("solve $(size(Ψ)) LSQ system using QR factorisation")
    Q, R = qr(Ψ)
-   if W == I
-      c = (R \ (Q' * Y)) ./ (1+stab)
-   else
-      A = Q' * (W * Q) + stab * eye(size(R, 1))
-      b = Q' * (W * y)
+   if W == I && regulariser == nothing
+      c = (R \ (Q' * Y)) ./ (1+cstab)
+   elseif regulariser == nothing
+      A = Q' * (W * Q) + cstab * eye(size(R, 1))
+      b = Q' * (W * Y)
       c = R \ (A \ b)
+   else
+      @assert W == I
+      A = (1 + cstab) * R' * R + regulariser
+      b = R' * Q' * Y
+      c = A \ b
    end
    # check error on training set
    z = Ψ * c - Y
