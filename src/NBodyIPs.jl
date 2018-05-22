@@ -37,7 +37,7 @@ include("polynomials.jl")
 include("fitting.jl")
 
 # loading data
-# include("data.jl")
+include("data.jl")
 
 # IP i/o
 include("io.jl")
