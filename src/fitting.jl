@@ -8,6 +8,8 @@ Base.norm(F::JVecsF) = norm(norm.(F))
 # components of the stress (up to symmetry)
 const _IS = SVector(1,2,3,5,6,9)
 
+
+
 """
 split off the inner assembly loop to
 prepare for parallelising
