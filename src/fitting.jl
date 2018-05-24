@@ -10,87 +10,6 @@ const _IS = SVector(1,2,3,5,6,9)
 
 
 
-"""
-split off the inner assembly loop to
-prepare for parallelising
-
-* `d` : one data point
-* `basis` : all basis functions
-* `nforces` : randomly choose nforces
-"""
-function assemble_lsq_block_old(d, basis, nforces)
-   len = length(d)
-   nforces = Int(min(nforces, len))
-   # ------- fill the data/observations vector -------------------
-   Y = Float64[]
-   # energy
-   push!(Y, energy(d) / len)
-   # forces
-   if forces(d) != nothing
-      f = forces(d)
-      # If = rand(1:length(f), nforces)   # random subset of forces
-      # f_vec = mat(f[If])[:]             # convert it into a single long vector
-      f_vec = mat(f)[:]
-      append!(Y, f_vec)                 # put force data into rhs
-   end
-   # stress / virial
-   if virial(d) != nothing
-      S = virial(d)
-      append!(Y, S[_IS] / len)
-   end
-
-   # ------- fill the LSQ system, i.e. evaluate basis at data points -------
-   # allocate (sub-) matrix of basis functions
-   Ψ = zeros(length(Y), length(basis))
-   # loop through basis functions
-   at = Atoms(d)
-   for (ib, b) in enumerate(basis)
-      i0 = 0
-      Ψ[i0+1, ib] = energy(b, at)/len
-      i0 += 1
-      # compute the forces
-      if forces(d) != nothing
-         fb = forces(b, at)
-         # fb_vec = mat(fb[If])[:]
-         fb_vec = mat(fb)[:]
-         Ψ[(i0+1):(i0+length(fb_vec)), ib] = fb_vec
-         i0 += length(fb_vec)
-      end
-      # compute the virials
-      if virial(d) != nothing
-         Sb = virial(b, at)
-         Ψ[(i0+1):(i0+length(_IS)), ib] = Sb[_IS]/len
-      end
-   end
-   # -------- what about the weight vector ------------
-   return Ψ, Y
-end
-
-
-# TODO: parallelise!
-function assemble_lsq_old(basis, data; verbose=true, nforces=0,
-                          dt = verbose ? 0.5 : Inf)
-   # generate many matrix blocks, one for each piece of data
-   #  ==> this should be switched to pmap, or @parallel
-   LSQ = @showprogress(dt, "assemble LSQ",
-                  [assemble_lsq_block_old(d, basis, nforces) for d in data])
-   # combine the local matrices into a big global matrix
-   nY = sum(length(block[2]) for block in LSQ)
-   Ψ = zeros(nY, length(basis))
-   Y = zeros(nY)
-   i0 = 0
-   for id = 1:length(data)
-      Ψi::Matrix{Float64}, Yi::Vector{Float64} = LSQ[id]
-      rows = (i0+1):(i0+length(Yi))
-      Ψ[rows, :] = Ψi
-      Y[rows] = Yi
-      i0 += length(Yi)
-   end
-   W = speye(length(Y))
-   return Ψ, Y, I
-end
-
-
 
 function assemble_lsq_block(d, Bord, Iord, nforces)
    len = length(d)
@@ -164,6 +83,9 @@ function assemble_lsq(basis, data; verbose=true, nforces=Inf,
    Iord = [ find(bo .== n)  for n = 1:maxord ]
    Bord = [ basis[iord] for iord in Iord ]
    Bord = [ [b for b in B] for B in Bord ]
+   Inonempty = find( .!isempty.(Bord) )
+   Iord = Iord[Inonempty]
+   Bord = Bord[Inonempty]
 
    # generate many matrix blocks, one for each piece of data
    #  ==> this should be switched to pmap, or @parallel
