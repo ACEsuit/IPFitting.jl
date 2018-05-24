@@ -4,7 +4,7 @@ using BenchmarkTools
 
 @testset "NBodyIPs" begin
    # TODO: monomials testset
-   # TODO: fast_polys testset 
+   # TODO: fast_polys testset
    @testset "Invariants" begin include("test_invariants.jl") end
    @testset "Polynomials" begin include("test_polynomials.jl") end
    # TODO: fitting testset
