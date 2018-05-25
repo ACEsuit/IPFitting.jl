@@ -19,7 +19,7 @@ end
 
 r0 = rnn(:Cu)
 calc = LennardJones(r0=r0) * C2Shift(2.7*r0)
-data = generate_data(:Cu, 3, 0.33, 200, calc)
+data = generate_data(:Cu, 3, 0.25*r0, 200, calc)
 
 B1 = [NBody(1.0)]
 # TRANSFORM = (@analytic r -> (2.9/r)^3)
