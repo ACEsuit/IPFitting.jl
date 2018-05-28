@@ -11,13 +11,13 @@ const _IS = SVector(1,2,3,5,6,9)
 
 
 
-function assemble_lsq_block(d, Bord, Iord, nforces)
+function assemble_lsq_block(d, Bord, Iord, nforces, w_E = 0.4)
    len = length(d)
    nforces = Int(min(nforces, len))
    # ------- fill the data/observations vector -------------------
    Y = Float64[]
    # energy
-   push!(Y, energy(d) / len)
+   push!(Y, w_E * energy(d) / len)
    # forces
    if forces(d) != nothing
       f = forces(d)
@@ -41,7 +41,7 @@ function assemble_lsq_block(d, Bord, Iord, nforces)
    i0 = 0
    for n = 1:length(Bord)
       Es = energy(Bord[n], at)
-      Ψ[i0+1, Iord[n]] = Es / len
+      Ψ[i0+1, Iord[n]] = w_E * Es / len
    end
    i0 += 1
 
@@ -74,23 +74,32 @@ function assemble_lsq_block(d, Bord, Iord, nforces)
 end
 
 
+function split_basis(basis)
+   # get the types of the individual basis elements
+   tps = typeof.(basis)
+   Iord = Vector{Int}[]
+   Bord = Any[]
+   for tp in unique(tps)
+      # find which elements of basis have type `tp`
+      I = find( tp .== tps )
+      push!(Iord, I)
+      push!(Bord, [ b for b in basis[I]] )
+   end
+   return Bord, Iord
+end
+
 # TODO: parallelise!
 function assemble_lsq(basis, data; verbose=true, nforces=Inf,
-                      dt = verbose ? 0.5 : Inf)
-   # sort basis set into body-orders
-   bo = bodyorder.(basis)
-   maxord = maximum(bo)
-   Iord = [ find(bo .== n)  for n = 1:maxord ]
-   Bord = [ basis[iord] for iord in Iord ]
-   Bord = [ [b for b in B] for B in Bord ]
-   Inonempty = find( .!isempty.(Bord) )
-   Iord = Iord[Inonempty]
-   Bord = Bord[Inonempty]
+                      dt = verbose ? 0.5 : Inf, w_E = 0.4)
+   # sort basis set into body-orders, and possibly different
+   # types within the same body-order (e.g. for matching!)
+   Bord, Iord = split_basis(basis)
 
    # generate many matrix blocks, one for each piece of data
    #  ==> this should be switched to pmap, or @parallel
    LSQ = @showprogress(dt, "assemble LSQ",
-               [assemble_lsq_block(d, Bord, Iord, nforces) for d in data])
+               [assemble_lsq_block(d, Bord, Iord, nforces, w_E)
+                for d in data])
    # combine the local matrices into a big global matrix
    nY = sum(length(block[2]) for block in LSQ)
    Ψ = zeros(nY, length(basis))
@@ -114,7 +123,8 @@ function regression(basis, data;
                     nforces=0, usestress=false,
                     stabstyle=:basis, cstab=1e-3,
                     weights=:I,
-                    regulariser = nothing)
+                    regulariser = nothing,
+                    w_E = 0.4)
 
    Ψ, Y, W = assemble_lsq(basis, data; verbose = verbose, nforces = nforces)
    if any(isnan, Ψ) || any(isnan, Y)
@@ -126,6 +136,18 @@ function regression(basis, data;
    # compute coefficients
    verbose && println("solve $(size(Ψ)) LSQ system using QR factorisation")
    Q, R = qr(Ψ)
+   @show cond(R)
+
+   if weights == :E
+      ndat = length(Y) ÷ length(data)
+      w = zeros(ndat, length(data))
+      E0 = minimum(energy(d) for d in data)
+      for (n, d) in enumerate(data)
+         w[:, n] = 1.0 / ( energy(d) / length(d) - E0 + 1.0 )^2
+         W = Diagonal(w[:])
+      end
+   end
+
    if W == I && regulariser == nothing
       c = (R \ (Q' * Y)) ./ (1+cstab)
    elseif regulariser == nothing
