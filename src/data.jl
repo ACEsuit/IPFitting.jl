@@ -47,6 +47,7 @@ struct Dat{T}
    E::Union{Void,T}         # energy
    F::Union{Void,JVecs{T}}  # forces
    S::Union{Void,JMat{T}}   # stress
+   w::T   # weight
 end
 
 Atoms(d) = d.at
@@ -83,7 +84,8 @@ function read_xyz(fname; index = ":", verbose=true,
          S = nothing
       end
       at = Atoms(ASEAtoms(atpy))
-      push!(data, Dat(at, E, F, S))
+      w = 1.0
+      push!(data, Dat(at, E, F, S, w))
    end
    return data
 end
