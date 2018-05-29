@@ -11,13 +11,14 @@ const _IS = SVector(1,2,3,5,6,9)
 
 
 
-function assemble_lsq_block(d, Bord, Iord, nforces, w_E = 0.4)
+function assemble_lsq_block(d, Bord, Iord, nforces,
+                            w_E, w_F, w_S)
    len = length(d)
    nforces = Int(min(nforces, len))
    # ------- fill the data/observations vector -------------------
    Y = Float64[]
    # energy
-   push!(Y, w_E * energy(d) / len)
+   push!(Y, w_E * energy(d))
    # forces
    if forces(d) != nothing
       f = forces(d)
@@ -29,7 +30,7 @@ function assemble_lsq_block(d, Bord, Iord, nforces, w_E = 0.4)
    # stress / virial
    if virial(d) != nothing
       S = virial(d)
-      append!(Y, S[_IS] / len)
+      append!(Y, w_S * S[_IS])
    end
 
    # ------- fill the LSQ system, i.e. evaluate basis at data points -------
@@ -41,7 +42,7 @@ function assemble_lsq_block(d, Bord, Iord, nforces, w_E = 0.4)
    i0 = 0
    for n = 1:length(Bord)
       Es = energy(Bord[n], at)
-      Ψ[i0+1, Iord[n]] = w_E * Es / len
+      Ψ[i0+1, Iord[n]] = w_E * Es
    end
    i0 += 1
 
@@ -63,14 +64,14 @@ function assemble_lsq_block(d, Bord, Iord, nforces, w_E = 0.4)
       for n = 1:length(Bord)
          Ss = virial(Bord[n], at)
          for j = 1:length(Ss)
-            Svec = Ss[j][_IS] / len
+            Svec = w_S * Ss[j][_IS]
             Ψ[(i0+1):(i0+length(_IS)), Iord[n][j]] = Svec
          end
       end
    end
 
    # -------- what about the weight vector ------------
-   return Ψ, Y
+   return d.w * Ψ, d.w * Y
 end
 
 
@@ -88,9 +89,13 @@ function split_basis(basis)
    return Bord, Iord
 end
 
+
+
 # TODO: parallelise!
 function assemble_lsq(basis, data; verbose=true, nforces=Inf,
-                      dt = verbose ? 0.5 : Inf, w_E = 0.4)
+                      dt = verbose ? 0.5 : Inf,
+                      w_E = 200.0, w_F = 1.0,
+                      w_S = 0.3 )
    # sort basis set into body-orders, and possibly different
    # types within the same body-order (e.g. for matching!)
    Bord, Iord = split_basis(basis)
@@ -98,7 +103,7 @@ function assemble_lsq(basis, data; verbose=true, nforces=Inf,
    # generate many matrix blocks, one for each piece of data
    #  ==> this should be switched to pmap, or @parallel
    LSQ = @showprogress(dt, "assemble LSQ",
-               [assemble_lsq_block(d, Bord, Iord, nforces, w_E)
+               [assemble_lsq_block(d, Bord, Iord, nforces, w_E, w_F, w_S)
                 for d in data])
    # combine the local matrices into a big global matrix
    nY = sum(length(block[2]) for block in LSQ)
@@ -124,10 +129,12 @@ function regression(basis, data;
                     stabstyle=:basis, cstab=1e-3,
                     weights=:I,
                     regulariser = nothing,
-                    w_E = 0.4)
+                    w_E = 30.0, w_F = 1.0, w_S = 0.3)
 
    Ψ, Y, W = assemble_lsq(basis, data;
-               verbose = verbose, nforces = nforces, w_E = w_E)
+               verbose = verbose, nforces = nforces,
+               w_E = w_E, w_F = w_F, w_S = w_S)
+
    if any(isnan, Ψ) || any(isnan, Y)
       error("discovered NaNs - something went wrong in the assembly")
    end
@@ -183,7 +190,7 @@ function fiterrors(V, data; verbose=true,
       at, E, F = Atoms(d), energy(d), forces(d)
       # energy error
       Ex = energy(V, at)
-      rmsE += (Ex - E)^2/length(at)^2
+      rmsE += (Ex - E)^2 / length(at)^2
       maeE += abs(Ex-E) / length(at)
       NE += 1  # number of energies
       # force error
@@ -257,9 +264,9 @@ function scatter_data(IP, data)
    for d in data
       at = Atoms(d)
       len = length(at)
-      push!(E_data, energy(d))
+      push!(E_data, energy(d) / len)
       append!(F_data, mat(forces(d))[:])
-      push!(E_fit, energy(IP, at))
+      push!(E_fit, energy(IP, at) / len)
       append!(F_fit, mat(forces(IP, at))[:])
    end
    return E_data, E_fit, F_data, F_fit
