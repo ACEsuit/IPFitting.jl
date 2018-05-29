@@ -126,7 +126,8 @@ function regression(basis, data;
                     regulariser = nothing,
                     w_E = 0.4)
 
-   Ψ, Y, W = assemble_lsq(basis, data; verbose = verbose, nforces = nforces)
+   Ψ, Y, W = assemble_lsq(basis, data;
+               verbose = verbose, nforces = nforces, w_E = w_E)
    if any(isnan, Ψ) || any(isnan, Y)
       error("discovered NaNs - something went wrong in the assembly")
    end
