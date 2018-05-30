@@ -18,19 +18,19 @@ function assemble_lsq_block(d, Bord, Iord, nforces,
    # ------- fill the data/observations vector -------------------
    Y = Float64[]
    # energy
-   push!(Y, w_E * energy(d))
+   push!(Y, sqrt(w_E) * energy(d))
    # forces
    if forces(d) != nothing
       f = forces(d)
       # If = rand(1:length(f), nforces)   # random subset of forces
       # f_vec = mat(f[If])[:]             # convert it into a single long vector
       f_vec = mat(f)[:]
-      append!(Y, f_vec)                 # put force data into rhs
+      append!(Y, sqrt(w_F) * f_vec)                 # put force data into rhs
    end
    # stress / virial
    if virial(d) != nothing
       S = virial(d)
-      append!(Y, w_S * S[_IS])
+      append!(Y, sqrt(w_S) * S[_IS])
    end
 
    # ------- fill the LSQ system, i.e. evaluate basis at data points -------
@@ -42,7 +42,7 @@ function assemble_lsq_block(d, Bord, Iord, nforces,
    i0 = 0
    for n = 1:length(Bord)
       Es = energy(Bord[n], at)
-      Ψ[i0+1, Iord[n]] = w_E * Es
+      Ψ[i0+1, Iord[n]] = sqrt(w_E) * Es
    end
    i0 += 1
 
@@ -52,7 +52,7 @@ function assemble_lsq_block(d, Bord, Iord, nforces,
          Fs = forces(Bord[n], at)
          for j = 1:length(Fs)
             # fb_vec = mat(Fs[j][If])[:]
-            fb_vec = mat(Fs[j])[:]
+            fb_vec = sqrt(w_F) * mat(Fs[j])[:]
             Ψ[(i0+1):(i0+length(fb_vec)), Iord[n][j]] = fb_vec
          end
       end
@@ -64,7 +64,7 @@ function assemble_lsq_block(d, Bord, Iord, nforces,
       for n = 1:length(Bord)
          Ss = virial(Bord[n], at)
          for j = 1:length(Ss)
-            Svec = w_S * Ss[j][_IS]
+            Svec = sqrt(w_S) * Ss[j][_IS]
             Ψ[(i0+1):(i0+length(_IS)), Iord[n][j]] = Svec
          end
       end
