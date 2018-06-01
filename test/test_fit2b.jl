@@ -12,7 +12,7 @@ function generate_data(species, L, rmax, N, calc)
       rattle!(at, rand() * rmax)
       E = energy(calc, at)
       F = forces(calc, at)
-      push!(data, Dat(at, E, F, nothing))
+      push!(data, Dat(at, E, F, nothing, 1.0))
    end
    return data
 end
@@ -62,3 +62,8 @@ df = DataFrame( :degrees => degrees,
                 :rms_E => err_erms,
                 :rms_F => err_frms )
 display(df)
+
+(@test minimum(err_erms) < 1e-5) |> println
+(@test minimum(err_frms) < 4e-4) |> println
+(@test minimum(err_eunif) < 2e-4) |> println
+(@test minimum(err_funif) < 4e-4) |> println

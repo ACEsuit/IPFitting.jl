@@ -9,7 +9,7 @@ using BenchmarkTools
    @testset "Iterators" begin include("test_iterators.jl") end
    @testset "Invariants" begin include("test_invariants.jl") end
    @testset "Polynomials" begin include("test_polynomials.jl") end
-   # TODO: fitting testset
+   @testset "Fitting" begin include("test_fit.jl") end
    # TODO: Data testset
    # TODO: IO / serialization testset
 end
