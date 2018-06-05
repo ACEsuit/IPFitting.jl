@@ -4,7 +4,7 @@ using Base.Threads
 
 export get_basis, regression, naive_sparsify,
        normalize_basis!, fiterrors, scatter_data,
-       print_fiterrsors
+       print_fiterrors
 
 Base.norm(F::JVecsF) = norm(norm.(F))
 
