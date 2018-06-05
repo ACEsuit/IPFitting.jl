@@ -1,5 +1,7 @@
 using JuLIP, ProgressMeter
 
+using Base.Threads
+
 export get_basis, regression, naive_sparsify,
        normalize_basis!, fiterrors, scatter_data
 
@@ -94,17 +96,27 @@ end
 # TODO: parallelise!
 function assemble_lsq(basis, data; verbose=true, nforces=Inf,
                       dt = verbose ? 0.5 : Inf,
-                      w_E = 200.0, w_F = 1.0,
-                      w_S = 0.3 )
+                      w_E = 200.0, w_F = 1.0, w_S = 0.3 )
    # sort basis set into body-orders, and possibly different
    # types within the same body-order (e.g. for matching!)
    Bord, Iord = split_basis(basis)
 
    # generate many matrix blocks, one for each piece of data
    #  ==> this should be switched to pmap, or @parallel
-   LSQ = @showprogress(dt, "assemble LSQ",
-               [assemble_lsq_block(d, Bord, Iord, nforces, w_E, w_F, w_S)
-                for d in data])
+   if nthreads() == 1
+      LSQ = @showprogress(dt, "assemble LSQ",
+                  [assemble_lsq_block(d, Bord, Iord, nforces, w_E, w_F, w_S)
+                   for d in data])
+   else
+      # error("parallel LSQ assembly not implemented")
+      println("Assemble LSQ with $(nthreads()) threads")
+      tic()
+      LSQ = Vector{Any}(length(data))
+      @threads for n = 1:length(data)
+         LSQ[n] = assemble_lsq_block(data[n], Bord, Iord, nforces, w_E, w_F, w_S)
+      end
+      toc()
+   end
    # combine the local matrices into a big global matrix
    nY = sum(length(block[2]) for block in LSQ)
    Ψ = zeros(nY, length(basis))
