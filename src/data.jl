@@ -48,6 +48,7 @@ struct Dat{T}
    F::Union{Void,JVecs{T}}  # forces
    S::Union{Void,JMat{T}}   # stress
    w::T   # weight
+   atpy
 end
 
 Atoms(d) = d.at
@@ -56,6 +57,7 @@ forces(d::Dat) = d.F
 virial(d::Dat) = d.S
 length(d::Dat) = length(d.at)
 
+config_type(d::Dat) = d.atpy[:info]["config_type"]
 
 function read_xyz(fname; index = ":", verbose=true,
                   dt = verbose ? 0.5 : Inf )
