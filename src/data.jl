@@ -57,7 +57,12 @@ forces(d::Dat) = d.F
 virial(d::Dat) = d.S
 length(d::Dat) = length(d.at)
 
-config_type(d::Dat) = d.atpy[:info]["config_type"]
+config_type(d::Dat) =
+   try
+      d.atpy[:info]["config_type"]
+   catch
+      d.atpy[:info]["configtype"]
+   end
 
 function read_xyz(fname; index = ":", verbose=true,
                   dt = verbose ? 0.5 : Inf )
