@@ -38,11 +38,11 @@ include("invariants.jl")
 include("polynomials.jl")
 @reexport using NBodyIPs.Polys
 
-# fitting from data (e.g., least squares)
-include("fitting.jl")
-
 # loading data
 include("data.jl")
+
+# fitting from data (e.g., least squares)
+include("fitting.jl")
 
 # IP i/o
 include("io.jl")

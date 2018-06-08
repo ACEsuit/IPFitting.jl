@@ -48,7 +48,7 @@ struct Dat{T}
    F::Union{Void,JVecs{T}}  # forces
    S::Union{Void,JMat{T}}   # stress
    w::T   # weight
-   atpy
+   config_type::String
 end
 
 Atoms(d) = d.at
@@ -56,47 +56,85 @@ energy(d::Dat) = d.E
 forces(d::Dat) = d.F
 virial(d::Dat) = d.S
 length(d::Dat) = length(d.at)
+config_type(d::Dat) = d.config_type
 
-config_type(d::Dat) =
-   try
-      d.atpy[:info]["config_type"]
-   catch
-      d.atpy[:info]["configtype"]
+
+function read_energy(atpy)
+   for key in keys(atpy[:info])
+      if lowercase(key) == "dft_energy"
+         return atpy[:info][key]
+      end
    end
+   try
+      return atpy[:get_potential_energy]()
+   end
+   return nothing
+end
 
-function read_xyz(fname; index = ":", verbose=true,
-                  dt = verbose ? 0.5 : Inf )
+function read_forces(atpy)
+   for key in keys(atpy[:arrays])
+      if lowercase(key) == "dft_force"
+         return atpy[:arrays][key]' |> vecs
+      end
+   end
+   try
+      return atpy[:get_array]("force")' |> vecs
+   end
+   return nothing
+end
+
+function read_virial(atpy)
+   for key in keys(atpy[:info])
+      if lowercase(key) == "dft_virial"
+         return JMat(atpy[:info][key]...)
+      end
+   end
+   try
+      return JMat(atpy[:info]("virial")...)
+   end
+   return nothing
+end
+
+function read_configtype(atpy)
+   if haskey(atpy[:info], "config_type")
+      return atpy[:info]["config_type"]
+   elseif haskey(atpy[:info], "configtype")
+      return atpy[:info]["configtype"]
+   end
+   return ""
+end
+
+
+function read_xyz(fname; verbose=true,
+                  dt = verbose ? 0.5 : Inf,
+                  exclude = [] )
    if verbose
       println("Reading in $fname ...")
    end
-   at_list = ase_io.read(fname, index=index)
+   at_list = ase_io.read(fname, index=":")
    data = Dat{Float64}[]
+   idx = 0
    @showprogress dt "Processing ..." for atpy in at_list
-      E = 0.0
-      F = JVecF[]
-      S = zero(JMatF)
-      try
-         E = atpy[:get_potential_energy]()
-      catch
-         E = nothing
+      config_type = read_configtype(atpy)
+      if config_type == ""
+         warn("$idx has no config_type")
       end
-      try
-         F = atpy[:get_array]("force")' |> vecs
-      catch
-         F = nothing
+      if config_type in exclude
+         continue
       end
-      try
-         S = JMat(atpy[:info]["virial"]...)
-      catch
-         S = nothing
+      E = read_energy(atpy)
+      if E == nothing
+         warn("$idx has not energy")
       end
-      at = Atoms(ASEAtoms(atpy))
-      w = 1.0
-      push!(data, Dat(at, E, F, S, w))
+      push!(data, Dat( Atoms(ASEAtoms(atpy)),
+                       E,
+                       read_forces(atpy),
+                       read_virial(atpy),
+                       1.0,
+                       config_type ))
    end
-   return data
+   return data 
 end
-
 
 
 function read(fname; kwargs...)

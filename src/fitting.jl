@@ -1,10 +1,15 @@
 using JuLIP, ProgressMeter
+using NBodyIPs.Data: Dat
 
 using Base.Threads
 
+import Base: kron
+
+
 export get_basis, regression, naive_sparsify,
        normalize_basis!, fiterrors, scatter_data,
-       print_fiterrors
+       print_fiterrors,
+       observations
 
 Base.norm(F::JVecsF) = norm(norm.(F))
 
@@ -294,4 +299,177 @@ function scatter_data(IP, data)
       append!(F_fit, mat(forces(IP, at))[:])
    end
    return E_data, E_fit, F_data, F_fit
+end
+
+
+# ======================== NEW LSQ SETUP ========================
+
+"""
+`mutable struct IpLsqSys`: type storing all information to perform a
+LSQ fit for an interatomic potential. To assemble the LsqSys use
+```
+dot(data, basis)
+```
+"""
+mutable struct LsqSys
+   data::Vector{Dat}
+   basis::Vector{NBodyFunction}
+   Ψ::Matrix{Float64}
+   QR
+end
+
+
+"""
+Take a basis and split it into individual body-orders.
+"""
+function split_basis(basis::AbstractVector{NBodyFunction})
+   # get the types of the individual basis elements
+   tps = typeof.(basis)
+   Iord = Vector{Int}[]
+   Bord = Any[]
+   for tp in unique(tps)
+      # find which elements of basis have type `tp`
+      I = find( tp .== tps )
+      push!(Iord, I)
+      push!(Bord, [b for b in basis[I]])
+   end
+   return Bord, Iord
+end
+
+
+kron(d::Dat, B::Vector{NBodyFunction}) = dot(d, split_basis(B)...)
+
+# ------- fill the LSQ system, i.e. evaluate basis at data points -------
+function kron(d::Dat, Bord::Vector, Iord::Vector{Vector{Int}})
+   len = length(d)
+   at = Atoms(d)
+
+   # allocate (sub-) matrix of basis functions
+   lenY = 1 # energy
+   if (forces(d) != nothing) && len > 1
+      lenY += 3*len
+   end
+   if virial(d) != nothing
+      lenY += length(_IS)
+   end
+   Ψ = zeros(lenY, sum(length.(Bord)))
+
+   # energies
+   i0 = 0
+   for n = 1:length(Bord)
+      Es = energy(Bord[n], at)
+      Ψ[i0+1, Iord[n]] = Es
+   end
+   i0 += 1
+
+   # forces
+   if (forces(d) != nothing) && len > 1
+      for n = 1:length(Bord)
+         Fs = forces(Bord[n], at)
+         for j = 1:length(Fs)
+            fb_vec = mat(Fs[j])[:]
+            Ψ[(i0+1):(i0+length(fb_vec)), Iord[n][j]] = fb_vec
+         end
+      end
+      i0 += 3 * len
+   end
+
+   # virial components
+   if virial(d) != nothing
+      for n = 1:length(Bord)
+         Ss = virial(Bord[n], at)
+         for j = 1:length(Ss)
+            Svec = Ss[j][_IS]
+            Ψ[(i0+1):(i0+length(_IS)), Iord[n][j]] = Svec
+         end
+      end
+   end
+
+   return Ψ
+end
+
+
+
+function kron(data::Vector{TD},  basis::Vector{TB}; verbose=true
+         ) where {TD <: Dat, TB <: NBodyFunction}
+   # sort basis set into body-orders, and possibly different
+   # types within the same body-order (e.g. for matching!)
+   Bord, Iord = split_basis(basis)
+
+   # generate many matrix blocks, one for each piece of data
+   #  ==> this should be switched to pmap, or @parallel
+   if nthreads() == 1
+      if verbose
+         println("Assembly LSQ in serial")
+         LSQ = @showprogress(1.0,
+                     [ kron(d, Bord, Iord) for d in data ] )
+      else
+         LSQ = [ kron(d, Bord, Iord) for d in data ]
+      end
+   else
+      # error("parallel LSQ assembly not implemented")
+      if verbose
+         println("Assemble LSQ with $(nthreads()) threads")
+         p = Progress(length(data))
+         p_ctr = 0
+         p_lock = SpinLock()
+      end
+      LSQ = Vector{Any}(length(data))
+      tic()
+      @threads for n = 1:length(data)
+         LSQ[n] = kron(data[n], Bord, Iord)
+         if verbose
+            lock(p_lock)
+            p_ctr += 1
+            ProgressMeter.update!(p, p_ctr)
+            unlock(p_lock)
+         end
+      end
+      toc()
+   end
+   # combine the local matrices into a big global matrix
+   nrows = sum(length(block) for block in LSQ)
+   Ψ = zeros(nrows, length(basis))
+   i0 = 0
+   for id = 1:length(data)
+      Ψi::Matrix{Float64} = LSQ[id]
+      i1 = i0 + size(Ψi,1)
+      Ψ[(i0+1):i1, :] = Ψi
+      i0 = i1
+   end
+
+   if verbose
+      println("QR-factorisation of $(size(Ψ)) LSQ system ...")
+   end
+
+   return LsqSys(data, basis, Ψ, qrfact(Ψ))
+end
+
+
+
+
+function observations(d::Dat)
+   # ------- fill the data/observations vector -------------------
+   Y = Float64[]
+   # energy
+   push!(Y, energy(d))
+   # forces
+   if (forces(d) != nothing) && (length(d) > 1)
+      f = forces(d)
+      f_vec = mat(f)[:]
+      append!(Y, f_vec)
+   end
+   # virial
+   if virial(d) != nothing
+      S = virial(d)
+      append!(Y, S[_IS])
+   end
+end
+
+function observations(data::AbstractVector{Dat})
+   Y = Float64[]
+   for d in data
+      append!(Y, observations(d))
+   end
+   return Y
 end
