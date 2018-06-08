@@ -111,10 +111,17 @@ function assemble_lsq(basis, data; verbose=true, nforces=Inf,
    else
       # error("parallel LSQ assembly not implemented")
       println("Assemble LSQ with $(nthreads()) threads")
-      tic()
+      p = Progress(length(data))
+      p_ctr = 0
+      p_lock = SpinLock()
       LSQ = Vector{Any}(length(data))
+      tic()
       @threads for n = 1:length(data)
          LSQ[n] = assemble_lsq_block(data[n], Bord, Iord, nforces, w_E, w_F, w_S)
+         lock(p_lock)
+         p_ctr += 1
+         ProgressMeter.update!(p, p_ctr)
+         unlock(p_lock)
       end
       toc()
    end
