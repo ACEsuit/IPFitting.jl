@@ -320,6 +320,8 @@ mutable struct LsqSys
 end
 
 
+config_types(lsq::LsqSys) = unique(config_type.(lsq.data))
+
 """
 Take a basis and split it into individual body-orders.
 """
@@ -500,7 +502,7 @@ function Base.info(lsq::LsqSys)
    println("      #configs: $(length(lsq.data))")
    println("    #basisfcns: $(length(lsq.basis))")
    println("  config_types: ",
-         prod(s*", " for s in unique(config_type.(lsq.data))))
+         prod(s*", " for s in config_types(lsq)))
 
    Bord, _ = split_basis(lsq.basis)
    println(" #basis groups: $(length(Bord))")
@@ -511,4 +513,162 @@ function Base.info(lsq::LsqSys)
       info(B; indent = 6)
    end
    println(repeat("=", 60))
+end
+
+
+# ------------ Refactored LSQ Fit Code
+
+
+_haskey and _getkey are to simulate named tuples
+
+_haskey(t::Tuple, key) = length(find(first.(t) .== key)) > 0
+
+function _getkey(t::Tuple, key)
+   i = find(first.(t) .== key)
+   return length(i) > 0 ? t[i[1]][2] : nothing
+end
+
+function _getkey_val(t::Tuple, key)
+   i = find(first.(t) .== key)
+   return length(i) > 0 ? t[i[1]][2] : 1.0
+end
+
+function read_weights(weights::Union{Void, Tuple})
+   # default weights
+   w_E = 30.0
+   w_F = 1.0
+   w_V = 0.3
+   if weights != nothing
+      _haskey(weights, :E) && w_E = _read_key(weights, :E)
+      _haskey(weights, :F) && w_F = _read_key(weights, :F)
+      _haskey(weights, :V) && w_V = _read_key(weights, :V)
+   end
+   return (:E => w_E, :F => w_F, :V => w_V)
+end
+
+# apply_config_weights!(lsq, config_weights::Void) = lsq
+#
+# function apply_config_weights!(lsq, config_weights::Tuple)
+#    ctypes = config_types(lsq)
+#    for (key, val) in config_weights
+#       @assert key in ctypes
+#       Idat_key = find( config_type.(lsq.data) .== key )
+#       for i in Idat_key
+#          lsq.data[i].w = val
+#       end
+#    end
+#    return lsq
+# end
+
+function get_lsq_system(lsq, weights, config_weights)
+   Y = observations(lsq)
+   W = zeros(length(Y))
+   # energy, force, virial weights
+   w_E, w_F, w_V = last.(weights)
+   # reference energy => we assume the first basis function is 1B
+   E0 = lsq.basis[1]()
+
+   idx = 0
+   for d in data
+      # weighting factor due to config_type
+      w_cfg = _getkey_val(config_weights, config_type(d))
+      # weighting factor from dataset
+      w = weight(d) * w_cfg
+
+      # energy
+      W[idx+1] = w * w_E
+      idx += 1
+      # and while we're at it, subtract E0 from Y
+      Y[idx] -= E0 * len
+
+      # forces
+      if (forces(d) != nothing) && (length(d) > 1)
+         W[(idx+1):(idx+3*len)] = w * w_F
+         idx += 3*len
+      end
+      # virial
+      if virial(d) != nothing
+         W[(idx+1):(idx+length(_IS))] = w * w_S
+      end
+   end
+
+   @assert idx == length(W) == length(Y)
+
+   # find the zeros and remove them
+   Inz = sort(find(W .!= 0))
+   Y = Y[Inz]
+   W = W[Inz]
+   Ψ = lsq.Ψ[Inz, 2:end]  # we are also remove the B1 basis function
+
+   # now rescale Y and Ψ
+   W .= sqrt.(W)
+   Y .*= W
+   scale!(Ψ, W)
+
+   # this should be it ...
+   return Ψ, Y 
+end
+
+
+"""
+
+## Keyword Arguments:
+
+* weights: either `nothing` or a tuple of `Pair`s, i.e.,
+```
+weights = (:E => 100.0, :F => 1.0, :V => 0.01)
+```
+Here `:E` stand for energy, `:F` for forces and `:V` for virial .
+
+* config_weights: a tuple of string, value pairs, e.g.,
+```
+config_weights = ("solid" => 10.0, "liquid" => 0.1)
+```
+this adjusts the weights on individual configurations from these categories
+if no weight is provided then the weight provided with the is used.
+Note in particular that `config_weights` takes precedence of Dat.w!
+If a weight 0.0 is used, then those configurations are removed from the LSQ
+system.
+"""
+function regression!(lsq;
+                     verbose = true,
+                     nforces=Inf,
+                     cstab = 1e-4,
+                     weights = nothing,
+                     config_weights = nothing )
+   # TODO
+   #  * regulariser
+   #  * exclude list
+   #  * stabstyle or stabiliser
+
+   weights = read_weights(weights)
+
+   # apply all the weights, get rid of anything that isn't needed or wanted
+   # in particular subtract E0 from the energies and remove B1 from the
+   # basis set
+   Y, Ψ = get_lsq_system(lsq, weights)
+   if any(isnan, Ψ) || any(isnan, Y)
+      error("discovered NaNs - something went wrong in the assembly")
+   end
+
+   # QR factorisation
+   verbose && println("solve $(size(Ψ)) LSQ system using QR factorisation")
+   QR = qrfact(Ψ)
+   Q, R = QR[:Q], QR[:R]
+   verbose && @show cond(R)
+   # back-substitution to get the coefficients
+   c = (R \ (Q' * Y)) ./ (1+cstab)
+
+   # check error on training set: i.e. the naive errors using the
+   # weights that are provided
+   if verbose
+      z = Ψ * c - Y
+      rel_rms = norm(z) / norm(Y)
+      verbose && println("naive relative rms error on training set: ", rel_rms)
+   end
+
+   # now add the 1-body term and convert this into an IP
+   # (I assume that the first basis function is the 1B function)
+   @assert bodyorder(lsq.basis[1]) == 1
+   return NBodyIP(lsq.basis, [1.0; c])
 end
