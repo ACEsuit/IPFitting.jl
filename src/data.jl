@@ -17,12 +17,14 @@ loaded information.
 """
 module Data
 
-using JuLIP, ASE, ProgressMeter
+using JuLIP, ASE, ProgressMeter, Base.Threads
 import JuLIP: Atoms, energy, forces, virial
 import Base: length
 
 using PyCall
 @pyimport ase.io as ase_io
+
+export Dat, config_type
 
 
 """
@@ -104,15 +106,20 @@ end
 
 
 function read_xyz(fname; verbose=true,
-                  dt = verbose ? 0.5 : Inf,
                   exclude = [] )
    if verbose
       println("Reading in $fname ...")
    end
    at_list = ase_io.read(fname, index=":")
-   data = Dat{Float64}[]
+   data = Vector{Dat{Float64}}(length(at_list))
    idx = 0
-   @showprogress dt "Processing ..." for atpy in at_list
+   if verbose
+      println("Processing data ...")
+      tic()
+   end
+   dt = verbose ? 1.0 : 0.0
+   @showprogress dt for n = 1:length(at_list)
+      atpy = at_list[n]
       config_type = read_configtype(atpy)
       if config_type == ""
          warn("$idx has no config_type")
@@ -124,13 +131,14 @@ function read_xyz(fname; verbose=true,
       if E == nothing
          warn("$idx has not energy")
       end
-      push!(data, Dat( Atoms(ASEAtoms(atpy)),
-                       E,
-                       read_forces(atpy),
-                       read_virial(atpy),
-                       1.0,
-                       config_type ))
+      data[n] = Dat( Atoms(ASEAtoms(atpy)),
+                     E,
+                     read_forces(atpy),
+                     read_virial(atpy),
+                     1.0,
+                     config_type )
    end
+   verbose && toc()
    return data
 end
 

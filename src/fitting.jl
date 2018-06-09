@@ -1,5 +1,6 @@
 using JuLIP, ProgressMeter
 using NBodyIPs.Data: Dat
+using NBodyIPs: match_dictionary
 
 using Base.Threads
 
@@ -314,6 +315,7 @@ dot(data, basis)
 mutable struct LsqSys
    data::Vector{Dat}
    basis::Vector{NBodyFunction}
+   Iord::Vector{Vector{Int}}
    Ψ::Matrix{Float64}
 end
 
@@ -424,7 +426,7 @@ function kron(data::Vector{TD},  basis::Vector{TB}; verbose=true
             unlock(p_lock)
          end
       end
-      toc()
+      verbose && toc()
    end
    # combine the local matrices into a big global matrix
    nrows = sum(size(block, 1) for block in LSQ)
@@ -437,7 +439,7 @@ function kron(data::Vector{TD},  basis::Vector{TB}; verbose=true
       i0 = i1
    end
 
-   return LsqSys(data, basis, Ψ)
+   return LsqSys(data, basis, Iord, Ψ)
 end
 
 
@@ -468,12 +470,45 @@ function observations(data::AbstractVector{Dat})
 end
 
 
-# ------- Fix JLD Bug -------------------
+# ------- Fix a JLD Bug --------------------------------------
+
 import JLD
-struct LsqSysSerializer
-   data
-   basis
-   Ψ
+struct LsqSysSerializer; data; basis; Iord; Ψ; end
+
+JLD.writeas(lsq::LsqSys) = LsqSysSerializer(lsq.data, lsq.basis, lsq.Iord, lsq.Ψ)
+
+function JLD.readas(lsq::LsqSysSerializer)
+   basis = lsq.basis
+   # make sure all elements of the same basis group have the
+   # same dictionary; the problem is that deserialize is called
+   # on each NBody individually which will give multiple types that
+   # are different for the compiler but describe the same dictionary.
+   for I in lsq.Iord, i = 2:length(I)
+      basis[I[i]] = match_dictionary(basis[I[i]], basis[I[1]])
+   end
+   return  LsqSys(lsq.data, basis, lsq.Iord, lsq.Ψ)
 end
-JLD.writeas(lsq::LsqSys) = LsqSysSerializer(lsq.data, lsq.basis, lsq.Ψ)
-JLD.readas(lsq::LsqSysSerializer)  = LsqSys(lsq.data, lsq.basis, lsq.Ψ)
+
+# -------------------------------------------------------
+
+using NBodyIPs.Data: config_type
+
+function Base.info(lsq::LsqSys)
+   println(repeat("=", 60))
+   println(" LsqSys Summary")
+   println(repeat("-", 60))
+   println("      #configs: $(length(lsq.data))")
+   println("    #basisfcns: $(length(lsq.basis))")
+   println("  config_types: ",
+         prod(s*", " for s in unique(config_type.(lsq.data))))
+
+   Bord, _ = split_basis(lsq.basis)
+   println(" #basis groups: $(length(Bord))")
+   println(repeat("-", 60))
+
+   for (n, B) in enumerate(Bord)
+      println("   Group $n:")
+      info(B; indent = 6)
+   end
+   println(repeat("=", 60))
+end
