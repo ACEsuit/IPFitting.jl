@@ -315,7 +315,6 @@ mutable struct LsqSys
    data::Vector{Dat}
    basis::Vector{NBodyFunction}
    Ψ::Matrix{Float64}
-   QR
 end
 
 
@@ -428,7 +427,7 @@ function kron(data::Vector{TD},  basis::Vector{TB}; verbose=true
       toc()
    end
    # combine the local matrices into a big global matrix
-   nrows = sum(length(block) for block in LSQ)
+   nrows = sum(size(block, 1) for block in LSQ)
    Ψ = zeros(nrows, length(basis))
    i0 = 0
    for id = 1:length(data)
@@ -438,14 +437,8 @@ function kron(data::Vector{TD},  basis::Vector{TB}; verbose=true
       i0 = i1
    end
 
-   if verbose
-      println("QR-factorisation of $(size(Ψ)) LSQ system ...")
-   end
-
-   return LsqSys(data, basis, Ψ, qrfact(Ψ))
+   return LsqSys(data, basis, Ψ)
 end
-
-
 
 
 function observations(d::Dat)
@@ -473,3 +466,14 @@ function observations(data::AbstractVector{Dat})
    end
    return Y
 end
+
+
+# ------- Fix JLD Bug -------------------
+import JLD
+struct LsqSysSerializer
+   data
+   basis
+   Ψ
+end
+JLD.writeas(lsq::LsqSys) = LsqSysSerializer(lsq.data, lsq.basis, lsq.Ψ)
+JLD.readas(lsq::LsqSysSerializer)  = LsqSys(lsq.data, lsq.basis, lsq.Ψ)

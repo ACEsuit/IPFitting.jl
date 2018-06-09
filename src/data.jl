@@ -31,16 +31,14 @@ using PyCall
 Atoms(d)
 energy(d)
 forces(d)
+virial(d)
+weight(d)
+config_type(d)
 length(d)    # number of atoms
 ```
 
 if information is missing, the relevant function will return `nothing` instead
 (TODO for J v1.0: change `nothing` to `missing`)
-
-## TODO
-```
-stress(d)
-```
 """
 struct Dat{T}
    at::Atoms
@@ -55,9 +53,9 @@ Atoms(d) = d.at
 energy(d::Dat) = d.E
 forces(d::Dat) = d.F
 virial(d::Dat) = d.S
+weight(d::Dat) = d.w
 length(d::Dat) = length(d.at)
 config_type(d::Dat) = d.config_type
-
 
 function read_energy(atpy)
    for key in keys(atpy[:info])
@@ -133,7 +131,7 @@ function read_xyz(fname; verbose=true,
                        1.0,
                        config_type ))
    end
-   return data 
+   return data
 end
 
 
@@ -143,5 +141,22 @@ function read(fname; kwargs...)
    end
    error("NBodyIPs.Data.read: unknown file format $(fname[end-3:end])")
 end
+
+
+# --------------- FIX JLD Bug --------------
+
+
+struct DatSerializer
+   at
+   E
+   F
+   S
+   w
+   config_type
+end
+
+import JLD
+JLD.writeas(d::Dat) = DatSerializer(d.at, d.E, d.F, d.S, d.w, d.config_type)
+JLD.readas(d::DatSerializer) = Dat(d.at, d.E, d.F, d.S, d.w, d.config_type)
 
 end

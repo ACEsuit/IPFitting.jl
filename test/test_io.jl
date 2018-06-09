@@ -32,3 +32,38 @@
 #
 # NBodyIPs.IO.write(@__DIR__() * "/test.jld", IP)
 # IP = NBodyIPs.IO.read(@__DIR__() * "/test.jld")
+
+
+# testing the custom JLD serialization
+
+using JuLIP, NBodyIPs, DataFrames, Plots, JLD
+using NBodyIPs.Data: Dat
+
+include(homedir() * "/Dropbox/PIBmat/Ti_DFTB_Data/Ti.jl")
+data = Ti.read_Ti(; exclude = ["wire", "surface", "omega", "hcp"])
+
+# reference energy
+B1 = [ NBody(Ti.get_E0()) ]
+
+# generate long-range 2B basis
+r0 = rnn(:Ti)
+TLONG = "@analytic r -> exp( - 2.5 * (r/$r0 - 1))"
+TSHORT = "@analytic r -> ($r0/r)^8"
+CUT2 = "(:cos, 5.5, 7.5)"
+B2 = [ gen_basis(2, Dictionary(TLONG, CUT2), 9);
+       gen_basis(2, Dictionary(TSHORT, CUT2), 6) ]
+
+# 3B BASIS
+TRANS3 = "@analytic r -> exp( - 3.0 * (r/$r0 - 1))"
+CUT3 = "(:cos, 5.0, 6.5)"
+B3 = gen_basis(3, Dictionary(TRANS3, CUT3), 8)
+
+B = [B1; B2; B3]
+@show length(B)
+
+lsq = kron(data[1:10], B)
+JLD.save("temp.jld", "d1", lsq)
+d1 = JLD.load("temp.jld", "d1")
+
+
+JLD.@load "temp.jld" lsq
