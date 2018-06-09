@@ -519,7 +519,7 @@ end
 # ------------ Refactored LSQ Fit Code
 
 
-_haskey and _getkey are to simulate named tuples
+# _haskey and _getkey are to simulate named tuples
 
 _haskey(t::Tuple, key) = length(find(first.(t) .== key)) > 0
 
@@ -606,7 +606,7 @@ function get_lsq_system(lsq, weights, config_weights)
    scale!(Ψ, W)
 
    # this should be it ...
-   return Ψ, Y 
+   return Ψ, Y
 end
 
 
