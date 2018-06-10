@@ -539,9 +539,9 @@ function read_weights(weights::Union{Void, Tuple})
    w_F = 1.0
    w_V = 0.3
    if weights != nothing
-      _haskey(weights, :E) && w_E = _read_key(weights, :E)
-      _haskey(weights, :F) && w_F = _read_key(weights, :F)
-      _haskey(weights, :V) && w_V = _read_key(weights, :V)
+      _haskey(weights, :E) && (w_E = _read_key(weights, :E))
+      _haskey(weights, :F) && (w_F = _read_key(weights, :F))
+      _haskey(weights, :V) && (w_V = _read_key(weights, :V))
    end
    return (:E => w_E, :F => w_F, :V => w_V)
 end

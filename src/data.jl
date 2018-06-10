@@ -106,11 +106,11 @@ end
 
 
 function read_xyz(fname; verbose=true,
-                  exclude = [] )
+                  exclude = [], index = ":" )
    if verbose
       println("Reading in $fname ...")
    end
-   at_list = ase_io.read(fname, index=":")
+   at_list = ase_io.read(fname, index=index)
    data = Vector{Dat{Float64}}(length(at_list))
    idx = 0
    if verbose
