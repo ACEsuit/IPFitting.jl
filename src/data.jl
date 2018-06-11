@@ -24,7 +24,7 @@ import Base: length
 using PyCall
 @pyimport ase.io as ase_io
 
-export Dat, config_type
+export Dat, config_type, weight
 
 
 """

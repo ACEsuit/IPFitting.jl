@@ -1,5 +1,5 @@
 using JuLIP, ProgressMeter
-using NBodyIPs.Data: Dat
+using NBodyIPs.Data: Dat, weight, config_type
 using NBodyIPs: match_dictionary
 
 using Base.Threads
@@ -10,7 +10,7 @@ import Base: kron
 export get_basis, regression, naive_sparsify,
        normalize_basis!, fiterrors, scatter_data,
        print_fiterrors,
-       observations
+       observations, get_lsq_system
 
 Base.norm(F::JVecsF) = norm(norm.(F))
 
@@ -461,6 +461,7 @@ function observations(d::Dat)
       S = virial(d)
       append!(Y, S[_IS])
    end
+   return Y
 end
 
 function observations(data::AbstractVector{Dat})
@@ -470,6 +471,8 @@ function observations(data::AbstractVector{Dat})
    end
    return Y
 end
+
+observations(lsq::LsqSys) = observations(lsq.data)
 
 
 # ------- Fix a JLD Bug --------------------------------------
@@ -533,7 +536,10 @@ function _getkey_val(t::Tuple, key)
    return length(i) > 0 ? t[i[1]][2] : 1.0
 end
 
-function read_weights(weights::Union{Void, Tuple})
+# TODO: hack - fix it
+_getkey_val(::Void, key) = 1.0
+
+function analyse_weights(weights::Union{Void, Tuple})
    # default weights
    w_E = 30.0
    w_F = 1.0
@@ -546,21 +552,70 @@ function read_weights(weights::Union{Void, Tuple})
    return (:E => w_E, :F => w_F, :V => w_V)
 end
 
-# apply_config_weights!(lsq, config_weights::Void) = lsq
-#
-# function apply_config_weights!(lsq, config_weights::Tuple)
-#    ctypes = config_types(lsq)
-#    for (key, val) in config_weights
-#       @assert key in ctypes
-#       Idat_key = find( config_type.(lsq.data) .== key )
-#       for i in Idat_key
-#          lsq.data[i].w = val
-#       end
-#    end
-#    return lsq
-# end
 
-function get_lsq_system(lsq, weights, config_weights)
+function analyse_include_exclude(lsq, include, exclude)
+   if include != nothing && exclude != nothing
+      error("only one of `include`, `exclude` may be different from `nothing`")
+   end
+   ctypes = config_types(lsq)
+   if include != nothing
+      if !issubset(include, ctypes)
+         error("`include` can only contain config types that are in the dataset")
+      end
+      # do nothing - just keep `include` as is to return
+   elseif exclude != nothing
+      if !issubset(exclude, ctypes)
+         error("`exclude` can only contain config types that are in the dataset")
+      end
+      include = setdiff(ctypes, exclude)
+   else
+      # both are nothing => keep all config_types
+      include = ctypes
+   end
+   return include
+end
+
+
+"""
+`get_lsq_system(lsq; kwargs...) -> Ψ, Y, Ibasis`
+
+Assemble the least squares system + rhs. The `kwargs` can be used to
+select a subset of the available data or basis set, and to adjust the
+weights by config_type. For more complex weight adjustments, one
+can directly modify the `lsq.data[n].w` coefficients.
+
+## Keyword Arguments:
+
+* weights: either `nothing` or a tuple of `Pair`s, i.e.,
+```
+weights = (:E => 100.0, :F => 1.0, :V => 0.01)
+```
+Here `:E` stand for energy, `:F` for forces and `:V` for virial .
+
+* config_weights: a tuple of string, value pairs, e.g.,
+```
+config_weights = ("solid" => 10.0, "liquid" => 0.1)
+```
+this adjusts the weights on individual configurations from these categories
+if no weight is provided then the weight provided with the is used.
+Note in particular that `config_weights` takes precedence of Dat.w!
+If a weight 0.0 is used, then those configurations are removed from the LSQ
+system.
+
+* `exclude`, `include`: arrays of strings of config_types to either
+include or exclude in the fit (default: all config types are included)
+
+* `order`: integer specifying up to which body-order to include the basis
+in the fit. (default: all basis functions are included)
+"""
+get_lsq_system(lsq; weights=nothing, config_weights=nothing,
+                    exclude=nothing, include=nothing, order = Inf) =
+   _get_lsq_system(lsq, analyse_weights(weights), config_weights,
+                   analyse_include_exclude(lsq, include, exclude), order)
+
+# function barrier for get_lsq_system
+function _get_lsq_system(lsq, weights, config_weights, include, order)
+
    Y = observations(lsq)
    W = zeros(length(Y))
    # energy, force, virial weights
@@ -568,12 +623,20 @@ function get_lsq_system(lsq, weights, config_weights)
    # reference energy => we assume the first basis function is 1B
    E0 = lsq.basis[1]()
 
+   # assemble the weight vector
    idx = 0
-   for d in data
+   for d in lsq.data
+      len = length(d)
       # weighting factor due to config_type
       w_cfg = _getkey_val(config_weights, config_type(d))
       # weighting factor from dataset
       w = weight(d) * w_cfg
+
+      # keep going through all data, but set the weight to zero if this
+      # one is to be excluded
+      if !(config_type(d) in include)
+         w = 0.0
+      end
 
       # energy
       W[idx+1] = w * w_E
@@ -582,7 +645,7 @@ function get_lsq_system(lsq, weights, config_weights)
       Y[idx] -= E0 * len
 
       # forces
-      if (forces(d) != nothing) && (length(d) > 1)
+      if (forces(d) != nothing) && (len > 1)
          W[(idx+1):(idx+3*len)] = w * w_F
          idx += 3*len
       end
@@ -591,23 +654,36 @@ function get_lsq_system(lsq, weights, config_weights)
          W[(idx+1):(idx+length(_IS))] = w * w_S
       end
    end
-
+   # double-check we haven't made a mess :)
    @assert idx == length(W) == length(Y)
 
-   # find the zeros and remove them
-   Inz = sort(find(W .!= 0))
-   Y = Y[Inz]
-   W = W[Inz]
-   Ψ = lsq.Ψ[Inz, 2:end]  # we are also remove the B1 basis function
+   # find the zeros and remove them => list of data points
+   Idata = find(W .!= 0.0) |> sort
 
-   # now rescale Y and Ψ
+   # find all basis functions with the required body-order
+   # (note we also remove the B1, which is assumed to be at index 1)
+   Ibasis = find(1 .< bodyorder.(lsq.basis) .<= order) |> sort
+
+   # take the appropriate slices of the data and basis
+   Y = Y[Idata]
+   W = W[Idata]
+   Ψ = lsq.Ψ[Idata, Ibasis]
+
+   # now rescale Y and Ψ according to W => Y_W, Ψ_W; then the two systems
+   #   \| Y_W - Ψ_W c \| -> min  and (Y - Ψ*c)^T W (Y - Ψ*x) => MIN
+   # are equivalent
    W .= sqrt.(W)
    Y .*= W
-   scale!(Ψ, W)
+   scale!(W, Ψ)
+
+   if any(isnan, Ψ) || any(isnan, Y)
+      error("discovered NaNs - something went horribly wrong!")
+   end
 
    # this should be it ...
-   return Ψ, Y
+   return Ψ, Y, Ibasis
 end
+
 
 
 """
@@ -632,32 +708,22 @@ system.
 """
 function regression!(lsq;
                      verbose = true,
-                     nforces=Inf,
-                     cstab = 1e-4,
-                     weights = nothing,
-                     config_weights = nothing )
+                     kwargs...)
    # TODO
    #  * regulariser
-   #  * exclude list
-   #  * stabstyle or stabiliser
-
-   weights = read_weights(weights)
+   #  * stabstyle or stabiliser => think about this carefully!
 
    # apply all the weights, get rid of anything that isn't needed or wanted
    # in particular subtract E0 from the energies and remove B1 from the
    # basis set
-   Y, Ψ = get_lsq_system(lsq, weights)
-   if any(isnan, Ψ) || any(isnan, Y)
-      error("discovered NaNs - something went wrong in the assembly")
-   end
+   Y, Ψ, Ibasis = get_lsq_system(lsq; kwargs...)
 
    # QR factorisation
    verbose && println("solve $(size(Ψ)) LSQ system using QR factorisation")
    QR = qrfact(Ψ)
-   Q, R = QR[:Q], QR[:R]
-   verbose && @show cond(R)
-   # back-substitution to get the coefficients
-   c = (R \ (Q' * Y)) ./ (1+cstab)
+   verbose && @show cond(QR[:R])
+   # back-substitution to get the coefficients # same as QR \ ???
+   c = QR \ Y
 
    # check error on training set: i.e. the naive errors using the
    # weights that are provided
@@ -671,4 +737,14 @@ function regression!(lsq;
    # (I assume that the first basis function is the 1B function)
    @assert bodyorder(lsq.basis[1]) == 1
    return NBodyIP(lsq.basis, [1.0; c])
+end
+
+
+function NBodyIP(lsq::LsqSys, c::Vector, Ibasis::Vector{Int})
+   if !(1 in Ibasis)
+      @assert bodyorder(lsq.basis[1]) == 1
+      c = [1.0; c]
+      Ibasis = [1; Ibasis]
+   end
+   return NBodyIP(lsq.basis[Ibasis], c)
 end
