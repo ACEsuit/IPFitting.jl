@@ -10,7 +10,8 @@ import Base: kron
 export get_basis, regression, naive_sparsify,
        normalize_basis!, fiterrors, scatter_data,
        print_fiterrors,
-       observations, get_lsq_system
+       observations, get_lsq_system,
+       regularise
 
 Base.norm(F::JVecsF) = norm(norm.(F))
 
@@ -263,27 +264,6 @@ function normalize_basis!(B, data)
    return B
 end
 
-"""
-remove a fraction `p` of normalised basis functions with the smallest
-normalised coefficients.
-
-NB: this returns complete *crap*.
-"""
-function naive_sparsify(B, c, data, p::AbstractFloat)
-   # get normalisation constants for the basis functions
-   nrmB = @showprogress "sparsify" [ force_norm(b, data) for b in B ]
-   # normalised contributions
-   cnrm = c .* nrmB
-   @show nrmB
-   # get the dominant contributions
-   I = sortperm(abs.(cnrm))
-   @show cnrm[I]
-   # get the subset of indices to keep
-   deleteat!(I, 1:floor(Int,length(B)*p))
-   # return the sparse basis and corresponding coefficients
-   return B[I], c[I]
-end
-
 
 
 function scatter_data(IP, data)
@@ -386,6 +366,7 @@ function kron(d::Dat, Bord::Vector, Iord::Vector{Vector{Int}})
             Ψ[(i0+1):(i0+length(_IS)), Iord[n][j]] = Svec
          end
       end
+      i0 += length(_IS)
    end
 
    return Ψ
@@ -609,12 +590,14 @@ include or exclude in the fit (default: all config types are included)
 in the fit. (default: all basis functions are included)
 """
 get_lsq_system(lsq; weights=nothing, config_weights=nothing,
-                    exclude=nothing, include=nothing, order = Inf) =
+                    exclude=nothing, include=nothing, order = Inf,
+                    regulariser = nothing) =
    _get_lsq_system(lsq, analyse_weights(weights), config_weights,
-                   analyse_include_exclude(lsq, include, exclude), order)
+                   analyse_include_exclude(lsq, include, exclude), order,
+                   regulariser)
 
 # function barrier for get_lsq_system
-function _get_lsq_system(lsq, weights, config_weights, include, order)
+function _get_lsq_system(lsq, weights, config_weights, include, order, regulariser)
 
    Y = observations(lsq)
    W = zeros(length(Y))
@@ -652,6 +635,7 @@ function _get_lsq_system(lsq, weights, config_weights, include, order)
       # virial
       if virial(d) != nothing
          W[(idx+1):(idx+length(_IS))] = w * w_S
+         idx += length(_IS)
       end
    end
    # double-check we haven't made a mess :)
@@ -680,10 +664,21 @@ function _get_lsq_system(lsq, weights, config_weights, include, order)
       error("discovered NaNs - something went horribly wrong!")
    end
 
+   # regularise
+   if regulariser != nothing
+      P = regulariser(lsq.basis[Ibasis])
+      Ψ, Y = regularise(Ψ, Y, P)
+   end
+
    # this should be it ...
    return Ψ, Y, Ibasis
 end
 
+
+function regularise(Ψ, Y, P::Matrix)
+   @assert size(Ψ,2) == size(P,2)
+   return vcat(Ψ, P), vcat(Y, zeros(size(P,1)))
+end
 
 
 """
@@ -706,9 +701,9 @@ Note in particular that `config_weights` takes precedence of Dat.w!
 If a weight 0.0 is used, then those configurations are removed from the LSQ
 system.
 """
-function regression!(lsq;
-                     verbose = true,
-                     kwargs...)
+function regression(lsq;
+                    verbose = true,
+                    kwargs...)
    # TODO
    #  * regulariser
    #  * stabstyle or stabiliser => think about this carefully!
@@ -748,3 +743,89 @@ function NBodyIP(lsq::LsqSys, c::Vector, Ibasis::Vector{Int})
    end
    return NBodyIP(lsq.basis[Ibasis], c)
 end
+
+
+# =============== Analysis Fitting Errors ===========
+
+_fiterrsdict() = Dict("E-RMS" => 0.0, "F-RMS" => 0.0, "E-MAE" => 0.0, "F-MAE" => 0.0)
+
+struct FitErrors
+   _::Dict{String, Dict{String,Float64}}
+end
+
+function fiterrors(lsq, c, Ibasis; include=nothing, exclude=nothing)
+   include = analyse_include_exclude(lsq, include, exclude)
+
+   E0 = lsq.basis[1]()
+   # create the dict for the fit errors
+   errs = Dict( "set" => _fiterrsdict() )
+   # count number of configurations
+   num = Dict("set" => Dict("E" => 0, "F" => 0))
+
+   for ct in include
+      errs[ct] = _fiterrsdict()
+      num[ct] = Dict("E" => 0, "F" => 0)
+   end
+
+   idx = 0
+   @showprogress for d in lsq.data
+      ct = config_type(d)
+      if !(ct in include)
+         continue
+      end
+
+      E_data, F_data, len = energy(d), forces(d), length(d)
+      E_data -= E0 * len
+
+      # ----- Energy error -----
+      E_fit = dot(lsq.Ψ[idx+1, Ibasis], c)
+      Erms = (E_data - E_fit)^2 / len^2
+      Emae = abs(E_data - E_fit) / len
+      errs[ct]["E-RMS"] += Erms
+      errs[ct]["E-MAE"] += Emae
+      num[ct]["E"] += 1
+      errs["set"]["E-RMS"] += Erms
+      errs["set"]["E-MAE"] += Emae
+      num["set"]["E"] += 1
+      idx += 1
+
+      # ----- Force error -------
+      if F_data != nothing
+         f_data = mat(F_data)[:]
+         f_fit = lsq.Ψ[(idx+1):(idx+3*len), Ibasis] * c
+         Frms = norm(f_data - f_fit)^2
+         Fmae = norm(f_data - f_fit, 1)
+         errs[ct]["F-RMS"] += Frms
+         errs[ct]["F-MAE"] += Fmae
+         num[ct]["F"] += 3 * len
+         errs["set"]["F-RMS"] += Frms
+         errs["set"]["F-MAE"] += Fmae
+         num["set"]["F"] += 3 * len
+         idx += 3 * len
+      end
+
+      # skip the stresses
+      if virial(d) != nothing
+         idx += length(_IS)
+      end
+   end
+
+   # NORMALISE
+   for key in keys(errs)
+      nE = num[key]["E"]
+      nF = num[key]["F"]
+      errs[key]["E-RMS"] = sqrt(errs[key]["E-RMS"] / nE)
+      errs[key]["F-RMS"] = sqrt(errs[key]["F-RMS"] / nF)
+      errs[key]["E-MAE"] = errs[key]["E-MAE"] / nE
+      errs[key]["F-MAE"] = errs[key]["F-MAE"] / nF
+   end
+
+   return FitErrors(errs)
+end
+
+
+# function print_fiterrors(errs::Tuple)
+#    @printf("             RMSE           ||             MAE   \n")
+#    @printf("      E      |       F      ||      E      |     F  \n")
+#    @printf(" %1.5f[eV] | %2.4f[eV/A] || %1.5f[eV] | %2.4f[eV/A] \n", errs...)
+# end

@@ -89,8 +89,8 @@ function read_virial(atpy)
          return JMat(atpy[:info][key]...)
       end
    end
-   try
-      return JMat(atpy[:info]("virial")...)
+   if haskey(atpy[:info], "virial")
+      return JMat(atpy[:info]["virial"]...)
    end
    return nothing
 end
