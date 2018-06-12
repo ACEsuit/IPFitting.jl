@@ -11,7 +11,7 @@ export get_basis, regression,
        fiterrors, scatter_data,
        print_fiterrors,
        observations, get_lsq_system,
-       regularise
+       regularise, table
 
 Base.norm(F::JVecsF) = norm(norm.(F))
 
@@ -253,15 +253,15 @@ end
 # TODO: hack - fix it
 _getkey_val(::Void, key) = 1.0
 
+default_weights() = (:E => 30.0, :F => 1.0, :V => 0.3)
+
 function analyse_weights(weights::Union{Void, Tuple})
    # default weights
-   w_E = 30.0
-   w_F = 1.0
-   w_V = 0.3
+   w_E, w_F, w_V = last.(default_weights())
    if weights != nothing
-      _haskey(weights, :E) && (w_E = _read_key(weights, :E))
-      _haskey(weights, :F) && (w_F = _read_key(weights, :F))
-      _haskey(weights, :V) && (w_V = _read_key(weights, :V))
+      _haskey(weights, :E) && (w_E = _getkey(weights, :E))
+      _haskey(weights, :F) && (w_F = _getkey(weights, :F))
+      _haskey(weights, :V) && (w_V = _getkey(weights, :V))
    end
    return (:E => w_E, :F => w_F, :V => w_V)
 end
@@ -483,7 +483,8 @@ end
 _fiterrsdict() = Dict("E-RMS" => 0.0, "F-RMS" => 0.0, "E-MAE" => 0.0, "F-MAE" => 0.0)
 
 struct FitErrors
-   _::Dict{String, Dict{String,Float64}}
+   errs::Dict{String, Dict{String,Float64}}
+   nrms::Dict{String, Dict{String,Float64}}
 end
 
 function fiterrors(lsq, c, Ibasis; include=nothing, exclude=nothing)
@@ -494,10 +495,12 @@ function fiterrors(lsq, c, Ibasis; include=nothing, exclude=nothing)
    errs = Dict( "set" => _fiterrsdict() )
    # count number of configurations
    num = Dict("set" => Dict("E" => 0, "F" => 0))
+   obs = Dict("set" => _fiterrsdict())
 
    for ct in include
       errs[ct] = _fiterrsdict()
       num[ct] = Dict("E" => 0, "F" => 0)
+      obs[ct] = _fiterrsdict()
    end
 
    idx = 0
@@ -523,10 +526,14 @@ function fiterrors(lsq, c, Ibasis; include=nothing, exclude=nothing)
       Erms = (E_data - E_fit)^2 / len^2
       Emae = abs(E_data - E_fit) / len
       errs[ct]["E-RMS"] += Erms
+      obs[ct]["E-RMS"] += (E_data / len)^2
       errs[ct]["E-MAE"] += Emae
+      obs[ct]["E-MAE"] += abs(E_data / len)
       num[ct]["E"] += 1
       errs["set"]["E-RMS"] += Erms
+      obs["set"]["E-RMS"] += (E_data / len)^2
       errs["set"]["E-MAE"] += Emae
+      obs["set"]["E-MAE"] += abs(E_data / len)
       num["set"]["E"] += 1
       idx += 1
 
@@ -537,10 +544,14 @@ function fiterrors(lsq, c, Ibasis; include=nothing, exclude=nothing)
          Frms = norm(f_data - f_fit)^2
          Fmae = norm(f_data - f_fit, 1)
          errs[ct]["F-RMS"] += Frms
+         obs[ct]["F-RMS"] += norm(f_data)^2
          errs[ct]["F-MAE"] += Fmae
+         obs[ct]["F-MAE"] += norm(f_data, 1)
          num[ct]["F"] += 3 * len
          errs["set"]["F-RMS"] += Frms
+         obs["set"]["F-RMS"] += norm(f_data)^2
          errs["set"]["F-MAE"] += Fmae
+         obs["set"]["F-MAE"] += norm(f_data, 1)
          num["set"]["F"] += 3 * len
          idx += 3 * len
       end
@@ -556,15 +567,46 @@ function fiterrors(lsq, c, Ibasis; include=nothing, exclude=nothing)
       nE = num[key]["E"]
       nF = num[key]["F"]
       errs[key]["E-RMS"] = sqrt(errs[key]["E-RMS"] / nE)
+      obs[key]["E-RMS"] = sqrt(obs[key]["E-RMS"] / nE)
       errs[key]["F-RMS"] = sqrt(errs[key]["F-RMS"] / nF)
+      obs[key]["F-RMS"] = sqrt(obs[key]["F-RMS"] / nF)
       errs[key]["E-MAE"] = errs[key]["E-MAE"] / nE
+      obs[key]["E-MAE"] = obs[key]["E-MAE"] / nE
       errs[key]["F-MAE"] = errs[key]["F-MAE"] / nF
+      obs[key]["F-MAE"] = obs[key]["F-MAE"] / nF
    end
 
-   return FitErrors(errs)
+   return FitErrors(errs, obs)
 end
 
 
+function table(errs::FitErrors; relative=false)
+   if !relative
+      println(errs::FitErrors)
+      return
+   end
+   print("-------------------------------------------------\n")
+   print("             ||       RMSE     ||       MAE      \n")
+   print(" config type ||  E [%] | F [%] ||  E [%] | F [%] \n")
+   print("-------------||--------|-------||--------|-------\n")
+   s_set = ""
+   nrms = errs.nrms
+   for (key, D) in errs.errs
+      nrm = nrms[key]
+      lkey = min(length(key), 11)
+      s = @sprintf(" %11s || %1.4f | %1.3f || %1.4f | %1.3f \n",
+               key[1:lkey], D["E-RMS"]/nrm["E-RMS"], D["F-RMS"]/nrm["F-RMS"],
+                            D["E-MAE"]/nrm["E-MAE"], D["F-MAE"]/nrm["F-MAE"])
+      if key == "set"
+         s_set = s
+      else
+         print(s)
+      end
+   end
+   print("-------------||--------|-------||--------|-------\n")
+   print(s_set)
+   print("-------------------------------------------------\n")
+end
 
 
 function Base.show(io::Base.TTY, errs::FitErrors)
@@ -573,7 +615,7 @@ function Base.show(io::Base.TTY, errs::FitErrors)
    print(io, " config type ||  E [eV] | F[eV/A] ||  E [eV] | F[eV/A] \n")
    print(io, "-------------||---------|---------||---------|---------\n")
    s_set = ""
-   for (key, D) in errs._
+   for (key, D) in errs.errs
       lkey = min(length(key), 11)
       s = @sprintf(" %11s || %1.5f | %1.5f || %1.5f | %1.5f \n",
                key[1:lkey], D["E-RMS"], D["F-RMS"], D["E-RMS"], D["E-MAE"])

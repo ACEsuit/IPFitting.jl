@@ -104,7 +104,7 @@ function read_configtype(atpy)
    return ""
 end
 
-
+# TODO: allow both include and exclude arguments
 function read_xyz(fname; verbose=true,
                   exclude = [], index = ":" )
    if verbose
@@ -118,8 +118,7 @@ function read_xyz(fname; verbose=true,
       tic()
    end
    dt = verbose ? 1.0 : 0.0
-   @showprogress dt for n = 1:length(at_list)
-      atpy = at_list[n]
+   @showprogress dt for atpy in at_list
       config_type = read_configtype(atpy)
       if config_type == ""
          warn("$idx has no config_type")
@@ -127,11 +126,12 @@ function read_xyz(fname; verbose=true,
       if config_type in exclude
          continue
       end
+      idx += 1
       E = read_energy(atpy)
       if E == nothing
          warn("$idx has not energy")
       end
-      data[n] = Dat( Atoms(ASEAtoms(atpy)),
+      data[idx] = Dat( Atoms(ASEAtoms(atpy)),
                      E,
                      read_forces(atpy),
                      read_virial(atpy),
@@ -139,7 +139,7 @@ function read_xyz(fname; verbose=true,
                      config_type )
    end
    verbose && toc()
-   return data
+   return data[1:idx]
 end
 
 
