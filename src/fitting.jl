@@ -38,7 +38,7 @@ config_types(lsq::LsqSys) = unique(config_type.(lsq.data))
 """
 Take a basis and split it into individual body-orders.
 """
-function split_basis(basis::AbstractVector{NBodyFunction})
+function split_basis(basis::AbstractVector{TB}) where TB <: NBodyFunction
    # get the types of the individual basis elements
    tps = typeof.(basis)
    Iord = Vector{Int}[]
@@ -367,7 +367,7 @@ function _get_lsq_system(lsq, weights, config_weights, include, order, regularis
       end
       # virial
       if virial(d) != nothing
-         W[(idx+1):(idx+length(_IS))] = w * w_S
+         W[(idx+1):(idx+length(_IS))] = w * w_V
          idx += length(_IS)
       end
    end
