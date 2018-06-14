@@ -48,5 +48,8 @@ include("fitting.jl")
 # IP i/o
 include("io.jl")
 
+#visualisation module
+include("PIPplot.jl")
+@reexport using NBodyIPs.PIPplot
 
 end # module
