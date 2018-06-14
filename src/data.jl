@@ -42,7 +42,7 @@ length(d)    # number of atoms
 if information is missing, the relevant function will return `nothing` instead
 (TODO for J v1.0: change `nothing` to `missing`)
 """
-struct Dat{T}
+mutable struct Dat{T}
    at::Atoms
    E::Union{Void,T}         # energy
    F::Union{Void,JVecs{T}}  # forces

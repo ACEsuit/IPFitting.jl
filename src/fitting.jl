@@ -5,13 +5,13 @@ using NBodyIPs: match_dictionary
 using Base.Threads
 
 import Base: kron
-
+import JLD2
 
 export get_basis, regression,
        fiterrors, scatter_data,
        print_fiterrors,
        observations, get_lsq_system,
-       regularise, table
+       regularise, table, load_lsq
 
 Base.norm(F::JVecsF) = norm(norm.(F))
 
@@ -677,3 +677,50 @@ end
 #    end
 #    return E_data, E_fit, F_data, F_fit
 # end
+
+
+# ----------- JLD2 Code -----------------
+
+using FileIO: save, load
+import FileIO: save
+
+function _checkextension(fname)
+   if fname[end-3:end] != "jld2"
+      error("the filename should end in `jld2`")
+   end
+end
+
+function save(fname::AbstractString, lsq::LsqSys)
+   _checkextension(fname)
+   # play a little trick to convert the basis into groups
+   IP = NBodyIP(lsq.basis, ones(length(lsq.basis)))
+   lsqdict = Dict(
+      "data" => lsq.data,
+      "basisgroups" => saveas.(IP.orders),
+      "Psi" => lsq.Ψ
+   )
+   save(fname, lsqdict)
+end
+
+function load_lsq(fname)
+   _checkextension(fname)
+   f = JLD2.jldopen(fname, "r")
+   Ψ = f["Psi"]
+   data = f["data"]
+   basisgroups = f["basisgroups"]
+   close(f)
+   # need to undo the lumping of the basis functions into a single NBody
+   # and get a basis back
+   basis = NBodyFunction[]
+   Iord = Vector{Int}[]
+   idx = 0
+   for Bgrp in basisgroups
+      Vn = loadas(Bgrp)
+      B = recover_basis(Vn)
+      push!(Iord, collect((idx+1):(idx+length(B))))
+      append!(basis, B)
+      idx += length(B)
+   end
+   @assert idx == length(basis)
+   return LsqSys(data, [b for b in basis], Iord, Ψ)
+end
