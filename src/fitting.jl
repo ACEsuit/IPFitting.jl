@@ -74,7 +74,7 @@ function kron(d::Dat, Bord::Vector, Iord::Vector{Vector{Int}})
    i0 = 0
    for n = 1:length(Bord)
       Es = energy(Bord[n], at)
-      Ψ[i0+1, Iord[n]] = Es
+      Ψ[i0+1, Iord[n]] = Es #/ len
    end
    i0 += 1
 
@@ -96,7 +96,7 @@ function kron(d::Dat, Bord::Vector, Iord::Vector{Vector{Int}})
          Ss = virial(Bord[n], at)
          for j = 1:length(Ss)
             Svec = Ss[j][_IS]
-            Ψ[(i0+1):(i0+length(_IS)), Iord[n][j]] = Svec
+            Ψ[(i0+1):(i0+length(_IS)), Iord[n][j]] = Svec #/ len
          end
       end
       i0 += length(_IS)
@@ -160,19 +160,20 @@ end
 
 
 function observations(d::Dat)
+   len = length(d)
    # ------- fill the data/observations vector -------------------
    Y = Float64[]
    # energy
-   push!(Y, energy(d))
+   push!(Y, energy(d) #/ len)
    # forces
-   if (forces(d) != nothing) && (length(d) > 1)
+   if (forces(d) != nothing) && (len > 1)
       f = forces(d)
       f_vec = mat(f)[:]
       append!(Y, f_vec)
    end
    # virial
    if virial(d) != nothing
-      S = virial(d)
+      S = virial(d) #/ len
       append!(Y, S[_IS])
    end
    return Y
@@ -324,13 +325,15 @@ in the fit. (default: all basis functions are included)
 """
 get_lsq_system(lsq; weights=nothing, config_weights=nothing,
                     exclude=nothing, include=nothing, order = Inf,
-                    regulariser = nothing) =
+                    regulariser = nothing,
+                    normalise_E = true, normalise_V = true) =
    _get_lsq_system(lsq, analyse_weights(weights), config_weights,
                    analyse_include_exclude(lsq, include, exclude), order,
-                   regulariser)
+                   regulariser, normalise_E, normalise_V)
 
 # function barrier for get_lsq_system
-function _get_lsq_system(lsq, weights, config_weights, include, order, regulariser)
+function _get_lsq_system(lsq, weights, config_weights, include, order,
+                         regulariser, normalise_E, normalise_V)
 
    Y = observations(lsq)
    W = zeros(length(Y))
@@ -343,6 +346,8 @@ function _get_lsq_system(lsq, weights, config_weights, include, order, regularis
    idx = 0
    for d in lsq.data
       len = length(d)
+      wnrm_E = normalise_E ? 1/len : 1.0
+      wnrm_V = normalise_V ? 1/len : 1.0
       # weighting factor due to config_type
       w_cfg = _getkey_val(config_weights, config_type(d))
       # weighting factor from dataset
@@ -355,7 +360,7 @@ function _get_lsq_system(lsq, weights, config_weights, include, order, regularis
       end
 
       # energy
-      W[idx+1] = w * w_E
+      W[idx+1] = w * w_E * wnrm_E
       idx += 1
       # and while we're at it, subtract E0 from Y
       Y[idx] -= E0 * len
@@ -367,7 +372,7 @@ function _get_lsq_system(lsq, weights, config_weights, include, order, regularis
       end
       # virial
       if virial(d) != nothing
-         W[(idx+1):(idx+length(_IS))] = w * w_V
+         W[(idx+1):(idx+length(_IS))] = w * w_V * wnrm_V
          idx += length(_IS)
       end
    end
@@ -480,7 +485,9 @@ end
 
 # =============== Analysis Fitting Errors ===========
 
-_fiterrsdict() = Dict("E-RMS" => 0.0, "F-RMS" => 0.0, "E-MAE" => 0.0, "F-MAE" => 0.0)
+_fiterrsdict() = Dict("E-RMS" => 0.0, "F-RMS" => 0.0, "V-RMS" => 0.0,
+                      "E-MAE" => 0.0, "F-MAE" => 0.0, "V-MAE" => 0.0)
+_cnterrsdict() = Dict("E" => 0, "F" => 0, "V" => 0)
 
 struct FitErrors
    errs::Dict{String, Dict{String,Float64}}
@@ -494,19 +501,19 @@ function fiterrors(lsq, c, Ibasis; include=nothing, exclude=nothing)
    # create the dict for the fit errors
    errs = Dict( "set" => _fiterrsdict() )
    # count number of configurations
-   num = Dict("set" => Dict("E" => 0, "F" => 0))
+   num = Dict("set" => _cnterrsdict())
    obs = Dict("set" => _fiterrsdict())
 
    for ct in include
       errs[ct] = _fiterrsdict()
-      num[ct] = Dict("E" => 0, "F" => 0)
+      num[ct] = _cnterrsdict()
       obs[ct] = _fiterrsdict()
    end
 
    idx = 0
    for d in lsq.data
       ct = config_type(d)
-      E_data, F_data, len = energy(d), forces(d), length(d)
+      E_data, F_data, V_data, len = energy(d), forces(d), virial(d), length(d)
       E_data -= E0 * len
 
       if !(ct in include)
@@ -556,8 +563,9 @@ function fiterrors(lsq, c, Ibasis; include=nothing, exclude=nothing)
          idx += 3 * len
       end
 
-      # skip the stresses
-      if virial(d) != nothing
+      # -------- stress errors ---------
+      if V_data != nothing
+         # (Skip for now)
          idx += length(_IS)
       end
    end
