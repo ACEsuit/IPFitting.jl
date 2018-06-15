@@ -74,7 +74,7 @@ function kron(d::Dat, Bord::Vector, Iord::Vector{Vector{Int}})
    i0 = 0
    for n = 1:length(Bord)
       Es = energy(Bord[n], at)
-      Ψ[i0+1, Iord[n]] = Es #/ len
+      Ψ[i0+1, Iord[n]] = Es
    end
    i0 += 1
 
@@ -96,7 +96,7 @@ function kron(d::Dat, Bord::Vector, Iord::Vector{Vector{Int}})
          Ss = virial(Bord[n], at)
          for j = 1:length(Ss)
             Svec = Ss[j][_IS]
-            Ψ[(i0+1):(i0+length(_IS)), Iord[n][j]] = Svec #/ len
+            Ψ[(i0+1):(i0+length(_IS)), Iord[n][j]] = Svec
          end
       end
       i0 += length(_IS)
@@ -164,7 +164,7 @@ function observations(d::Dat)
    # ------- fill the data/observations vector -------------------
    Y = Float64[]
    # energy
-   push!(Y, energy(d) #/ len)
+   push!(Y, energy(d))
    # forces
    if (forces(d) != nothing) && (len > 1)
       f = forces(d)
@@ -173,7 +173,7 @@ function observations(d::Dat)
    end
    # virial
    if virial(d) != nothing
-      S = virial(d) #/ len
+      S = virial(d)
       append!(Y, S[_IS])
    end
    return Y
