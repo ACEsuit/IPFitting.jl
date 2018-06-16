@@ -545,7 +545,7 @@ function fiterrors(lsq, c, Ibasis; include=nothing, exclude=nothing)
       idx += 1
 
       # ----- Force error -------
-      if F_data != nothing
+      if (F_data != nothing) && (len > 1)
          f_data = mat(F_data)[:]
          f_fit = lsq.Ψ[(idx+1):(idx+3*len), Ibasis] * c
          Frms = norm(f_data - f_fit)^2
