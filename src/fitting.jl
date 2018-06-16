@@ -565,18 +565,18 @@ function fiterrors(lsq, c, Ibasis; include=nothing, exclude=nothing)
 
       # -------- stress errors ---------
       if V_data != nothing
-         V_fit = lsq.Ψ[(idx+1):(idx+length(_IS)),:] * c
-         V_err = norm(V_fit - V_data, Inf) / len  # replace with operator norm on matrix
-         errs[ct]["V-RMS"] += V_err^2
-         obs[ct]["V-RMS"] += norm(V_data, Inf)^2
-         errs[ct]["V-MAE"] += V_err
-         obs[ct]["V-MAE"] += norm(V_err, Inf)
-         num[ct]["V"] += 1
-         errs["set"]["V-RMS"] += V_err^2
-         obs["set"]["V-RMS"] += norm(V_data, Inf)^2
-         errs["set"]["V-MAE"] += V_err
-         obs["set"]["V-MAE"] += norm(V_err, Inf)
-         num["set"]["V"] += 1
+         # V_fit = lsq.Ψ[(idx+1):(idx+length(_IS)),Ibasis] * c
+         # V_err = norm(V_fit - V_data[_IS], Inf) / len  # replace with operator norm on matrix
+         # errs[ct]["V-RMS"] += V_err^2
+         # obs[ct]["V-RMS"] += norm(V_data, Inf)^2
+         # errs[ct]["V-MAE"] += V_err
+         # obs[ct]["V-MAE"] += norm(V_err, Inf)
+         # num[ct]["V"] += 1
+         # errs["set"]["V-RMS"] += V_err^2
+         # obs["set"]["V-RMS"] += norm(V_data, Inf)^2
+         # errs["set"]["V-MAE"] += V_err
+         # obs["set"]["V-MAE"] += norm(V_err, Inf)
+         # num["set"]["V"] += 1
          idx += length(_IS)
       end
    end
@@ -589,14 +589,14 @@ function fiterrors(lsq, c, Ibasis; include=nothing, exclude=nothing)
       obs[key]["E-RMS"] = sqrt(obs[key]["E-RMS"] / nE)
       errs[key]["F-RMS"] = sqrt(errs[key]["F-RMS"] / nF)
       obs[key]["F-RMS"] = sqrt(obs[key]["F-RMS"] / nF)
-      errs[key]["V-RMS"] = sqrt(errs[key]["V-RMS"] / nV)
-      obs[key]["V-RMS"] = sqrt(obs[key]["V-RMS"] / nV)
+      # errs[key]["V-RMS"] = sqrt(errs[key]["V-RMS"] / nV)
+      # obs[key]["V-RMS"] = sqrt(obs[key]["V-RMS"] / nV)
       errs[key]["E-MAE"] = errs[key]["E-MAE"] / nE
       obs[key]["E-MAE"] = obs[key]["E-MAE"] / nE
       errs[key]["F-MAE"] = errs[key]["F-MAE"] / nF
       obs[key]["F-MAE"] = obs[key]["F-MAE"] / nF
-      errs[key]["V-MAE"] = errs[key]["V-MAE"] / nV
-      obs[key]["V-MAE"] = obs[key]["V-MAE"] / nV
+      # errs[key]["V-MAE"] = errs[key]["V-MAE"] / nV
+      # obs[key]["V-MAE"] = obs[key]["V-MAE"] / nV
    end
 
    return FitErrors(errs, obs)
