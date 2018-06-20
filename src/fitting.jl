@@ -537,6 +537,7 @@ function fiterrors(lsq, c, Ibasis; include=nothing, exclude=nothing)
       errs[ct]["E-MAE"] += Emae
       obs[ct]["E-MAE"] += abs(E_data / len)
       num[ct]["E"] += 1
+      # - - - - - - - - - - - - - - - -
       errs["set"]["E-RMS"] += Erms
       obs["set"]["E-RMS"] += (E_data / len)^2
       errs["set"]["E-MAE"] += Emae
@@ -555,6 +556,7 @@ function fiterrors(lsq, c, Ibasis; include=nothing, exclude=nothing)
          errs[ct]["F-MAE"] += Fmae
          obs[ct]["F-MAE"] += norm(f_data, 1)
          num[ct]["F"] += 3 * len
+         # - - - - - - - - - - - - - - - -
          errs["set"]["F-RMS"] += Frms
          obs["set"]["F-RMS"] += norm(f_data)^2
          errs["set"]["F-MAE"] += Fmae
@@ -565,18 +567,20 @@ function fiterrors(lsq, c, Ibasis; include=nothing, exclude=nothing)
 
       # -------- stress errors ---------
       if V_data != nothing
-         # V_fit = lsq.Ψ[(idx+1):(idx+length(_IS)),Ibasis] * c
-         # V_err = norm(V_fit - V_data[_IS], Inf) / len  # replace with operator norm on matrix
-         # errs[ct]["V-RMS"] += V_err^2
-         # obs[ct]["V-RMS"] += norm(V_data, Inf)^2
-         # errs[ct]["V-MAE"] += V_err
-         # obs[ct]["V-MAE"] += norm(V_err, Inf)
-         # num[ct]["V"] += 1
-         # errs["set"]["V-RMS"] += V_err^2
-         # obs["set"]["V-RMS"] += norm(V_data, Inf)^2
-         # errs["set"]["V-MAE"] += V_err
-         # obs["set"]["V-MAE"] += norm(V_err, Inf)
-         # num["set"]["V"] += 1
+         V_fit = lsq.Ψ[(idx+1):(idx+length(_IS)),Ibasis] * c
+         V_err = norm(V_fit - V_data[_IS], Inf) / len  # replace with operator norm on matrix
+         V_nrm = norm(V_data[_IS], Inf)
+         errs[ct]["V-RMS"] += V_err^2
+         obs[ct]["V-RMS"] += V_nrm^2
+         errs[ct]["V-MAE"] += V_err
+         obs[ct]["V-MAE"] += V_nrm
+         num[ct]["V"] += 1
+         # - - - - - - - - - - - - - - - -
+         errs["set"]["V-RMS"] += V_err^2
+         obs["set"]["V-RMS"] += V_nrm^2
+         errs["set"]["V-MAE"] += V_err
+         obs["set"]["V-MAE"] += V_nrm
+         num["set"]["V"] += 1
          idx += length(_IS)
       end
    end
@@ -585,18 +589,19 @@ function fiterrors(lsq, c, Ibasis; include=nothing, exclude=nothing)
    for key in keys(errs)
       nE = num[key]["E"]
       nF = num[key]["F"]
+      nV = num[key]["V"]
       errs[key]["E-RMS"] = sqrt(errs[key]["E-RMS"] / nE)
       obs[key]["E-RMS"] = sqrt(obs[key]["E-RMS"] / nE)
       errs[key]["F-RMS"] = sqrt(errs[key]["F-RMS"] / nF)
       obs[key]["F-RMS"] = sqrt(obs[key]["F-RMS"] / nF)
-      # errs[key]["V-RMS"] = sqrt(errs[key]["V-RMS"] / nV)
-      # obs[key]["V-RMS"] = sqrt(obs[key]["V-RMS"] / nV)
+      errs[key]["V-RMS"] = sqrt(errs[key]["V-RMS"] / nV)
+      obs[key]["V-RMS"] = sqrt(obs[key]["V-RMS"] / nV)
       errs[key]["E-MAE"] = errs[key]["E-MAE"] / nE
       obs[key]["E-MAE"] = obs[key]["E-MAE"] / nE
       errs[key]["F-MAE"] = errs[key]["F-MAE"] / nF
       obs[key]["F-MAE"] = obs[key]["F-MAE"] / nF
-      # errs[key]["V-MAE"] = errs[key]["V-MAE"] / nV
-      # obs[key]["V-MAE"] = obs[key]["V-MAE"] / nV
+      errs[key]["V-MAE"] = errs[key]["V-MAE"] / nV
+      obs[key]["V-MAE"] = obs[key]["V-MAE"] / nV
    end
 
    return FitErrors(errs, obs)
@@ -612,49 +617,52 @@ function table(errs::FitErrors; relative=false)
 end
 
 function table_relative(errs)
-   print("-------------------------------------------------\n")
-   print("             ||       RMSE     ||       MAE      \n")
-   print(" config type ||  E [%] | F [%] ||  E [%] | F [%] \n")
-   print("-------------||--------|-------||--------|-------\n")
+   print("---------------------------------------------------------------\n")
+   print("             ||           RMSE        ||           MAE      \n")
+   print(" config type || E [%] | F [%] | V [%] || E [%] | F [%] | V [%] \n")
+   print("-------------||-------|-------|-------||-------|-------|-------\n")
    s_set = ""
    nrms = errs.nrms
    for (key, D) in errs.errs
       nrm = nrms[key]
       lkey = min(length(key), 11)
-      s = @sprintf(" %11s || %1.4f | %1.3f || %1.4f | %1.3f \n",
-               key[1:lkey], D["E-RMS"]/nrm["E-RMS"], D["F-RMS"]/nrm["F-RMS"],
-                            D["E-MAE"]/nrm["E-MAE"], D["F-MAE"]/nrm["F-MAE"])
+      s = @sprintf(" %11s || %5.2f | %5.2f | %5.2f || %5.2f | %5.2f | %5.2f \n",
+         key[1:lkey],
+         100*D["E-RMS"]/nrm["E-RMS"], 100*D["F-RMS"]/nrm["F-RMS"], 100*D["V-RMS"]/nrm["V-RMS"],
+         100*D["E-MAE"]/nrm["E-MAE"], 100*D["F-MAE"]/nrm["F-MAE"], 100*D["V-MAE"]/nrm["V-MAE"])
       if key == "set"
          s_set = s
       else
          print(s)
       end
    end
-   print("-------------||--------|-------||--------|-------\n")
+   print("-------------||-------|-------|-------||-------|-------|-------\n")
    print(s_set)
-   print("-------------------------------------------------\n")
+   print("---------------------------------------------------------------\n")
 end
 
 
 function table_absolute(errs::FitErrors)
-   print("-------------------------------------------------------\n")
-   print("             ||       RMSE        ||        MAE       \n")
-   print(" config type ||  E [eV] | F[eV/A] ||  E [eV] | F[eV/A] \n")
-   print("-------------||---------|---------||---------|---------\n")
+   print("---------------------------------------------------------------------------\n")
+   print("             ||            RMSE             ||             MAE        \n")
+   print(" config type ||  E [eV] | F[eV/A] | V[eV/A] ||  E [eV] | F[eV/A] | V[eV/A] \n")
+   print("-------------||---------|---------|---------||---------|---------|---------\n")
    s_set = ""
    for (key, D) in errs.errs
       lkey = min(length(key), 11)
-      s = @sprintf(" %11s || %1.5f | %1.5f || %1.5f | %1.5f \n",
-               key[1:lkey], D["E-RMS"], D["F-RMS"], D["E-RMS"], D["E-MAE"])
+      s = @sprintf(" %11s || %7.4f | %7.4f | %7.4f || %7.4f | %7.4f | %7.4f \n",
+                   key[1:lkey],
+                   D["E-RMS"], D["F-RMS"], D["V-RMS"],
+                   D["E-RMS"], D["E-MAE"], D["V-MAE"] )
       if key == "set"
          s_set = s
       else
          print(s)
       end
    end
-   print("-------------||---------|---------||---------|---------\n")
+   print("-------------||---------|---------|---------||---------|---------|---------\n")
    print(s_set)
-   print("-------------------------------------------------------\n")
+   print("---------------------------------------------------------------------------\n")
 end
 
 
