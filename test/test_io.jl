@@ -67,3 +67,21 @@ d1 = JLD.load("temp.jld", "d1")
 
 
 JLD.@load "temp.jld" lsq
+
+
+
+
+
+
+using FileIO
+save("ip_temp.jld2", "IP", IP4)
+IP4b = load("ip_temp.jld2", "IP")
+IP4bf = fast(IP4b)
+using StaticArrays
+for n in [1,3,6]
+    for _ = 1:10
+        r = SVector((3.0 + rand(n))...)
+        @assert IP4(r) ≈ IP4b(r)
+        @assert IP4(r) ≈ IP4bf(r)
+    end
+end
