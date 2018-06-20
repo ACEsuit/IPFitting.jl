@@ -2,12 +2,9 @@ julia 0.6
 JuLIP
 NeighbourLists
 Reexport
-ForwardDiff
 StaticArrays
-Combinatorics
 ProgressMeter
 PyCall
 ASE
-BenchmarkTools
-JLD
+JLD2
 StaticPolynomials
