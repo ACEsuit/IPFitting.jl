@@ -11,12 +11,16 @@
 <!--
 
 TODO
- * virial errors
  * merge Cas' visualisation branch
- * LASSO
- * sparse grid basis
+ * partial data
+ * LASSO              >>> Genevieve
+ * sparse grid basis  >>> with Genevieve next week??
+
+Mess around at night:
  * W fit
  * Si fit => or not
+
+Big ones
  * environment dependence for fullsymm
  * bond-angle potentials + environment dependence
 

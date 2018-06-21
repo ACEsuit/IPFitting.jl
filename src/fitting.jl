@@ -11,7 +11,8 @@ export get_basis, regression,
        fiterrors, scatter_data,
        print_fiterrors,
        observations, get_lsq_system,
-       regularise, table, load_lsq
+       regularise, table, load_lsq,
+       config_types
 
 Base.norm(F::JVecsF) = norm(norm.(F))
 
@@ -22,7 +23,7 @@ const _IS = SVector(1,2,3,5,6,9)
 `mutable struct IpLsqSys`: type storing all information to perform a
 LSQ fit for an interatomic potential. To assemble the LsqSys use
 ```
-dot(data, basis)
+kron(data, basis)
 ```
 """
 mutable struct LsqSys
@@ -190,24 +191,6 @@ end
 observations(lsq::LsqSys) = observations(lsq.data)
 
 
-# ------- Fix a JLD Bug --------------------------------------
-
-import JLD
-struct LsqSysSerializer; data; basis; Iord; Ψ; end
-
-JLD.writeas(lsq::LsqSys) = LsqSysSerializer(lsq.data, lsq.basis, lsq.Iord, lsq.Ψ)
-
-function JLD.readas(lsq::LsqSysSerializer)
-   basis = lsq.basis
-   # make sure all elements of the same basis group have the
-   # same dictionary; the problem is that deserialize is called
-   # on each NBody individually which will give multiple types that
-   # are different for the compiler but describe the same dictionary.
-   for I in lsq.Iord, i = 2:length(I)
-      basis[I[i]] = match_dictionary(basis[I[i]], basis[I[1]])
-   end
-   return  LsqSys(lsq.data, basis, lsq.Iord, lsq.Ψ)
-end
 
 # -------------------------------------------------------
 
@@ -231,6 +214,13 @@ function Base.show(io::Base.IO, lsq::LsqSys)
       info(B; indent = 6)
    end
    println(io, repeat("=", 60))
+end
+
+
+function Base.append!(lsq::NBodyIPs.LsqSys, data::Vector{TD}) where TD <: NBodyIPs.Data.Dat
+   lsq2 = kron(data, lsq.basis)
+   lsq.data = [lsq.data; data]
+   lsq.Ψ = [lsq.Ψ; lsq2.Ψ]
 end
 
 
@@ -291,6 +281,50 @@ function analyse_include_exclude(lsq, include, exclude)
 end
 
 
+function analyse_subbasis(lsq, order, degrees, Ibasis)
+   not_nothing = length(find( [order, degrees, Ibasis] .!= nothing ))
+   if not_nothing > 1
+      @show order, degrees, Ibasis
+      error("at most one of the keyword arguments `order`, `degrees`, `Ibasis` maybe provided")
+   end
+
+   # if the user has given no information, then we just take the entire basis
+   if not_nothing == 0
+      order = Inf
+   end
+
+   # if basis is chosen by maximum body-order ...
+   if order != nothing
+      Ibasis = find(1 .< bodyorder.(lsq.basis) .<= order) |> sort
+
+   # if basis is chosen by maximum degrees body-order ...
+   # degrees = array of
+   elseif degrees != nothing
+      # check that the constant is excluded
+      @assert degrees[1] == 0
+      Ibasis = Int[]
+      for (deg, I) in zip(degrees, lsq.Iord)
+         if deg == 0
+            continue
+         end
+         # loop through all basis functions in the current group
+         for i in I
+            # and add all those to Ibasis which have degree <= deg
+            if degree(lsq.basis[i]) <= deg
+               push!(Ibasis, i)
+            end
+         end
+      end
+
+   # of indeed if the basis is just constructed through individual indices
+   else
+      Ibasis = Int[i for i in Ibasis]
+   end
+
+   return Ibasis
+end
+
+
 """
 `get_lsq_system(lsq; kwargs...) -> Ψ, Y, Ibasis`
 
@@ -323,16 +357,24 @@ include or exclude in the fit (default: all config types are included)
 * `order`: integer specifying up to which body-order to include the basis
 in the fit. (default: all basis functions are included)
 """
-get_lsq_system(lsq; weights=nothing, config_weights=nothing,
-                    exclude=nothing, include=nothing, order = Inf,
-                    regulariser = nothing,
-                    normalise_E = true, normalise_V = true) =
-   _get_lsq_system(lsq, analyse_weights(weights), config_weights,
-                   analyse_include_exclude(lsq, include, exclude), order,
+get_lsq_system(lsq;
+               weights=nothing,
+               config_weights=nothing,
+               exclude=nothing, include=nothing,
+               order = nothing,
+               degrees = nothing,
+               Ibasis = nothing,
+               regulariser = nothing,
+               normalise_E = true, normalise_V = true) =
+   _get_lsq_system(lsq,
+                   analyse_weights(weights),
+                   config_weights,
+                   analyse_include_exclude(lsq, include, exclude),
+                   analyse_subbasis(lsq, order, degrees, Ibasis),
                    regulariser, normalise_E, normalise_V)
 
 # function barrier for get_lsq_system
-function _get_lsq_system(lsq, weights, config_weights, include, order,
+function _get_lsq_system(lsq, weights, config_weights, include, Ibasis,
                          regulariser, normalise_E, normalise_V)
 
    Y = observations(lsq)
@@ -381,10 +423,6 @@ function _get_lsq_system(lsq, weights, config_weights, include, order,
 
    # find the zeros and remove them => list of data points
    Idata = find(W .!= 0.0) |> sort
-
-   # find all basis functions with the required body-order
-   # (note we also remove the B1, which is assumed to be at index 1)
-   Ibasis = find(1 .< bodyorder.(lsq.basis) .<= order) |> sort
 
    # take the appropriate slices of the data and basis
    Y = Y[Idata]
