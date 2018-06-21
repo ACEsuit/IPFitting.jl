@@ -12,7 +12,7 @@ function generate_data(species, L, rmax, N, calc)
       rattle!(at, rand() * rmax)
       E = energy(calc, at)
       F = forces(calc, at)
-      push!(data, Dat(at, E, F, nothing))
+      push!(data, Dat(at, E, F, nothing, 1.0))
    end
    return data
 end
@@ -37,7 +37,7 @@ D3 = Dictionary(TRANSFORM, CUTOFF3)
 err_erms = Float64[]
 err_frms = Float64[]
 # degrees = [(4,4), (6,6), (8,6), (10,8), (12,10), (14,10), (16,12)]
-degrees = [4, 6, 8, 10, 12, 14, 16]
+degrees = [4, 6, 8, 10] # , 12, 14, 16]
 rr = linspace(0.9*r0, cutoff(calc), 200)
 for deg3 in degrees
    # B = [B1; gen_basis(2, D2, deg2); gen_basis(3, D3, deg3)]
@@ -66,3 +66,6 @@ df = DataFrame( :degrees => degrees,
                 :rms_E => err_erms,
                 :rms_F => err_frms )
 display(df)
+
+(@test minimum(err_erms) < 0.0004) |> println
+(@test minimum(err_frms) < 0.04) |> println

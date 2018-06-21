@@ -14,7 +14,7 @@ See `?...` on how to
 """
 module NBodyIPs
 
-using Reexport
+using Reexport, StaticArrays
 
 # two auxiliary functions to make for easier assembly of the code
 push_str!(ex::Vector{Expr}, s::String) = push!(ex, parse(s))
@@ -22,6 +22,8 @@ append_str!(ex::Vector{Expr}, s::Vector{String}) = append!(ex, parse.(s))
 
 
 include("fastpolys.jl")
+
+include("invariants.jl")
 
 include("common.jl")
 
@@ -32,17 +34,16 @@ include("common.jl")
 #       or maybe other parts of the package
 include("misc.jl")
 
-include("invariants.jl")
 
 # describe basis functions in terms of symmetry invariants
 include("polynomials.jl")
 @reexport using NBodyIPs.Polys
 
-# fitting from data (e.g., least squares)
-include("fitting.jl")
-
 # loading data
 include("data.jl")
+
+# fitting from data (e.g., least squares)
+include("fitting.jl")
 
 # IP i/o
 include("io.jl")
