@@ -49,11 +49,15 @@ include("data.jl")
 @reexport using NBodyIPs.Data
 
 # fitting from data (e.g., least squares)
-# TODO: make this a sub-module and re-export 
+# TODO: make this a sub-module and re-export
 include("fitting.jl")
 
 # IP i/o
 include("io.jl")
 @reexport using NBodyIPs.IO
+
+#visualisation module
+include("PIPplot.jl")
+@reexport using NBodyIPs.PIPplot
 
 end # module
