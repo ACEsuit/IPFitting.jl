@@ -13,6 +13,7 @@
 TODO
  * merge Cas' visualisation branch
  * partial data
+    - unclear this is a good idea, leave for now
  * LASSO              >>> Genevieve
  * sparse grid basis  >>> with Genevieve next week??
 

@@ -20,10 +20,12 @@ Base.norm(F::JVecsF) = norm(norm.(F))
 const _IS = SVector(1,2,3,5,6,9)
 
 """
-`mutable struct IpLsqSys`: type storing all information to perform a
+`mutable struct LsqSys`: type storing all information to perform a
 LSQ fit for an interatomic potential. To assemble the LsqSys use
+one of (equivalent)
 ```
 kron(data, basis)
+LsqSys(data, basis)
 ```
 """
 mutable struct LsqSys
@@ -33,6 +35,7 @@ mutable struct LsqSys
    Ψ::Matrix{Float64}
 end
 
+LsqSys(data, basis) = kron(data, basis)
 
 config_types(lsq::LsqSys) = unique(config_type.(lsq.data))
 
@@ -53,8 +56,6 @@ function split_basis(basis::AbstractVector{TB}) where TB <: NBodyFunction
    return Bord, Iord
 end
 
-
-kron(d::Dat, B::Vector{NBodyFunction}) = dot(d, split_basis(B)...)
 
 # ------- fill the LSQ system, i.e. evaluate basis at data points -------
 function kron(d::Dat, Bord::Vector, Iord::Vector{Vector{Int}})
