@@ -4,7 +4,7 @@ using NBodyIPs: match_dictionary
 
 using Base.Threads
 
-import Base: kron
+import Base: kron, append!
 import JLD2
 
 export get_basis, regression,
@@ -219,9 +219,13 @@ end
 
 
 function Base.append!(lsq::NBodyIPs.LsqSys, data::Vector{TD}) where TD <: NBodyIPs.Data.Dat
-   lsq2 = kron(data, lsq.basis)
-   lsq.data = [lsq.data; data]
+   return append!(lsq, kron(data, lsq.basis))
+end
+
+function Base.append!(lsq::NBodyIPs.LsqSys, lsq2::NBodyIPs.LsqSys)
+   lsq.data = [lsq.data; lsq2.data]
    lsq.Ψ = [lsq.Ψ; lsq2.Ψ]
+   return lsq
 end
 
 
@@ -326,6 +330,30 @@ function analyse_subbasis(lsq, order, degrees, Ibasis)
 end
 
 
+function hess_weights_hook!(w, d::Dat)
+   at = Atoms(d)
+   if length(w) != 1 + 3 * length(at)
+      warn("unexpected length(w) in hess_weights_hook => ignore")
+      return w
+   end
+   # don't use this energy
+   w[1] = 0.0
+   # compute R vectors
+   X = positions(at)
+   h = norm(X[1])
+   if h < 1e-5 || h > 0.02
+      warn("unexpected location of X[1] in hess_weights_hook => ignore")
+      return w
+   end
+   X[1] *= 0
+   R = [ JuLIP.project_min(at, x - X[1])  for x in X ]
+   r = norm.(R)
+   r3 = (ones(3) * r')[:]
+   w[2:end] .= w[2:end] .* (r3.^7) / h
+   return w
+end
+
+
 """
 `get_lsq_system(lsq; kwargs...) -> Ψ, Y, Ibasis`
 
@@ -366,17 +394,20 @@ get_lsq_system(lsq;
                degrees = nothing,
                Ibasis = nothing,
                regulariser = nothing,
-               normalise_E = true, normalise_V = true) =
+               normalise_E = true, normalise_V = true,
+               hooks = Dict("hess" => hess_weights_hook!)) =
    _get_lsq_system(lsq,
                    analyse_weights(weights),
                    config_weights,
                    analyse_include_exclude(lsq, include, exclude),
                    analyse_subbasis(lsq, order, degrees, Ibasis),
-                   regulariser, normalise_E, normalise_V)
+                   regulariser, normalise_E, normalise_V,
+                   hooks)
 
 # function barrier for get_lsq_system
 function _get_lsq_system(lsq, weights, config_weights, include, Ibasis,
-                         regulariser, normalise_E, normalise_V)
+                         regulariser, normalise_E, normalise_V,
+                         hooks)
 
    Y = observations(lsq)
    W = zeros(length(Y))
@@ -388,6 +419,7 @@ function _get_lsq_system(lsq, weights, config_weights, include, Ibasis,
    # assemble the weight vector
    idx = 0
    for d in lsq.data
+      idx_init = idx+1
       len = length(d)
       wnrm_E = normalise_E ? 1/len : 1.0
       wnrm_V = normalise_V ? 1/len : 1.0
@@ -417,6 +449,16 @@ function _get_lsq_system(lsq, weights, config_weights, include, Ibasis,
       if virial(d) != nothing
          W[(idx+1):(idx+length(_IS))] = w * w_V * wnrm_V
          idx += length(_IS)
+      end
+
+      # TODO: this should be generalised to be able to hook into
+      #       other kinds of weight modifications
+      idx_end = idx
+      if length(config_type(d)) >= 4 && config_type(d)[1:4] == "hess"
+         if haskey(hooks, "hess")
+            w = hooks["hess"](W[idx_init:idx_end], d)
+            W[idx_init:idx_end] = w
+         end 
       end
    end
    # double-check we haven't made a mess :)
