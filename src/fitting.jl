@@ -12,7 +12,8 @@ export get_basis, regression,
        print_fiterrors,
        observations, get_lsq_system,
        regularise, table, load_lsq,
-       config_types
+       config_types,
+       del_data!
 
 Base.norm(F::JVecsF) = norm(norm.(F))
 
@@ -31,7 +32,7 @@ LsqSys(data, basis)
 mutable struct LsqSys
    data::Vector{Dat}
    basis::Vector{NBodyFunction}
-   Iord::Vector{Vector{Int}}
+   Iord::Vector{Vector{Int}}     # result of split_basis
    Ψ::Matrix{Float64}
 end
 
@@ -197,24 +198,24 @@ observations(lsq::LsqSys) = observations(lsq.data)
 
 using NBodyIPs.Data: config_type
 
-function Base.show(io::Base.IO, lsq::LsqSys)
-   println(io, repeat("=", 60))
-   println(io, " LsqSys Summary")
-   println(io, repeat("-", 60))
-   println(io, "      #configs: $(length(lsq.data))")
-   println(io, "    #basisfcns: $(length(lsq.basis))")
-   println(io, "  config_types: ",
+function Base.info(lsq::LsqSys)
+   println(repeat("=", 60))
+   println(" LsqSys Summary")
+   println(repeat("-", 60))
+   println("      #configs: $(length(lsq.data))")
+   println("    #basisfcns: $(length(lsq.basis))")
+   println("  config_types: ",
          prod(s*", " for s in config_types(lsq)))
 
    Bord, _ = split_basis(lsq.basis)
-   println(io, " #basis groups: $(length(Bord))")
-   println(io, repeat("-", 60))
+   println(" #basis groups: $(length(Bord))")
+   println(repeat("-", 60))
 
    for (n, B) in enumerate(Bord)
-      println(io, "   Group $n:")
+      println("   Group $n:")
       info(B; indent = 6)
    end
-   println(io, repeat("=", 60))
+   println(repeat("=", 60))
 end
 
 
@@ -458,7 +459,7 @@ function _get_lsq_system(lsq, weights, config_weights, include, Ibasis,
          if haskey(hooks, "hess")
             w = hooks["hess"](W[idx_init:idx_end], d)
             W[idx_init:idx_end] = w
-         end 
+         end
       end
    end
    # double-check we haven't made a mess :)
@@ -497,6 +498,41 @@ end
 function regularise(Ψ, Y, P::Matrix)
    @assert size(Ψ,2) == size(P,2)
    return vcat(Ψ, P), vcat(Y, zeros(size(P,1)))
+end
+
+data_rows(lsq::LsqSys) = data_rows(lsq.data)
+
+function data_rows(data::Vector)
+   I = Vector{Int}[]
+   idx = 0
+   for d in data
+      idx_init = idx+1
+      len = length(d)
+      @assert energy(d) != nothing
+      idx += 1
+      if (forces(d) != nothing) && (len > 1)
+         idx += 3*len
+      end
+      if virial(d) != nothing
+         idx += length(_IS)
+      end
+      idx_end = idx
+      push!(I, collect(idx_init:idx_end))
+   end
+   return I
+end
+
+
+function del_data!(lsq::LsqSys, Idel::AbstractVector{Int})
+   I = data_rows(lsq)
+   Idata = setdiff(1:length(lsq.data), Idel)
+   @show length(Idata)
+   Irows = vcat( I[Idata]... )
+   @show length(Irows)
+
+   lsq.data = lsq.data[Idata]
+   lsq.Ψ = lsq.Ψ[Irows, :]
+   return lsq
 end
 
 
