@@ -14,9 +14,14 @@ See `?...` on how to
 """
 module NBodyIPs
 
-using Reexport, StaticArrays
+using Reexport
+
+@reexport using StaticArrays
+@reexport using FileIO
+
 
 # two auxiliary functions to make for easier assembly of the code
+# TODO: move these somewhere else
 push_str!(ex::Vector{Expr}, s::String) = push!(ex, parse(s))
 append_str!(ex::Vector{Expr}, s::Vector{String}) = append!(ex, parse.(s))
 
@@ -41,12 +46,18 @@ include("polynomials.jl")
 
 # loading data
 include("data.jl")
+@reexport using NBodyIPs.Data
 
 # fitting from data (e.g., least squares)
+# TODO: make this a sub-module and re-export
 include("fitting.jl")
 
 # IP i/o
 include("io.jl")
+@reexport using NBodyIPs.IO
 
+#visualisation module
+include("PIPplot.jl")
+@reexport using NBodyIPs.PIPplot
 
 end # module

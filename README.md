@@ -7,3 +7,22 @@
 
 [![codecov.io](http://codecov.io/github/cortner/NBodyIPs.jl/coverage.svg?branch=master)](http://codecov.io/github/cortner/NBodyIPs.jl?branch=master)
 -->
+
+<!--
+
+TODO
+ * merge Cas' visualisation branch
+ * partial data
+    - unclear this is a good idea, leave for now
+ * LASSO              >>> Genevieve
+ * sparse grid basis  >>> with Genevieve next week??
+
+Mess around at night:
+ * W fit
+ * Si fit => or not
+
+Big ones
+ * environment dependence for fullsymm
+ * bond-angle potentials + environment dependence
+
+-->

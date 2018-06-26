@@ -5,13 +5,14 @@ using NBodyIPs: match_dictionary
 using Base.Threads
 
 import Base: kron
-
+import JLD2
 
 export get_basis, regression,
        fiterrors, scatter_data,
        print_fiterrors,
        observations, get_lsq_system,
-       regularise, table
+       regularise, table, load_lsq,
+       config_types
 
 Base.norm(F::JVecsF) = norm(norm.(F))
 
@@ -19,10 +20,12 @@ Base.norm(F::JVecsF) = norm(norm.(F))
 const _IS = SVector(1,2,3,5,6,9)
 
 """
-`mutable struct IpLsqSys`: type storing all information to perform a
+`mutable struct LsqSys`: type storing all information to perform a
 LSQ fit for an interatomic potential. To assemble the LsqSys use
+one of (equivalent)
 ```
-dot(data, basis)
+kron(data, basis)
+LsqSys(data, basis)
 ```
 """
 mutable struct LsqSys
@@ -32,6 +35,7 @@ mutable struct LsqSys
    Ψ::Matrix{Float64}
 end
 
+LsqSys(data, basis) = kron(data, basis)
 
 config_types(lsq::LsqSys) = unique(config_type.(lsq.data))
 
@@ -52,8 +56,6 @@ function split_basis(basis::AbstractVector{TB}) where TB <: NBodyFunction
    return Bord, Iord
 end
 
-
-kron(d::Dat, B::Vector{NBodyFunction}) = dot(d, split_basis(B)...)
 
 # ------- fill the LSQ system, i.e. evaluate basis at data points -------
 function kron(d::Dat, Bord::Vector, Iord::Vector{Vector{Int}})
@@ -160,12 +162,13 @@ end
 
 
 function observations(d::Dat)
+   len = length(d)
    # ------- fill the data/observations vector -------------------
    Y = Float64[]
    # energy
    push!(Y, energy(d))
    # forces
-   if (forces(d) != nothing) && (length(d) > 1)
+   if (forces(d) != nothing) && (len > 1)
       f = forces(d)
       f_vec = mat(f)[:]
       append!(Y, f_vec)
@@ -189,47 +192,36 @@ end
 observations(lsq::LsqSys) = observations(lsq.data)
 
 
-# ------- Fix a JLD Bug --------------------------------------
-
-import JLD
-struct LsqSysSerializer; data; basis; Iord; Ψ; end
-
-JLD.writeas(lsq::LsqSys) = LsqSysSerializer(lsq.data, lsq.basis, lsq.Iord, lsq.Ψ)
-
-function JLD.readas(lsq::LsqSysSerializer)
-   basis = lsq.basis
-   # make sure all elements of the same basis group have the
-   # same dictionary; the problem is that deserialize is called
-   # on each NBody individually which will give multiple types that
-   # are different for the compiler but describe the same dictionary.
-   for I in lsq.Iord, i = 2:length(I)
-      basis[I[i]] = match_dictionary(basis[I[i]], basis[I[1]])
-   end
-   return  LsqSys(lsq.data, basis, lsq.Iord, lsq.Ψ)
-end
 
 # -------------------------------------------------------
 
 using NBodyIPs.Data: config_type
 
-function Base.show(io::Base.TTY, lsq::LsqSys)
-   println(repeat("=", 60))
-   println(" LsqSys Summary")
-   println(repeat("-", 60))
-   println("      #configs: $(length(lsq.data))")
-   println("    #basisfcns: $(length(lsq.basis))")
-   println("  config_types: ",
+function Base.show(io::Base.IO, lsq::LsqSys)
+   println(io, repeat("=", 60))
+   println(io, " LsqSys Summary")
+   println(io, repeat("-", 60))
+   println(io, "      #configs: $(length(lsq.data))")
+   println(io, "    #basisfcns: $(length(lsq.basis))")
+   println(io, "  config_types: ",
          prod(s*", " for s in config_types(lsq)))
 
    Bord, _ = split_basis(lsq.basis)
-   println(" #basis groups: $(length(Bord))")
-   println(repeat("-", 60))
+   println(io, " #basis groups: $(length(Bord))")
+   println(io, repeat("-", 60))
 
    for (n, B) in enumerate(Bord)
-      println("   Group $n:")
+      println(io, "   Group $n:")
       info(B; indent = 6)
    end
-   println(repeat("=", 60))
+   println(io, repeat("=", 60))
+end
+
+
+function Base.append!(lsq::NBodyIPs.LsqSys, data::Vector{TD}) where TD <: NBodyIPs.Data.Dat
+   lsq2 = kron(data, lsq.basis)
+   lsq.data = [lsq.data; data]
+   lsq.Ψ = [lsq.Ψ; lsq2.Ψ]
 end
 
 
@@ -290,6 +282,50 @@ function analyse_include_exclude(lsq, include, exclude)
 end
 
 
+function analyse_subbasis(lsq, order, degrees, Ibasis)
+   not_nothing = length(find( [order, degrees, Ibasis] .!= nothing ))
+   if not_nothing > 1
+      @show order, degrees, Ibasis
+      error("at most one of the keyword arguments `order`, `degrees`, `Ibasis` maybe provided")
+   end
+
+   # if the user has given no information, then we just take the entire basis
+   if not_nothing == 0
+      order = Inf
+   end
+
+   # if basis is chosen by maximum body-order ...
+   if order != nothing
+      Ibasis = find(1 .< bodyorder.(lsq.basis) .<= order) |> sort
+
+   # if basis is chosen by maximum degrees body-order ...
+   # degrees = array of
+   elseif degrees != nothing
+      # check that the constant is excluded
+      @assert degrees[1] == 0
+      Ibasis = Int[]
+      for (deg, I) in zip(degrees, lsq.Iord)
+         if deg == 0
+            continue
+         end
+         # loop through all basis functions in the current group
+         for i in I
+            # and add all those to Ibasis which have degree <= deg
+            if degree(lsq.basis[i]) <= deg
+               push!(Ibasis, i)
+            end
+         end
+      end
+
+   # of indeed if the basis is just constructed through individual indices
+   else
+      Ibasis = Int[i for i in Ibasis]
+   end
+
+   return Ibasis
+end
+
+
 """
 `get_lsq_system(lsq; kwargs...) -> Ψ, Y, Ibasis`
 
@@ -322,15 +358,25 @@ include or exclude in the fit (default: all config types are included)
 * `order`: integer specifying up to which body-order to include the basis
 in the fit. (default: all basis functions are included)
 """
-get_lsq_system(lsq; weights=nothing, config_weights=nothing,
-                    exclude=nothing, include=nothing, order = Inf,
-                    regulariser = nothing) =
-   _get_lsq_system(lsq, analyse_weights(weights), config_weights,
-                   analyse_include_exclude(lsq, include, exclude), order,
-                   regulariser)
+get_lsq_system(lsq;
+               weights=nothing,
+               config_weights=nothing,
+               exclude=nothing, include=nothing,
+               order = nothing,
+               degrees = nothing,
+               Ibasis = nothing,
+               regulariser = nothing,
+               normalise_E = true, normalise_V = true) =
+   _get_lsq_system(lsq,
+                   analyse_weights(weights),
+                   config_weights,
+                   analyse_include_exclude(lsq, include, exclude),
+                   analyse_subbasis(lsq, order, degrees, Ibasis),
+                   regulariser, normalise_E, normalise_V)
 
 # function barrier for get_lsq_system
-function _get_lsq_system(lsq, weights, config_weights, include, order, regulariser)
+function _get_lsq_system(lsq, weights, config_weights, include, Ibasis,
+                         regulariser, normalise_E, normalise_V)
 
    Y = observations(lsq)
    W = zeros(length(Y))
@@ -343,6 +389,8 @@ function _get_lsq_system(lsq, weights, config_weights, include, order, regularis
    idx = 0
    for d in lsq.data
       len = length(d)
+      wnrm_E = normalise_E ? 1/len : 1.0
+      wnrm_V = normalise_V ? 1/len : 1.0
       # weighting factor due to config_type
       w_cfg = _getkey_val(config_weights, config_type(d))
       # weighting factor from dataset
@@ -355,7 +403,7 @@ function _get_lsq_system(lsq, weights, config_weights, include, order, regularis
       end
 
       # energy
-      W[idx+1] = w * w_E
+      W[idx+1] = w * w_E * wnrm_E
       idx += 1
       # and while we're at it, subtract E0 from Y
       Y[idx] -= E0 * len
@@ -367,7 +415,7 @@ function _get_lsq_system(lsq, weights, config_weights, include, order, regularis
       end
       # virial
       if virial(d) != nothing
-         W[(idx+1):(idx+length(_IS))] = w * w_V
+         W[(idx+1):(idx+length(_IS))] = w * w_V * wnrm_V
          idx += length(_IS)
       end
    end
@@ -376,10 +424,6 @@ function _get_lsq_system(lsq, weights, config_weights, include, order, regularis
 
    # find the zeros and remove them => list of data points
    Idata = find(W .!= 0.0) |> sort
-
-   # find all basis functions with the required body-order
-   # (note we also remove the B1, which is assumed to be at index 1)
-   Ibasis = find(1 .< bodyorder.(lsq.basis) .<= order) |> sort
 
    # take the appropriate slices of the data and basis
    Y = Y[Idata]
@@ -480,7 +524,9 @@ end
 
 # =============== Analysis Fitting Errors ===========
 
-_fiterrsdict() = Dict("E-RMS" => 0.0, "F-RMS" => 0.0, "E-MAE" => 0.0, "F-MAE" => 0.0)
+_fiterrsdict() = Dict("E-RMS" => 0.0, "F-RMS" => 0.0, "V-RMS" => 0.0,
+                      "E-MAE" => 0.0, "F-MAE" => 0.0, "V-MAE" => 0.0)
+_cnterrsdict() = Dict("E" => 0, "F" => 0, "V" => 0)
 
 struct FitErrors
    errs::Dict{String, Dict{String,Float64}}
@@ -494,19 +540,19 @@ function fiterrors(lsq, c, Ibasis; include=nothing, exclude=nothing)
    # create the dict for the fit errors
    errs = Dict( "set" => _fiterrsdict() )
    # count number of configurations
-   num = Dict("set" => Dict("E" => 0, "F" => 0))
+   num = Dict("set" => _cnterrsdict())
    obs = Dict("set" => _fiterrsdict())
 
    for ct in include
       errs[ct] = _fiterrsdict()
-      num[ct] = Dict("E" => 0, "F" => 0)
+      num[ct] = _cnterrsdict()
       obs[ct] = _fiterrsdict()
    end
 
    idx = 0
    for d in lsq.data
       ct = config_type(d)
-      E_data, F_data, len = energy(d), forces(d), length(d)
+      E_data, F_data, V_data, len = energy(d), forces(d), virial(d), length(d)
       E_data -= E0 * len
 
       if !(ct in include)
@@ -530,6 +576,7 @@ function fiterrors(lsq, c, Ibasis; include=nothing, exclude=nothing)
       errs[ct]["E-MAE"] += Emae
       obs[ct]["E-MAE"] += abs(E_data / len)
       num[ct]["E"] += 1
+      # - - - - - - - - - - - - - - - -
       errs["set"]["E-RMS"] += Erms
       obs["set"]["E-RMS"] += (E_data / len)^2
       errs["set"]["E-MAE"] += Emae
@@ -538,7 +585,7 @@ function fiterrors(lsq, c, Ibasis; include=nothing, exclude=nothing)
       idx += 1
 
       # ----- Force error -------
-      if F_data != nothing
+      if (F_data != nothing) && (len > 1)
          f_data = mat(F_data)[:]
          f_fit = lsq.Ψ[(idx+1):(idx+3*len), Ibasis] * c
          Frms = norm(f_data - f_fit)^2
@@ -548,6 +595,7 @@ function fiterrors(lsq, c, Ibasis; include=nothing, exclude=nothing)
          errs[ct]["F-MAE"] += Fmae
          obs[ct]["F-MAE"] += norm(f_data, 1)
          num[ct]["F"] += 3 * len
+         # - - - - - - - - - - - - - - - -
          errs["set"]["F-RMS"] += Frms
          obs["set"]["F-RMS"] += norm(f_data)^2
          errs["set"]["F-MAE"] += Fmae
@@ -556,8 +604,22 @@ function fiterrors(lsq, c, Ibasis; include=nothing, exclude=nothing)
          idx += 3 * len
       end
 
-      # skip the stresses
-      if virial(d) != nothing
+      # -------- stress errors ---------
+      if V_data != nothing
+         V_fit = lsq.Ψ[(idx+1):(idx+length(_IS)),Ibasis] * c
+         V_err = norm(V_fit - V_data[_IS], Inf) / len  # replace with operator norm on matrix
+         V_nrm = norm(V_data[_IS], Inf)
+         errs[ct]["V-RMS"] += V_err^2
+         obs[ct]["V-RMS"] += V_nrm^2
+         errs[ct]["V-MAE"] += V_err
+         obs[ct]["V-MAE"] += V_nrm
+         num[ct]["V"] += 1
+         # - - - - - - - - - - - - - - - -
+         errs["set"]["V-RMS"] += V_err^2
+         obs["set"]["V-RMS"] += V_nrm^2
+         errs["set"]["V-MAE"] += V_err
+         obs["set"]["V-MAE"] += V_nrm
+         num["set"]["V"] += 1
          idx += length(_IS)
       end
    end
@@ -566,14 +628,19 @@ function fiterrors(lsq, c, Ibasis; include=nothing, exclude=nothing)
    for key in keys(errs)
       nE = num[key]["E"]
       nF = num[key]["F"]
+      nV = num[key]["V"]
       errs[key]["E-RMS"] = sqrt(errs[key]["E-RMS"] / nE)
       obs[key]["E-RMS"] = sqrt(obs[key]["E-RMS"] / nE)
       errs[key]["F-RMS"] = sqrt(errs[key]["F-RMS"] / nF)
       obs[key]["F-RMS"] = sqrt(obs[key]["F-RMS"] / nF)
+      errs[key]["V-RMS"] = sqrt(errs[key]["V-RMS"] / nV)
+      obs[key]["V-RMS"] = sqrt(obs[key]["V-RMS"] / nV)
       errs[key]["E-MAE"] = errs[key]["E-MAE"] / nE
       obs[key]["E-MAE"] = obs[key]["E-MAE"] / nE
       errs[key]["F-MAE"] = errs[key]["F-MAE"] / nF
       obs[key]["F-MAE"] = obs[key]["F-MAE"] / nF
+      errs[key]["V-MAE"] = errs[key]["V-MAE"] / nV
+      obs[key]["V-MAE"] = obs[key]["V-MAE"] / nV
    end
 
    return FitErrors(errs, obs)
@@ -581,53 +648,60 @@ end
 
 
 function table(errs::FitErrors; relative=false)
-   if !relative
-      println(errs::FitErrors)
-      return
+   if relative
+      table_relative(errs)
+   else
+      table_absolute(errs)
    end
-   print("-------------------------------------------------\n")
-   print("             ||       RMSE     ||       MAE      \n")
-   print(" config type ||  E [%] | F [%] ||  E [%] | F [%] \n")
-   print("-------------||--------|-------||--------|-------\n")
+end
+
+function table_relative(errs)
+   print("---------------------------------------------------------------\n")
+   print("             ||           RMSE        ||           MAE      \n")
+   print(" config type || E [%] | F [%] | V [%] || E [%] | F [%] | V [%] \n")
+   print("-------------||-------|-------|-------||-------|-------|-------\n")
    s_set = ""
    nrms = errs.nrms
    for (key, D) in errs.errs
       nrm = nrms[key]
       lkey = min(length(key), 11)
-      s = @sprintf(" %11s || %1.4f | %1.3f || %1.4f | %1.3f \n",
-               key[1:lkey], D["E-RMS"]/nrm["E-RMS"], D["F-RMS"]/nrm["F-RMS"],
-                            D["E-MAE"]/nrm["E-MAE"], D["F-MAE"]/nrm["F-MAE"])
+      s = @sprintf(" %11s || %5.2f | %5.2f | %5.2f || %5.2f | %5.2f | %5.2f \n",
+         key[1:lkey],
+         100*D["E-RMS"]/nrm["E-RMS"], 100*D["F-RMS"]/nrm["F-RMS"], 100*D["V-RMS"]/nrm["V-RMS"],
+         100*D["E-MAE"]/nrm["E-MAE"], 100*D["F-MAE"]/nrm["F-MAE"], 100*D["V-MAE"]/nrm["V-MAE"])
       if key == "set"
          s_set = s
       else
          print(s)
       end
    end
-   print("-------------||--------|-------||--------|-------\n")
+   print("-------------||-------|-------|-------||-------|-------|-------\n")
    print(s_set)
-   print("-------------------------------------------------\n")
+   print("---------------------------------------------------------------\n")
 end
 
 
-function Base.show(io::Base.TTY, errs::FitErrors)
-   print(io, "-------------------------------------------------------\n")
-   print(io, "             ||       RMSE        ||        MAE       \n")
-   print(io, " config type ||  E [eV] | F[eV/A] ||  E [eV] | F[eV/A] \n")
-   print(io, "-------------||---------|---------||---------|---------\n")
+function table_absolute(errs::FitErrors)
+   print("---------------------------------------------------------------------------\n")
+   print("             ||            RMSE             ||             MAE        \n")
+   print(" config type ||  E [eV] | F[eV/A] | V[eV/A] ||  E [eV] | F[eV/A] | V[eV/A] \n")
+   print("-------------||---------|---------|---------||---------|---------|---------\n")
    s_set = ""
    for (key, D) in errs.errs
       lkey = min(length(key), 11)
-      s = @sprintf(" %11s || %1.5f | %1.5f || %1.5f | %1.5f \n",
-               key[1:lkey], D["E-RMS"], D["F-RMS"], D["E-RMS"], D["E-MAE"])
+      s = @sprintf(" %11s || %7.4f | %7.4f | %7.4f || %7.4f | %7.4f | %7.4f \n",
+                   key[1:lkey],
+                   D["E-RMS"], D["F-RMS"], D["V-RMS"],
+                   D["E-RMS"], D["E-MAE"], D["V-MAE"] )
       if key == "set"
          s_set = s
       else
-         print(io, s)
+         print(s)
       end
    end
-   print(io, "-------------||---------|---------||---------|---------\n")
-   print(io, s_set)
-   print(io, "-------------------------------------------------------\n")
+   print("-------------||---------|---------|---------||---------|---------|---------\n")
+   print(s_set)
+   print("---------------------------------------------------------------------------\n")
 end
 
 
@@ -677,3 +751,50 @@ end
 #    end
 #    return E_data, E_fit, F_data, F_fit
 # end
+
+
+# ----------- JLD2 Code -----------------
+
+using FileIO: save, load
+import FileIO: save
+
+function _checkextension(fname)
+   if fname[end-3:end] != "jld2"
+      error("the filename should end in `jld2`")
+   end
+end
+
+function save(fname::AbstractString, lsq::LsqSys)
+   _checkextension(fname)
+   # play a little trick to convert the basis into groups
+   IP = NBodyIP(lsq.basis, ones(length(lsq.basis)))
+   lsqdict = Dict(
+      "data" => lsq.data,
+      "basisgroups" => saveas.(IP.orders),
+      "Psi" => lsq.Ψ
+   )
+   save(fname, lsqdict)
+end
+
+function load_lsq(fname)
+   _checkextension(fname)
+   f = JLD2.jldopen(fname, "r")
+   Ψ = f["Psi"]
+   data = f["data"]
+   basisgroups = f["basisgroups"]
+   close(f)
+   # need to undo the lumping of the basis functions into a single NBody
+   # and get a basis back
+   basis = NBodyFunction[]
+   Iord = Vector{Int}[]
+   idx = 0
+   for Bgrp in basisgroups
+      Vn = loadas(Bgrp)
+      B = recover_basis(Vn)
+      push!(Iord, collect((idx+1):(idx+length(B))))
+      append!(basis, B)
+      idx += length(B)
+   end
+   @assert idx == length(basis)
+   return LsqSys(data, [b for b in basis], Iord, Ψ)
+end
