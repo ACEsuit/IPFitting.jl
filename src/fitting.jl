@@ -4,7 +4,7 @@ using NBodyIPs: match_dictionary
 
 using Base.Threads
 
-import Base: kron
+import Base: kron, append!
 import JLD2
 
 export get_basis, regression,
@@ -12,7 +12,8 @@ export get_basis, regression,
        print_fiterrors,
        observations, get_lsq_system,
        regularise, table, load_lsq,
-       config_types
+       config_types,
+       del_data!
 
 Base.norm(F::JVecsF) = norm(norm.(F))
 
@@ -31,7 +32,7 @@ LsqSys(data, basis)
 mutable struct LsqSys
    data::Vector{Dat}
    basis::Vector{NBodyFunction}
-   Iord::Vector{Vector{Int}}
+   Iord::Vector{Vector{Int}}     # result of split_basis
    Ψ::Matrix{Float64}
 end
 
@@ -197,31 +198,35 @@ observations(lsq::LsqSys) = observations(lsq.data)
 
 using NBodyIPs.Data: config_type
 
-function Base.show(io::Base.IO, lsq::LsqSys)
-   println(io, repeat("=", 60))
-   println(io, " LsqSys Summary")
-   println(io, repeat("-", 60))
-   println(io, "      #configs: $(length(lsq.data))")
-   println(io, "    #basisfcns: $(length(lsq.basis))")
-   println(io, "  config_types: ",
+function Base.info(lsq::LsqSys)
+   println(repeat("=", 60))
+   println(" LsqSys Summary")
+   println(repeat("-", 60))
+   println("      #configs: $(length(lsq.data))")
+   println("    #basisfcns: $(length(lsq.basis))")
+   println("  config_types: ",
          prod(s*", " for s in config_types(lsq)))
 
    Bord, _ = split_basis(lsq.basis)
-   println(io, " #basis groups: $(length(Bord))")
-   println(io, repeat("-", 60))
+   println(" #basis groups: $(length(Bord))")
+   println(repeat("-", 60))
 
    for (n, B) in enumerate(Bord)
-      println(io, "   Group $n:")
+      println("   Group $n:")
       info(B; indent = 6)
    end
-   println(io, repeat("=", 60))
+   println(repeat("=", 60))
 end
 
 
 function Base.append!(lsq::NBodyIPs.LsqSys, data::Vector{TD}) where TD <: NBodyIPs.Data.Dat
-   lsq2 = kron(data, lsq.basis)
-   lsq.data = [lsq.data; data]
+   return append!(lsq, kron(data, lsq.basis))
+end
+
+function Base.append!(lsq::NBodyIPs.LsqSys, lsq2::NBodyIPs.LsqSys)
+   lsq.data = [lsq.data; lsq2.data]
    lsq.Ψ = [lsq.Ψ; lsq2.Ψ]
+   return lsq
 end
 
 
@@ -326,6 +331,30 @@ function analyse_subbasis(lsq, order, degrees, Ibasis)
 end
 
 
+function hess_weights_hook!(w, d::Dat)
+   at = Atoms(d)
+   if length(w) != 1 + 3 * length(at)
+      warn("unexpected length(w) in hess_weights_hook => ignore")
+      return w
+   end
+   # don't use this energy
+   w[1] = 0.0
+   # compute R vectors
+   X = positions(at)
+   h = norm(X[1])
+   if h < 1e-5 || h > 0.02
+      warn("unexpected location of X[1] in hess_weights_hook => ignore")
+      return w
+   end
+   X[1] *= 0
+   R = [ JuLIP.project_min(at, x - X[1])  for x in X ]
+   r = norm.(R)
+   r3 = (ones(3) * r')[:]
+   w[2:end] .= w[2:end] .* (r3.^7) / h
+   return w
+end
+
+
 """
 `get_lsq_system(lsq; kwargs...) -> Ψ, Y, Ibasis`
 
@@ -366,17 +395,20 @@ get_lsq_system(lsq;
                degrees = nothing,
                Ibasis = nothing,
                regulariser = nothing,
-               normalise_E = true, normalise_V = true) =
+               normalise_E = true, normalise_V = true,
+               hooks = Dict("hess" => hess_weights_hook!)) =
    _get_lsq_system(lsq,
                    analyse_weights(weights),
                    config_weights,
                    analyse_include_exclude(lsq, include, exclude),
                    analyse_subbasis(lsq, order, degrees, Ibasis),
-                   regulariser, normalise_E, normalise_V)
+                   regulariser, normalise_E, normalise_V,
+                   hooks)
 
 # function barrier for get_lsq_system
 function _get_lsq_system(lsq, weights, config_weights, include, Ibasis,
-                         regulariser, normalise_E, normalise_V)
+                         regulariser, normalise_E, normalise_V,
+                         hooks)
 
    Y = observations(lsq)
    W = zeros(length(Y))
@@ -388,6 +420,7 @@ function _get_lsq_system(lsq, weights, config_weights, include, Ibasis,
    # assemble the weight vector
    idx = 0
    for d in lsq.data
+      idx_init = idx+1
       len = length(d)
       wnrm_E = normalise_E ? 1/len : 1.0
       wnrm_V = normalise_V ? 1/len : 1.0
@@ -417,6 +450,16 @@ function _get_lsq_system(lsq, weights, config_weights, include, Ibasis,
       if virial(d) != nothing
          W[(idx+1):(idx+length(_IS))] = w * w_V * wnrm_V
          idx += length(_IS)
+      end
+
+      # TODO: this should be generalised to be able to hook into
+      #       other kinds of weight modifications
+      idx_end = idx
+      if length(config_type(d)) >= 4 && config_type(d)[1:4] == "hess"
+         if haskey(hooks, "hess")
+            w = hooks["hess"](W[idx_init:idx_end], d)
+            W[idx_init:idx_end] = w
+         end
       end
    end
    # double-check we haven't made a mess :)
@@ -455,6 +498,41 @@ end
 function regularise(Ψ, Y, P::Matrix)
    @assert size(Ψ,2) == size(P,2)
    return vcat(Ψ, P), vcat(Y, zeros(size(P,1)))
+end
+
+data_rows(lsq::LsqSys) = data_rows(lsq.data)
+
+function data_rows(data::Vector)
+   I = Vector{Int}[]
+   idx = 0
+   for d in data
+      idx_init = idx+1
+      len = length(d)
+      @assert energy(d) != nothing
+      idx += 1
+      if (forces(d) != nothing) && (len > 1)
+         idx += 3*len
+      end
+      if virial(d) != nothing
+         idx += length(_IS)
+      end
+      idx_end = idx
+      push!(I, collect(idx_init:idx_end))
+   end
+   return I
+end
+
+
+function del_data!(lsq::LsqSys, Idel::AbstractVector{Int})
+   I = data_rows(lsq)
+   Idata = setdiff(1:length(lsq.data), Idel)
+   @show length(Idata)
+   Irows = vcat( I[Idata]... )
+   @show length(Irows)
+
+   lsq.data = lsq.data[Idata]
+   lsq.Ψ = lsq.Ψ[Irows, :]
+   return lsq
 end
 
 

@@ -11,7 +11,7 @@
 <!--
 
 TODO
- * merge Cas' visualisation branch
+ * regularisation
  * partial data
     - unclear this is a good idea, leave for now
  * LASSO              >>> Genevieve
@@ -19,6 +19,7 @@ TODO
 
 Mess around at night:
  * W fit
+ * Al fit
  * Si fit => or not
 
 Big ones
