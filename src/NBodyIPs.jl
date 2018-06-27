@@ -53,6 +53,8 @@ include("data.jl")
 # TODO: make this a sub-module and re-export
 include("fitting.jl")
 
+include("errors.jl")
+
 # # IP i/o
 # include("io.jl")
 

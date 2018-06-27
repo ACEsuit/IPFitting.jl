@@ -151,20 +151,16 @@ function read(fname; kwargs...)
 end
 
 
-# --------------- FIX JLD Bug --------------
 
 
-struct DatSerializer
-   at
-   E
-   F
-   S
-   w
-   config_type
-end
-
-import JLD
-JLD.writeas(d::Dat) = DatSerializer(d.at, d.E, d.F, d.S, d.w, d.config_type)
-JLD.readas(d::DatSerializer) = Dat(d.at, d.E, d.F, d.S, d.w, d.config_type)
+# struct DatSerializer
+#    at
+#    E
+#    F
+#    S
+#    w
+#    config_type
+# end
+#
 
 end
