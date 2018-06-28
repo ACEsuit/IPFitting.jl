@@ -200,48 +200,6 @@ end
 
 
 
-#
-# """
-# computes the maximum force over all configurations
-# in `data`
-# """
-# function max_force(b, data)
-#    out = 0.0
-#    for d in data
-#       f = forces(b, Atoms(d))
-#       out = max(out, maximum(norm.(f)))
-#    end
-#    return out
-# end
-#
-# function normalize_basis!(B, data)
-#    for b in B
-#       @assert (length(b.c) == 1)
-#       maxfrc = max_force(b, data)
-#       if maxfrc > 0
-#          b.c[1] /= maxfrc
-#       end
-#       if 0 < maxfrc < 1e-8
-#          warn("encountered a very small maxfrc = $maxfrc")
-#       end
-#    end
-#    return B
-# end
-
-   # E_data = Float64[]
-   # E_fit = Float64[]
-   # F_data = Float64[]
-   # F_fit = Float64[]
-   # for d in data
-   #    at = Atoms(d)
-   #    len = length(at)
-   #    push!(E_data, energy(d) / len)
-   #    append!(F_data, mat(forces(d))[:])
-   #    push!(E_fit, energy(IP, at) / len)
-   #    append!(F_fit, mat(forces(IP, at))[:])
-   # end
-   # return E_data, E_fit, F_data, F_fit
-
 
 function scatter_E(errs::FitErrors; s=1)
    D = deepcopy(errs.scatterE)

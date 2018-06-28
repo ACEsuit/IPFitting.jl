@@ -603,10 +603,17 @@ end
 using FileIO: save, load
 import FileIO: save
 
+struct XJld2 end
+struct XJson end
+
+
 function _checkextension(fname)
-   if fname[end-3:end] != "jld2"
-      error("the filename should end in `jld2`")
+   if fname[end-3:end] == "jld2"
+      return XJld2()
+   elseif fname[end-3:end] == "json"
+      return XJson()
    end
+   error("the filename should end in `jld2`")
 end
 
 function save(fname::AbstractString, lsq::LsqSys)
@@ -623,13 +630,18 @@ end
 
 function load_lsq(fname)
    _checkextension(fname)
+   data = nothing
+   basisgroups = nothing
+   Ψ = nothing
    try
       f = JLD2.jldopen(fname, "r")
       Ψ = f["Psi"]
       data = f["data"]
       basisgroups = f["basisgroups"]
       close(f)
+      println("Looks like the file loaded on the first attempt.")
    catch
+      println("Still needs two attempts to load JLD2 files.")
       f = JLD2.jldopen(fname, "r")
       Ψ = f["Psi"]
       data = f["data"]
@@ -658,8 +670,10 @@ function save(fname::AbstractString, IP::NBodyIP)
 end
 
 
-function load_ip(fname::AbstractString)
-   _checkextension(fname)
+load_ip(fname::AbstractString) = load_ip(_checkextension(fname), fname)
+
+function load_ip(::XJld2, fname)
+   IPs = nothing
    try
       IPs = load(fname, "IP")
    catch
