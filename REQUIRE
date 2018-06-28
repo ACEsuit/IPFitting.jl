@@ -7,5 +7,7 @@ ProgressMeter
 PyCall
 ASE
 JLD2
+JSON
+Sobol
 StaticPolynomials
 Combinatorics

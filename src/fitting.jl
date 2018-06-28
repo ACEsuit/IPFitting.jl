@@ -5,7 +5,7 @@ using NBodyIPs: match_dictionary
 using Base.Threads
 
 import Base: kron, append!
-import JLD2
+import JLD2, JSON
 
 export get_basis, regression,
        observations, get_lsq_system,
@@ -664,13 +664,13 @@ function load_lsq(fname)
    return LsqSys(data, [b for b in basis], Iord, Ψ)
 end
 
-function save(fname::AbstractString, IP::NBodyIP)
-   _checkextension(fname)
-   save(fname, "IP", saveas(IP))
-end
+save(fname::AbstractString, IP::NBodyIP) =
+   save_ip(_checkextension(fname), fname, IP)
 
+load_ip(fname::AbstractString) =
+   load_ip(_checkextension(fname), fname)
 
-load_ip(fname::AbstractString) = load_ip(_checkextension(fname), fname)
+save_ip(::XJld2, fname, IP) = save(fname, "IP", saveas(IP))
 
 function load_ip(::XJld2, fname)
    IPs = nothing
@@ -680,4 +680,17 @@ function load_ip(::XJld2, fname)
       IPs = load(fname, "IP")
    end
    return loadas(IPs)
+end
+
+
+function save_ip(::XJson, fname, IP)
+   IPs = saveas_json(IP)
+   f = open(fname, "w")
+   print(f, JSON.json(IPs))
+   close(f)
+end
+
+function load_ip(::XJson, fname)
+   IPj = JSON.parsefile(fname)
+   return loadas_json(NBodyIP, IPj)
 end
