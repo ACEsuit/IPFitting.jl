@@ -10,6 +10,7 @@ using BenchmarkTools
    @testset "Invariants" begin include("test_invariants.jl") end
    @testset "Polynomials" begin include("test_polynomials.jl") end
    @testset "Fitting" begin include("test_fit.jl") end
+   @testset "EnvironmentIPs" begin include("test_environ.jl") end 
    # TODO: Data testset
    # TODO: IO / serialization testset
 end
