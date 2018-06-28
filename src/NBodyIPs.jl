@@ -46,6 +46,8 @@ include("polynomials.jl")
 @reexport using NBodyIPs.Polys
 
 include("environ.jl")
+import NBodyIPs.EnvBLs: envbl_basis
+export envbl_basis
 
 # loading data
 include("data.jl")

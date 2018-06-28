@@ -41,7 +41,7 @@ config_types(lsq::LsqSys) = unique(config_type.(lsq.data))
 """
 Take a basis and split it into individual body-orders.
 """
-function split_basis(basis::AbstractVector{TB}) where TB <: NBodyFunction
+function split_basis(basis::AbstractVector{TB}) where TB <: AbstractCalculator
    # get the types of the individual basis elements
    tps = typeof.(basis)
    Iord = Vector{Int}[]
@@ -109,7 +109,7 @@ end
 
 
 function kron(data::Vector{TD},  basis::Vector{TB}; verbose=true
-         ) where {TD <: Dat, TB <: NBodyFunction}
+         ) where {TD <: Dat, TB <: AbstractCalculator}
    # sort basis set into body-orders, and possibly different
    # types within the same body-order (e.g. for matching!)
    Bord, Iord = split_basis(basis)
