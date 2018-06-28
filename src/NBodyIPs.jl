@@ -45,6 +45,8 @@ include("misc.jl")
 include("polynomials.jl")
 @reexport using NBodyIPs.Polys
 
+include("environ.jl")
+
 # loading data
 include("data.jl")
 @reexport using NBodyIPs.Data
