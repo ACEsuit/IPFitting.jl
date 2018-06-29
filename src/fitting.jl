@@ -27,9 +27,9 @@ kron(data, basis)
 LsqSys(data, basis)
 ```
 """
-mutable struct LsqSys
-   data::Vector{Dat}
-   basis::Vector{NBodyFunction}
+mutable struct LsqSys{TD, TB}
+   data::Vector{TD}
+   basis::Vector{TB}
    Iord::Vector{Vector{Int}}     # result of split_basis
    Ψ::Matrix{Float64}
 end
@@ -157,6 +157,7 @@ function kron(data::Vector{TD},  basis::Vector{TB}; verbose=true
    end
 
    return LsqSys(data, basis, Iord, Ψ)
+   # return data, basis, Iord, Ψ
 end
 
 
@@ -650,7 +651,7 @@ function load_lsq(fname)
    end
    # need to undo the lumping of the basis functions into a single NBody
    # and get a basis back
-   basis = NBodyFunction[]
+   basis = []
    Iord = Vector{Int}[]
    idx = 0
    for Bgrp in basisgroups
