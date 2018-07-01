@@ -4,15 +4,14 @@ using NBodyIPs: match_dictionary
 
 using Base.Threads
 
-import Base: kron
-import JLD2
+import Base: kron, append!
+import JLD2, JSON
 
 export get_basis, regression,
-       fiterrors, scatter_data,
-       print_fiterrors,
        observations, get_lsq_system,
-       regularise, table, load_lsq,
-       config_types
+       regularise, table, load_lsq, load_ip,
+       config_types,
+       del_data!
 
 Base.norm(F::JVecsF) = norm(norm.(F))
 
@@ -31,7 +30,7 @@ LsqSys(data, basis)
 mutable struct LsqSys
    data::Vector{Dat}
    basis::Vector{NBodyFunction}
-   Iord::Vector{Vector{Int}}
+   Iord::Vector{Vector{Int}}     # result of split_basis
    Ψ::Matrix{Float64}
 end
 
@@ -197,31 +196,35 @@ observations(lsq::LsqSys) = observations(lsq.data)
 
 using NBodyIPs.Data: config_type
 
-function Base.show(io::Base.IO, lsq::LsqSys)
-   println(io, repeat("=", 60))
-   println(io, " LsqSys Summary")
-   println(io, repeat("-", 60))
-   println(io, "      #configs: $(length(lsq.data))")
-   println(io, "    #basisfcns: $(length(lsq.basis))")
-   println(io, "  config_types: ",
+function Base.info(lsq::LsqSys)
+   println(repeat("=", 60))
+   println(" LsqSys Summary")
+   println(repeat("-", 60))
+   println("      #configs: $(length(lsq.data))")
+   println("    #basisfcns: $(length(lsq.basis))")
+   println("  config_types: ",
          prod(s*", " for s in config_types(lsq)))
 
    Bord, _ = split_basis(lsq.basis)
-   println(io, " #basis groups: $(length(Bord))")
-   println(io, repeat("-", 60))
+   println(" #basis groups: $(length(Bord))")
+   println(repeat("-", 60))
 
    for (n, B) in enumerate(Bord)
-      println(io, "   Group $n:")
+      println("   Group $n:")
       info(B; indent = 6)
    end
-   println(io, repeat("=", 60))
+   println(repeat("=", 60))
 end
 
 
 function Base.append!(lsq::NBodyIPs.LsqSys, data::Vector{TD}) where TD <: NBodyIPs.Data.Dat
-   lsq2 = kron(data, lsq.basis)
-   lsq.data = [lsq.data; data]
+   return append!(lsq, kron(data, lsq.basis))
+end
+
+function Base.append!(lsq::NBodyIPs.LsqSys, lsq2::NBodyIPs.LsqSys)
+   lsq.data = [lsq.data; lsq2.data]
    lsq.Ψ = [lsq.Ψ; lsq2.Ψ]
+   return lsq
 end
 
 
@@ -326,6 +329,30 @@ function analyse_subbasis(lsq, order, degrees, Ibasis)
 end
 
 
+function hess_weights_hook!(w, d::Dat)
+   at = Atoms(d)
+   if length(w) != 1 + 3 * length(at)
+      warn("unexpected length(w) in hess_weights_hook => ignore")
+      return w
+   end
+   # don't use this energy
+   w[1] = 0.0
+   # compute R vectors
+   X = positions(at)
+   h = norm(X[1])
+   if h < 1e-5 || h > 0.02
+      warn("unexpected location of X[1] in hess_weights_hook => ignore")
+      return w
+   end
+   X[1] *= 0
+   R = [ JuLIP.project_min(at, x - X[1])  for x in X ]
+   r = norm.(R)
+   r3 = (ones(3) * r')[:]
+   w[2:end] .= w[2:end] .* (r3.^7) / h
+   return w
+end
+
+
 """
 `get_lsq_system(lsq; kwargs...) -> Ψ, Y, Ibasis`
 
@@ -366,17 +393,20 @@ get_lsq_system(lsq;
                degrees = nothing,
                Ibasis = nothing,
                regulariser = nothing,
-               normalise_E = true, normalise_V = true) =
+               normalise_E = true, normalise_V = true,
+               hooks = Dict("hess" => hess_weights_hook!)) =
    _get_lsq_system(lsq,
                    analyse_weights(weights),
                    config_weights,
                    analyse_include_exclude(lsq, include, exclude),
                    analyse_subbasis(lsq, order, degrees, Ibasis),
-                   regulariser, normalise_E, normalise_V)
+                   regulariser, normalise_E, normalise_V,
+                   hooks)
 
 # function barrier for get_lsq_system
 function _get_lsq_system(lsq, weights, config_weights, include, Ibasis,
-                         regulariser, normalise_E, normalise_V)
+                         regulariser, normalise_E, normalise_V,
+                         hooks)
 
    Y = observations(lsq)
    W = zeros(length(Y))
@@ -388,6 +418,7 @@ function _get_lsq_system(lsq, weights, config_weights, include, Ibasis,
    # assemble the weight vector
    idx = 0
    for d in lsq.data
+      idx_init = idx+1
       len = length(d)
       wnrm_E = normalise_E ? 1/len : 1.0
       wnrm_V = normalise_V ? 1/len : 1.0
@@ -417,6 +448,16 @@ function _get_lsq_system(lsq, weights, config_weights, include, Ibasis,
       if virial(d) != nothing
          W[(idx+1):(idx+length(_IS))] = w * w_V * wnrm_V
          idx += length(_IS)
+      end
+
+      # TODO: this should be generalised to be able to hook into
+      #       other kinds of weight modifications
+      idx_end = idx
+      if length(config_type(d)) >= 4 && config_type(d)[1:4] == "hess"
+         if haskey(hooks, "hess")
+            w = hooks["hess"](W[idx_init:idx_end], d)
+            W[idx_init:idx_end] = w
+         end
       end
    end
    # double-check we haven't made a mess :)
@@ -455,6 +496,41 @@ end
 function regularise(Ψ, Y, P::Matrix)
    @assert size(Ψ,2) == size(P,2)
    return vcat(Ψ, P), vcat(Y, zeros(size(P,1)))
+end
+
+data_rows(lsq::LsqSys) = data_rows(lsq.data)
+
+function data_rows(data::Vector)
+   I = Vector{Int}[]
+   idx = 0
+   for d in data
+      idx_init = idx+1
+      len = length(d)
+      @assert energy(d) != nothing
+      idx += 1
+      if (forces(d) != nothing) && (len > 1)
+         idx += 3*len
+      end
+      if virial(d) != nothing
+         idx += length(_IS)
+      end
+      idx_end = idx
+      push!(I, collect(idx_init:idx_end))
+   end
+   return I
+end
+
+
+function del_data!(lsq::LsqSys, Idel::AbstractVector{Int})
+   I = data_rows(lsq)
+   Idata = setdiff(1:length(lsq.data), Idel)
+   @show length(Idata)
+   Irows = vcat( I[Idata]... )
+   @show length(Irows)
+
+   lsq.data = lsq.data[Idata]
+   lsq.Ψ = lsq.Ψ[Irows, :]
+   return lsq
 end
 
 
@@ -522,246 +598,22 @@ function NBodyIP(lsq::LsqSys, c::Vector, Ibasis::Vector{Int})
 end
 
 
-# =============== Analysis Fitting Errors ===========
-
-_fiterrsdict() = Dict("E-RMS" => 0.0, "F-RMS" => 0.0, "V-RMS" => 0.0,
-                      "E-MAE" => 0.0, "F-MAE" => 0.0, "V-MAE" => 0.0)
-_cnterrsdict() = Dict("E" => 0, "F" => 0, "V" => 0)
-
-struct FitErrors
-   errs::Dict{String, Dict{String,Float64}}
-   nrms::Dict{String, Dict{String,Float64}}
-end
-
-function fiterrors(lsq, c, Ibasis; include=nothing, exclude=nothing)
-   include = analyse_include_exclude(lsq, include, exclude)
-
-   E0 = lsq.basis[1]()
-   # create the dict for the fit errors
-   errs = Dict( "set" => _fiterrsdict() )
-   # count number of configurations
-   num = Dict("set" => _cnterrsdict())
-   obs = Dict("set" => _fiterrsdict())
-
-   for ct in include
-      errs[ct] = _fiterrsdict()
-      num[ct] = _cnterrsdict()
-      obs[ct] = _fiterrsdict()
-   end
-
-   idx = 0
-   for d in lsq.data
-      ct = config_type(d)
-      E_data, F_data, V_data, len = energy(d), forces(d), virial(d), length(d)
-      E_data -= E0 * len
-
-      if !(ct in include)
-         idx += 1 # E
-         if F_data != nothing
-            idx += 3 * len
-         end
-         if virial(d) != nothing
-            idx += length(_IS)
-         end
-         continue
-      end
-
-
-      # ----- Energy error -----
-      E_fit = dot(lsq.Ψ[idx+1, Ibasis], c)
-      Erms = (E_data - E_fit)^2 / len^2
-      Emae = abs(E_data - E_fit) / len
-      errs[ct]["E-RMS"] += Erms
-      obs[ct]["E-RMS"] += (E_data / len)^2
-      errs[ct]["E-MAE"] += Emae
-      obs[ct]["E-MAE"] += abs(E_data / len)
-      num[ct]["E"] += 1
-      # - - - - - - - - - - - - - - - -
-      errs["set"]["E-RMS"] += Erms
-      obs["set"]["E-RMS"] += (E_data / len)^2
-      errs["set"]["E-MAE"] += Emae
-      obs["set"]["E-MAE"] += abs(E_data / len)
-      num["set"]["E"] += 1
-      idx += 1
-
-      # ----- Force error -------
-      if (F_data != nothing) && (len > 1)
-         f_data = mat(F_data)[:]
-         f_fit = lsq.Ψ[(idx+1):(idx+3*len), Ibasis] * c
-         Frms = norm(f_data - f_fit)^2
-         Fmae = norm(f_data - f_fit, 1)
-         errs[ct]["F-RMS"] += Frms
-         obs[ct]["F-RMS"] += norm(f_data)^2
-         errs[ct]["F-MAE"] += Fmae
-         obs[ct]["F-MAE"] += norm(f_data, 1)
-         num[ct]["F"] += 3 * len
-         # - - - - - - - - - - - - - - - -
-         errs["set"]["F-RMS"] += Frms
-         obs["set"]["F-RMS"] += norm(f_data)^2
-         errs["set"]["F-MAE"] += Fmae
-         obs["set"]["F-MAE"] += norm(f_data, 1)
-         num["set"]["F"] += 3 * len
-         idx += 3 * len
-      end
-
-      # -------- stress errors ---------
-      if V_data != nothing
-         V_fit = lsq.Ψ[(idx+1):(idx+length(_IS)),Ibasis] * c
-         V_err = norm(V_fit - V_data[_IS], Inf) / len  # replace with operator norm on matrix
-         V_nrm = norm(V_data[_IS], Inf)
-         errs[ct]["V-RMS"] += V_err^2
-         obs[ct]["V-RMS"] += V_nrm^2
-         errs[ct]["V-MAE"] += V_err
-         obs[ct]["V-MAE"] += V_nrm
-         num[ct]["V"] += 1
-         # - - - - - - - - - - - - - - - -
-         errs["set"]["V-RMS"] += V_err^2
-         obs["set"]["V-RMS"] += V_nrm^2
-         errs["set"]["V-MAE"] += V_err
-         obs["set"]["V-MAE"] += V_nrm
-         num["set"]["V"] += 1
-         idx += length(_IS)
-      end
-   end
-
-   # NORMALISE
-   for key in keys(errs)
-      nE = num[key]["E"]
-      nF = num[key]["F"]
-      nV = num[key]["V"]
-      errs[key]["E-RMS"] = sqrt(errs[key]["E-RMS"] / nE)
-      obs[key]["E-RMS"] = sqrt(obs[key]["E-RMS"] / nE)
-      errs[key]["F-RMS"] = sqrt(errs[key]["F-RMS"] / nF)
-      obs[key]["F-RMS"] = sqrt(obs[key]["F-RMS"] / nF)
-      errs[key]["V-RMS"] = sqrt(errs[key]["V-RMS"] / nV)
-      obs[key]["V-RMS"] = sqrt(obs[key]["V-RMS"] / nV)
-      errs[key]["E-MAE"] = errs[key]["E-MAE"] / nE
-      obs[key]["E-MAE"] = obs[key]["E-MAE"] / nE
-      errs[key]["F-MAE"] = errs[key]["F-MAE"] / nF
-      obs[key]["F-MAE"] = obs[key]["F-MAE"] / nF
-      errs[key]["V-MAE"] = errs[key]["V-MAE"] / nV
-      obs[key]["V-MAE"] = obs[key]["V-MAE"] / nV
-   end
-
-   return FitErrors(errs, obs)
-end
-
-
-function table(errs::FitErrors; relative=false)
-   if relative
-      table_relative(errs)
-   else
-      table_absolute(errs)
-   end
-end
-
-function table_relative(errs)
-   print("---------------------------------------------------------------\n")
-   print("             ||           RMSE        ||           MAE      \n")
-   print(" config type || E [%] | F [%] | V [%] || E [%] | F [%] | V [%] \n")
-   print("-------------||-------|-------|-------||-------|-------|-------\n")
-   s_set = ""
-   nrms = errs.nrms
-   for (key, D) in errs.errs
-      nrm = nrms[key]
-      lkey = min(length(key), 11)
-      s = @sprintf(" %11s || %5.2f | %5.2f | %5.2f || %5.2f | %5.2f | %5.2f \n",
-         key[1:lkey],
-         100*D["E-RMS"]/nrm["E-RMS"], 100*D["F-RMS"]/nrm["F-RMS"], 100*D["V-RMS"]/nrm["V-RMS"],
-         100*D["E-MAE"]/nrm["E-MAE"], 100*D["F-MAE"]/nrm["F-MAE"], 100*D["V-MAE"]/nrm["V-MAE"])
-      if key == "set"
-         s_set = s
-      else
-         print(s)
-      end
-   end
-   print("-------------||-------|-------|-------||-------|-------|-------\n")
-   print(s_set)
-   print("---------------------------------------------------------------\n")
-end
-
-
-function table_absolute(errs::FitErrors)
-   print("---------------------------------------------------------------------------\n")
-   print("             ||            RMSE             ||             MAE        \n")
-   print(" config type ||  E [eV] | F[eV/A] | V[eV/A] ||  E [eV] | F[eV/A] | V[eV/A] \n")
-   print("-------------||---------|---------|---------||---------|---------|---------\n")
-   s_set = ""
-   for (key, D) in errs.errs
-      lkey = min(length(key), 11)
-      s = @sprintf(" %11s || %7.4f | %7.4f | %7.4f || %7.4f | %7.4f | %7.4f \n",
-                   key[1:lkey],
-                   D["E-RMS"], D["F-RMS"], D["V-RMS"],
-                   D["E-RMS"], D["E-MAE"], D["V-MAE"] )
-      if key == "set"
-         s_set = s
-      else
-         print(s)
-      end
-   end
-   print("-------------||---------|---------|---------||---------|---------|---------\n")
-   print(s_set)
-   print("---------------------------------------------------------------------------\n")
-end
-
-
-
-#
-# """
-# computes the maximum force over all configurations
-# in `data`
-# """
-# function max_force(b, data)
-#    out = 0.0
-#    for d in data
-#       f = forces(b, Atoms(d))
-#       out = max(out, maximum(norm.(f)))
-#    end
-#    return out
-# end
-#
-# function normalize_basis!(B, data)
-#    for b in B
-#       @assert (length(b.c) == 1)
-#       maxfrc = max_force(b, data)
-#       if maxfrc > 0
-#          b.c[1] /= maxfrc
-#       end
-#       if 0 < maxfrc < 1e-8
-#          warn("encountered a very small maxfrc = $maxfrc")
-#       end
-#    end
-#    return B
-# end
-#
-
-
-# function scatter_data(IP, data)
-#    E_data = Float64[]
-#    E_fit = Float64[]
-#    F_data = Float64[]
-#    F_fit = Float64[]
-#    for d in data
-#       at = Atoms(d)
-#       len = length(at)
-#       push!(E_data, energy(d) / len)
-#       append!(F_data, mat(forces(d))[:])
-#       push!(E_fit, energy(IP, at) / len)
-#       append!(F_fit, mat(forces(IP, at))[:])
-#    end
-#    return E_data, E_fit, F_data, F_fit
-# end
-
-
 # ----------- JLD2 Code -----------------
 
 using FileIO: save, load
 import FileIO: save
 
+struct XJld2 end
+struct XJson end
+
+
 function _checkextension(fname)
-   if fname[end-3:end] != "jld2"
-      error("the filename should end in `jld2`")
+   if fname[end-3:end] == "jld2"
+      return XJld2()
+   elseif fname[end-3:end] == "json"
+      return XJson()
    end
+   error("the filename should end in `jld2`")
 end
 
 function save(fname::AbstractString, lsq::LsqSys)
@@ -778,11 +630,24 @@ end
 
 function load_lsq(fname)
    _checkextension(fname)
-   f = JLD2.jldopen(fname, "r")
-   Ψ = f["Psi"]
-   data = f["data"]
-   basisgroups = f["basisgroups"]
-   close(f)
+   data = nothing
+   basisgroups = nothing
+   Ψ = nothing
+   try
+      f = JLD2.jldopen(fname, "r")
+      Ψ = f["Psi"]
+      data = f["data"]
+      basisgroups = f["basisgroups"]
+      close(f)
+      println("Looks like the file loaded on the first attempt.")
+   catch
+      println("Still needs two attempts to load JLD2 files.")
+      f = JLD2.jldopen(fname, "r")
+      Ψ = f["Psi"]
+      data = f["data"]
+      basisgroups = f["basisgroups"]
+      close(f)
+   end
    # need to undo the lumping of the basis functions into a single NBody
    # and get a basis back
    basis = NBodyFunction[]
@@ -797,4 +662,35 @@ function load_lsq(fname)
    end
    @assert idx == length(basis)
    return LsqSys(data, [b for b in basis], Iord, Ψ)
+end
+
+save(fname::AbstractString, IP::NBodyIP) =
+   save_ip(_checkextension(fname), fname, IP)
+
+load_ip(fname::AbstractString) =
+   load_ip(_checkextension(fname), fname)
+
+save_ip(::XJld2, fname, IP) = save(fname, "IP", saveas(IP))
+
+function load_ip(::XJld2, fname)
+   IPs = nothing
+   try
+      IPs = load(fname, "IP")
+   catch
+      IPs = load(fname, "IP")
+   end
+   return loadas(IPs)
+end
+
+
+function save_ip(::XJson, fname, IP)
+   IPs = saveas_json(IP)
+   f = open(fname, "w")
+   print(f, JSON.json(IPs))
+   close(f)
+end
+
+function load_ip(::XJson, fname)
+   IPj = JSON.parsefile(fname)
+   return loadas_json(NBodyIP, IPj)
 end

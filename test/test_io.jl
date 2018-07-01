@@ -85,3 +85,31 @@ for n in [1,3,6]
         @assert IP4(r) ≈ IP4bf(r)
     end
 end
+
+
+
+
+
+import JSON
+using NBodyIPs
+IP = load_ip("co_fits/Ti_4B_med.jld2")
+
+IPj = NBodyIPs.saveas_json(IP)
+
+f = open("temp.json", "w")
+print(f, JSON.json(IPj, 3))
+close(f)
+
+IPstr = JSON.parsefile("temp.json")
+IP2 = NBodyIPs.loadas_json(NBodyIP, IPstr)
+
+save("co_fits/Ti_4B_med.json", IP)
+IP2 = load_ip("co_fits/Ti_4B_med.json")
+
+
+for dim in [1, 3, 6]
+   for n = 1:10
+      r =  SVector((3.0 + rand(dim))...)
+      @show abs(IP2(r) - IP(r))
+   end
+end

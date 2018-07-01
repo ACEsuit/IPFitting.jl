@@ -18,6 +18,7 @@ using Reexport
 
 @reexport using StaticArrays
 @reexport using FileIO
+@reexport using JuLIP
 
 
 # two auxiliary functions to make for easier assembly of the code
@@ -52,9 +53,10 @@ include("data.jl")
 # TODO: make this a sub-module and re-export
 include("fitting.jl")
 
-# IP i/o
-include("io.jl")
-@reexport using NBodyIPs.IO
+include("errors.jl")
+
+# # IP i/o
+# include("io.jl")
 
 #visualisation module
 include("PIPplot.jl")
