@@ -181,7 +181,7 @@ function observations(d::Dat)
    return Y
 end
 
-function observations(data::AbstractVector{TD}) where {TD <: Dat} 
+function observations(data::AbstractVector{TD}) where {TD <: Dat}
    Y = Float64[]
    for d in data
       append!(Y, observations(d))
@@ -606,11 +606,13 @@ import FileIO: save
 
 struct XJld2 end
 struct XJson end
-
+struct XJld end
 
 function _checkextension(fname)
    if fname[end-3:end] == "jld2"
       return XJld2()
+   elseif fname[end-2:end] == "jld"
+      return XJld()
    elseif fname[end-3:end] == "json"
       return XJson()
    end
@@ -629,7 +631,17 @@ function save(fname::AbstractString, lsq::LsqSys)
    save(fname, lsqdict)
 end
 
-function load_lsq(fname)
+load_lsq(fname) = load_lsq(_checkextension(fname), fname)
+
+function load_lsq(::XJld, fname)
+   lsqdict = load(fname)
+   Ψ = lsqdict["Psi"]
+   data = lsqdict["data"]
+   basisgroups = lsqdict["basisgroups"]
+   return dict_to_lsq(Ψ, data, basisgroups)
+end
+
+function load_lsq(::XJld2, fname)
    _checkextension(fname)
    data = nothing
    basisgroups = nothing
@@ -649,6 +661,10 @@ function load_lsq(fname)
       basisgroups = f["basisgroups"]
       close(f)
    end
+   return dict_to_lsq(Ψ, data, basisgroups)
+end
+
+function dict_to_lsq(Ψ, data, basisgroups)
    # need to undo the lumping of the basis functions into a single NBody
    # and get a basis back
    basis = []
