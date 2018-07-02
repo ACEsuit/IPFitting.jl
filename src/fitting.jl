@@ -181,7 +181,7 @@ function observations(d::Dat)
    return Y
 end
 
-function observations(data::AbstractVector{Dat})
+function observations(data::AbstractVector{TD}) where {TD <: Dat} 
    Y = Float64[]
    for d in data
       append!(Y, observations(d))
