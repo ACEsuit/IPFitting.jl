@@ -334,6 +334,8 @@ function hess_weights_hook!(w, d::Dat)
    at = Atoms(d)
    if length(w) != 1 + 3 * length(at)
       warn("unexpected length(w) in hess_weights_hook => ignore")
+      @show length(w)
+      @show 1 + 3 * length(at)
       return w
    end
    # don't use this energy
@@ -464,6 +466,10 @@ function _get_lsq_system(lsq, weights, config_weights, include, Ibasis,
    # double-check we haven't made a mess :)
    @assert idx == length(W) == length(Y)
 
+   # remove NaNs
+   Irows = find( any(isnan.(lsq.Ψ[i,:])) for i = 1:size(lsq.Ψ, 1) )
+   W[Irows] .= 0.0
+
    # find the zeros and remove them => list of data points
    Idata = find(W .!= 0.0) |> sort
 
@@ -475,6 +481,7 @@ function _get_lsq_system(lsq, weights, config_weights, include, Ibasis,
    # now rescale Y and Ψ according to W => Y_W, Ψ_W; then the two systems
    #   \| Y_W - Ψ_W c \| -> min  and (Y - Ψ*c)^T W (Y - Ψ*x) => MIN
    # are equivalent
+
    W .= sqrt.(W)
    Y .*= W
    scale!(W, Ψ)
