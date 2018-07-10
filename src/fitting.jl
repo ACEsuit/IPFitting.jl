@@ -332,26 +332,32 @@ end
 
 function hess_weights_hook!(w, d::Dat)
    at = Atoms(d)
-   if length(w) != 1 + 3 * length(at)
-      warn("unexpected length(w) in hess_weights_hook => ignore")
-      @show length(w)
-      @show 1 + 3 * length(at)
-      return w
-   end
-   # don't use this energy
-   w[1] = 0.0
+   if energy(d) == nothing || forces(d) == nothing
+      warn("""hess_weights_hook!: a training configuration does not contain
+              energy and forces => ignore""")
+     return w
+  end
    # compute R vectors
    X = positions(at)
-   h = norm(X[1])
-   if h < 1e-5 || h > 0.02
-      warn("unexpected location of X[1] in hess_weights_hook => ignore")
-      return w
-   end
-   X[1] *= 0
+   h = 0.01 # norm(X[1])
+   # if h < 1e-5 || h > 0.02
+   #    warn("unexpected location of X[1] in hess_weights_hook => ignore")
+   #    @show X[1], h
+   #    return w
+   # end
+
+   # give this energy a lot of weight to make sure we match the
+   # ground state (which we assume this is)
+   w[1] = 0.0
+
+   # now fix the scaling for the force weights
+   # X[1] *= 0
    R = [ JuLIP.project_min(at, x - X[1])  for x in X ]
    r = norm.(R)
    r3 = (ones(3) * r')[:]
-   w[2:end] .= w[2:end] .* (r3.^7) / h
+   If = 2:(1+3*length(R))
+   w[If] .= w[If] .* (r3.^7) / h
+   w[2] = 0.0
    return w
 end
 
@@ -456,7 +462,7 @@ function _get_lsq_system(lsq, weights, config_weights, include, Ibasis,
       # TODO: this should be generalised to be able to hook into
       #       other kinds of weight modifications
       idx_end = idx
-      if length(config_type(d)) >= 4 && config_type(d)[1:4] == "hess"
+      if w != 0 && length(config_type(d)) >= 4 && config_type(d)[1:4] == "hess"
          if haskey(hooks, "hess")
             w = hooks["hess"](W[idx_init:idx_end], d)
             W[idx_init:idx_end] = w
