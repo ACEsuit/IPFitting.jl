@@ -1,16 +1,7 @@
 julia 0.6
-JuLIP
-NeighbourLists
-Reexport
-StaticArrays
-ProgressMeter
 PyCall
 ASE
 JLD2
-JLD
 JSON
-Sobol
-StaticPolynomials
-Combinatorics
 BenchmarkTools
 DataFrames
