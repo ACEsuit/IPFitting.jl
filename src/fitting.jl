@@ -5,7 +5,6 @@ using NBodyIPs: match_dictionary
 using Base.Threads
 
 import Base: kron, append!
-import JLD2, JSON
 
 export get_basis, regression,
        observations, get_lsq_system,
@@ -18,21 +17,6 @@ Base.norm(F::JVecsF) = norm(norm.(F))
 # components of the stress (up to symmetry)
 const _IS = SVector(1,2,3,5,6,9)
 
-"""
-`mutable struct LsqSys`: type storing all information to perform a
-LSQ fit for an interatomic potential. To assemble the LsqSys use
-one of (equivalent)
-```
-kron(data, basis)
-LsqSys(data, basis)
-```
-"""
-mutable struct LsqSys{TD, TB}
-   data::Vector{TD}
-   basis::Vector{TB}
-   Iord::Vector{Vector{Int}}     # result of split_basis
-   Ψ::Matrix{Float64}
-end
 
 LsqSys(data, basis) = kron(data, basis)
 

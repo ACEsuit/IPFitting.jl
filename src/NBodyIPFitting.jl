@@ -19,7 +19,7 @@ using Reexport
 @reexport using JuLIP
 @reexport using NBodyIPs
 
-
+include("types.jl")
 
 # loading data
 include("data.jl")

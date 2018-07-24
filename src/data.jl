@@ -18,6 +18,7 @@ loaded information.
 module Data
 
 using JuLIP, ASE, ProgressMeter, FileIO
+using NBodyIPFitting: Dat 
 import JuLIP: Atoms, energy, forces, virial
 import Base: length
 
@@ -26,30 +27,6 @@ using PyCall
 
 export config_type, weight, load_data
 
-
-"""
-`Dat`: store one simulation data point. If `d::Dat`, to obtain the data, use
-```
-Atoms(d)
-energy(d)
-forces(d)
-virial(d)
-weight(d)
-config_type(d)
-length(d)    # number of atoms
-```
-If information is missing, the relevant function will return `nothing` instead
-(TODO for J v1.0: change `nothing` to `missing`)
-"""
-mutable struct Dat{T}
-   at::Atoms
-   E::Union{Void, T}         # energy
-   F::Union{Void, JVecs{T}}  # forces
-   S::Union{Void, JMat{T}}   # stress
-   w                         # weight, could be anything?
-   config_type::Union{Void, String}
-   D::Dict{String, Any}
-end
 
 Atoms(d) = d.at
 energy(d::Dat) = d.E
