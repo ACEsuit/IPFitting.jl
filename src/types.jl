@@ -1,4 +1,5 @@
 
+using JuLIP: Atoms, JVec, JMat, JVecs,
 
 """
 `Dat`: store one simulation data point. If `d::Dat`, to obtain the data, use
@@ -34,14 +35,22 @@ kron(data, basis)
 LsqSys(data, basis)
 ```
 """
-mutable struct LsqSys{TD, TB}
+mutable struct LsqSys{TD}
    data::Vector{TD}
-   basis::Vector{TB}
+   basis::Vector{AbstractCalculator}
    Iord::Vector{Vector{Int}}     # result of split_basis
    Ψ::Matrix{Float64}
 end
 
 
-mutable struct LsqDB
+"""
+`mutable struct LsqDB{TD, TB}`
 
+A representation of a least-squares system stored on disk, which can
+be extended by adding data, or
+"""
+mutable struct LsqDB{TD}
+   data::Vector{TD}
+   basis::Vector{AbstractCalculator}
+   dirname::String
 end
