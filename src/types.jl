@@ -1,7 +1,9 @@
 
-using JuLIP: Atoms, JVec, JMat, JVecs, AbstractCalculator
+import Base: ==
 
-export LsqDB
+using JuLIP: Atoms, JVec, JMat, JVecs, AbstractCalculator, mat, vecs
+
+export LsqDB, Dat
 
 
 """
@@ -28,9 +30,19 @@ mutable struct Dat{T}
    D::Dict{String, Any}
 end
 
+==(d1::Dat, d2::Dat) = (
+      (d1.at == d2.at) && (d1.E == d2.E) && (d1.F == d2.F) && (d1.V == d2.V) &&
+      (d1.config_type == d2.config_type) && (d1.D == d2.D)
+   )
+
+Dat(at, E, F, V, w, config_type) =
+   Dat(at, E, F, V, w, config_type, Dict{String, Any}())
+
 Base.Dict(d::Dat) =
    Dict("id" => "NBodyIPFitting.Dat",
-         "at" => Dict(d.at), "E" => d.E, "F" => mat(d.F), "V" => Matrix(d.V),
+         "at" => Dict(d.at), "E" => d.E,
+         "F" => d.F == nothing ? nothing : mat(d.F),
+         "V" => d.V == nothing ? nothing : Matrix(d.V),
          "w" => d.w, "config_type" => d.config_type, "D" => d.D)
 
 function Dat(D::Dict)

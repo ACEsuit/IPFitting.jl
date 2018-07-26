@@ -73,7 +73,7 @@ function LsqDB(dbdir::AbstractString)
    return LsqDB(load_data(dbdir), load_basis(dbdir), dbdir)
 end
 
-# --------- Append New Data to the DB -------------
+# ------------- Append New Data to the DB -----------------
 
 function push!(db::LsqDB, d::Dat;
                datidx = length(data(db)+1))
@@ -105,7 +105,7 @@ function append!(db::LsqDB, ds::AbstractVector{TD}; verbose=true
    return db
 end
 
-# --------- Append New Basis Functions to the DB -------------
+# ------------- Append New Basis Functions to the DB -----------------
 
 push!(db::LsqDB, b::AbstractCalculator) = append!(db, [b])
 

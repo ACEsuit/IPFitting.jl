@@ -30,7 +30,7 @@ export config_type, weight, load_data
 Atoms(d) = d.at
 energy(d::Dat) = d.E
 forces(d::Dat) = d.F
-virial(d::Dat) = d.S
+virial(d::Dat) = d.V
 weight(d::Dat) = d.w
 length(d::Dat) = length(d.at)
 config_type(d::Dat) = d.config_type

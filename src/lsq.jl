@@ -1,8 +1,8 @@
 
 module Lsq
 
-using StaticArrays 
-using JuLIP: AbstractCalculator
+using StaticArrays
+using JuLIP: AbstractCalculator, Atoms, energy, forces, virial
 using NBodyIPFitting: Dat
 
 # components of the stress (up to symmetry)
@@ -30,7 +30,7 @@ end
 # fill the LSQ system, i.e. evaluate basis at data points
 function evallsq(d::Dat, B::AbstractVector{TB}
                  ) where {TB <: AbstractCalculator}
-   if !(isleaftype(T))
+   if !(isleaftype(TB))
       return evallsq_split(d, B)
    end
 
@@ -48,7 +48,7 @@ function evallsq(d::Dat, B::AbstractVector{TB}
       D["F"] = forces(B, at)
    end
    if (virial(d) != nothing)
-      Vs = virial(Bord[n], at)
+      Vs = virial(B, at)
       # store a vector rather than a matrix
       D["V"] = [ v[_IS] for v in Vs ]
    end
@@ -59,7 +59,7 @@ end
 
 function _cat_(As, Iord)
    TA = eltype(As[1])
-   A = zeros(TA, sum(size(AA)[end] for AA in As))
+   A = Vector{TA}(sum(size(AA)[end] for AA in As))
    for i = 1:length(As)
       A[Iord[i]] = As[i]
    end
@@ -70,7 +70,7 @@ end
 split the Basis `B` into subsets of identical types and evaluate
 those independently (fast).
 """
-function evallsq_split(d, B)
+function evallsq_split(d, basis)
    # TB is not a leaf-type so we should split the basis to be able to
    # evaluate_many & co
    Bord, Iord = split_basis(basis)
@@ -79,7 +79,7 @@ function evallsq_split(d, B)
    # we assume that all D_ord[i] contain the same keys.
    D = Dict{String,Any}()
    for key in keys(D_ord[1])
-      D[key] = _cat_([DD[key] for DD in DD_ord], Iord)
+      D[key] = _cat_([DD[key] for DD in D_ord], Iord)
    end
    return D
 end
