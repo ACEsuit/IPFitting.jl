@@ -19,16 +19,16 @@ end
 ##
 println("Testing _vec2arr and _arr2vec")
 A = rand(10)
-@test DB._vec2arr(A) == A
-@test DB._arr2vec(A) == A
-A = rand(3, 10)
-B = [rand(3) for n = 1:10]
-@test DB._vec2arr(DB._arr2vec(A)) == A
-@test DB._arr2vec(DB._vec2arr(B)) == B
-A = rand(3,4, 10)
+display(@test DB._vec2arr(A) == A)
+display(@test DB._arr2vec(A) == A)
+display(A = rand(3, 10))
+display(B = [rand(3) for n = 1:10])
+display(@test DB._vec2arr(DB._arr2vec(A)) == A)
+display(@test DB._arr2vec(DB._vec2arr(B)) == B)
+display(A = rand(3,4, 10))
 B = [rand(3,4) for n = 1:10]
-@test DB._vec2arr(DB._arr2vec(A)) == A
-@test DB._arr2vec(DB._vec2arr(B)) == B
+display(@test DB._vec2arr(DB._arr2vec(A)) == A)
+display(@test DB._arr2vec(DB._vec2arr(B)) == B)
 
 ##
 println("Check serialisation of basis: ")
@@ -83,6 +83,9 @@ print("Test that the basis matches: ")
 display(@test all(db.basis .== db1.basis))
 print("Test that the data matches: ")
 display(@test all(db.data .== db1.data))
+
+println("Visually check that the files exist: " )
+run(`ls $db_dir`)
 
 println("Delete the temporary database")
 rm(tmpdir; force=true, recursive=true)

@@ -78,7 +78,7 @@ end
 function push!(db::LsqDB, d::Dat;
                datidx = length(data(db)+1))
    # TODO: check whether d already exists in the database
-   datfname = joinpath(dbdir(db) * "dat_$(datidx).jld2")
+   datfname = joinpath(dbdir(db), "dat_$(datidx).jld2")
    lsqdict = Lsq.evallsq(d, basis(db))
    save(datfname, "data", d, "lsq", lsqdict)
    # if length(db.data) >= datidx then we assume that d has already been
