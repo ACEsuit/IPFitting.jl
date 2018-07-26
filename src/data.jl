@@ -18,15 +18,14 @@ loaded information.
 module Data
 
 using JuLIP, ASE, ProgressMeter, FileIO
-using NBodyIPFitting: Dat 
+using NBodyIPFitting: Dat
 import JuLIP: Atoms, energy, forces, virial
-import Base: length
+import Base: length, Dict
 
 using PyCall
 @pyimport ase.io as ase_io
 
 export config_type, weight, load_data
-
 
 Atoms(d) = d.at
 energy(d::Dat) = d.E

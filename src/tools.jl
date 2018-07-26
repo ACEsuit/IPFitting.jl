@@ -1,6 +1,8 @@
 
 module Tools
 
+using ProgressMeter, Base.Threads
+
 function tfor(f, rg; verbose=true, msg="")
    if nthreads() == 1
       verbose && println("$msg in serial")
@@ -31,5 +33,8 @@ function tfor(f, rg; verbose=true, msg="")
    end
    return nothing
 end
+
+
+decode(D::Dict) = convert(Val(Symbol(D["id"])), D)
 
 end

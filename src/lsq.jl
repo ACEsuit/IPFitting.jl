@@ -1,6 +1,7 @@
 
 module Lsq
 
+using StaticArrays 
 using JuLIP: AbstractCalculator
 using NBodyIPFitting: Dat
 

@@ -9,5 +9,3 @@ using BenchmarkTools
 # end
 
 Fit = NBodyIPFitting
-
-lsqdb = Fit.DB.initdb(homedir()*"/scratch/nbodyips", "test1")

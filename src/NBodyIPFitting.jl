@@ -21,7 +21,9 @@ include("types.jl")
 
 # loading data
 include("data.jl")
-@reexport using NBodyIPs.Data
+@reexport using NBodyIPFitting.Data
+
+include("lsq.jl")
 
 include("lsq_db.jl")
 
