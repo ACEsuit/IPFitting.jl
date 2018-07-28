@@ -1,7 +1,9 @@
 
 module DB
 
-using JuLIP, FileIO
+using FileIO
+
+using JuLIP: vecs, mat, AbstractCalculator
 
 using NBodyIPFitting: Dat, LsqDB
 using NBodyIPFitting.Tools: tfor, decode
@@ -86,8 +88,6 @@ end
 
 # ------------- Append New Data to the DB -----------------
 
-
-
 function push!(db::LsqDB, d::Dat; datidx = length(data(db)+1))
    # TODO: check whether d already exists in the database
    lsqdict = Lsq.evallsq(d, basis(db))
@@ -136,10 +136,10 @@ function _append_basis_to_dat!(db, bs, datidx)
    lsqdict = load(datfname, "lsq")
    lsqnew = Lsq.evallsq(data(db, datidx), bs)
    for key in keys(lsqdict)
-      append!(lsqdict[key], lsqneq[key])
+      append!(lsqdict[key], lsqnew[key])
    end
    save_dat(db, datidx, lsqdict)
-   return db 
+   return db
 end
 
 # --------- Auxiliaries -------------
@@ -170,18 +170,50 @@ end
 
 _arr2vec(A_vec::AbstractVector{TA}) where {TA <: Real} = [a for a in A_vec]
 
-function _vec2arr(Dvec::Dict{String, Vector})
+
+"""
+`function _vec2arr(Dvec::Dict{String})`
+
+convert LSQ matrix entries stored in atomistic/JuLIP format into a
+big multi-dimensional arrays for efficient storage
+"""
+function _vec2arr(Dvec::Dict{String})
    Darr = Dict{String, Array}()
    for (key, val) in Dvec
-      Darr[key] = _vec2arr(val)
+      if key == "E"
+         Darr[key] = val
+      elseif key == "V"
+         # each element of val is a R^6 vector representing a virial stress
+         Darr[key] = mat(val)
+      elseif key == "F"
+         # mat.(val) : convert each collection of forces into a matrix
+         # _vec2arr( : convert a Vector of matrices into a multi-dimensional array
+         Darr[key] = _vec2arr( mat.(val) )
+      else
+         error("unknown key `$key`")
+      end
    end
    return Darr
 end
 
-function _arr2vec(Darr::Dict{String, Array})
+"""
+function _arr2vec(Darr::Dict{String})`
+
+convert LSQ matrix entries stored as multi-dimensional arrays back into
+atomistic/JuLIP format
+"""
+function _arr2vec(Darr::Dict{String})
    Dvec = Dict{String, Vector}()
    for (key, val) in Darr
-      Dvec[key] = _arr2vec(val)
+      if key == "E"
+         Dvec[key] = val
+      elseif key == "V"
+         Dvec[key] = vecs(val)
+      elseif key == "F"
+         Dvec[key] = vecs(_arr2vec(val))
+      else
+         error("unknown key `$key`")
+      end
    end
    return Dvec
 end

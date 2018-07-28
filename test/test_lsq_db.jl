@@ -1,6 +1,5 @@
 ##
 using Base.Test
-
 using NBodyIPFitting
 using NBodyIPs
 using NBodyIPs.Polys: poly_basis
@@ -57,6 +56,7 @@ catch
    display(@test true)
 end
 
+##
 print("Add some basis functions: ")
 try
    append!(db, basis1)
@@ -84,8 +84,14 @@ display(@test all(db.basis .== db1.basis))
 print("Test that the data matches: ")
 display(@test all(db.data .== db1.data))
 
-println("Visually check that the files exist: " )
-run(`ls $db_dir`)
+##
+println("Add additional basis functions")
+basis3 = poly_basis(3, "(3/r)^5", "(:cos2s, 2.0, 2.5, 3.5, 5.5)", 5)
+append!(db, basis3)
 
+## Confirm that the LSQ entries load correctly and
+
+
+##
 println("Delete the temporary database")
 rm(tmpdir; force=true, recursive=true)
