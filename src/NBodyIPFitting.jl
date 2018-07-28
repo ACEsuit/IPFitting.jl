@@ -17,6 +17,8 @@ using Reexport
 
 include("tools.jl")
 
+include("fio.jl")
+
 include("types.jl")
 
 # loading data

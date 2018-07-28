@@ -1,14 +1,14 @@
 
 module DB
 
-using FileIO
-
+using StaticArrays: SVector
 using JuLIP: vecs, mat, AbstractCalculator
 
 using NBodyIPFitting: Dat, LsqDB
 using NBodyIPFitting.Tools: tfor, decode
 
-import NBodyIPFitting.Lsq
+import NBodyIPFitting.Lsq,
+       NBodyIPFitting.FIO
 
 import Base: append!, push!
 
@@ -18,8 +18,34 @@ import Base: append!, push!
 #        config_types,
 #        del_data!
 
-const DATAFILE = "data.jld2"
-const BASISFILE = "basis.jld2"
+const DBFILETYPE = ".h5"
+const DATAFILE = "data" * DBFILETYPE
+const BASISFILE = "basis" * DBFILETYPE
+
+# function _checkfname(fname)
+#    if length(fname) >= 3
+#       if fname[end-2:end] == ".h5"
+#          return fname
+#       end
+#    end
+#    return fname * ".h5"
+# end
+
+# function _save(fname, args...)
+#    h5open(_checkfname(fname), "w") do file
+#       for (key, val) in args
+#          write(file, key, val)
+#       end
+#    end
+# end
+#
+# function _load(fname, args...)
+#    file = h5open(_checkfname(fname), "r")
+#    ret = [file[key] for key in args]
+#    close(file)
+#    return ret...
+# end
+
 
 """
 `dbdir(db::LsqDB)` : return the absolute path to the database
@@ -36,7 +62,7 @@ datafile(db::LsqDB) = datafile(dbdir(db))
 load_data(dbdir::AbstractString) =
    Vector{Dat{Float64}}(Dat.(load(datafile(dbdir), "data")))
 load_data(db::LsqDB) = load(dbdir(db))
-save_data(dbdir::AbstractString, data) = save(datafile(dbdir), "data", Dict.(data))
+save_data(dbdir::AbstractString, data) = _save(datafile(dbdir), "data" => Dict.(data))
 save_data(db::LsqDB) = save_data(dbdir(db), data(db))
 
 basisfile(dbdir::AbstractString) = joinpath(dbdir, BASISFILE)
@@ -45,15 +71,17 @@ load_basis(dbdir::AbstractString) =
    Vector{AbstractCalculator}(decode.(load(basisfile(dbdir), "basis")))
 load_basis(db::LsqDB) = load(dbdir(db))
 save_basis(dbdir::AbstractString, basis) =
-   save(basisfile(dbdir), "basis", Dict.(basis))
+   _save(basisfile(dbdir), "basis" => Dict.(basis))
 save_basis(db::LsqDB) = save_basis(dbdir(db), basis(db))
 
-datfilename(db, datidx) = joinpath(dbdir(db), "dat_$(datidx).jld2")
+datfilename(db, datidx) = joinpath(dbdir(db), "dat_$(datidx)" * DBFILETYPE)
+
 save_dat(db, datidx, lsq_dict) =
-   save(datfilename(db, datidx), "data", data(db, datidx),
-                                 "lsq", _vec2arr(lsq_dict))
+   _save(datfilename(db, datidx), "dat_" => data(db, datidx),
+                                  collect(lsq_dict)...)
+
 function load_dat(db, datidx)
-   dat, lsq = load(datfilename(db, datidx), "data", "lsq")
+   DD = _load(datfilename(db, datidx), "data", "lsq")
    @assert dat == data(db, datidx)
    return _arr2vec(lsq)
 end
@@ -202,15 +230,15 @@ function _arr2vec(Darr::Dict{String})`
 convert LSQ matrix entries stored as multi-dimensional arrays back into
 atomistic/JuLIP format
 """
-function _arr2vec(Darr::Dict{String})
+function _arr2vec(Darr::Dict{String,Array})
    Dvec = Dict{String, Vector}()
    for (key, val) in Darr
       if key == "E"
          Dvec[key] = val
       elseif key == "V"
-         Dvec[key] = vecs(val)
+         Dvec[key] = reinterpret(SVector{6,Float64}, val, (size(val,2),))
       elseif key == "F"
-         Dvec[key] = vecs(_arr2vec(val))
+         Dvec[key] = vecs.(_arr2vec(val))
       else
          error("unknown key `$key`")
       end
