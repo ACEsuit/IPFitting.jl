@@ -25,7 +25,9 @@ const BASISFILE = "basis.jld2"
 dbdir(db::LsqDB) = db.dirname
 
 data(db::LsqDB) = db.data
+data(db::LsqDB, i::Integer) = db.data[i]
 basis(db::LsqDB) = db.basis
+basis(db::LsqDB, i::Integer) = db.basis[i]
 
 datafile(dbdir::AbstractString) = joinpath(dbdir, DATAFILE)
 datafile(db::LsqDB) = datafile(dbdir(db))
@@ -44,6 +46,15 @@ save_basis(dbdir::AbstractString, basis) =
    save(basisfile(dbdir), "basis", Dict.(basis))
 save_basis(db::LsqDB) = save_basis(dbdir(db), basis(db))
 
+datfilename(db, datidx) = joinpath(dbdir(db), "dat_$(datidx).jld2")
+save_dat(db, datidx, lsq_dict) =
+   save(datfilename(db, datidx), "data", data(db, datidx),
+                                 "lsq", _vec2arr(lsq_dict))
+function load_dat(db, datidx)
+   dat, lsq = load(datfilename(db, datidx), "data", "lsq")
+   @assert dat == data(db, datidx)
+   return _arr2vec(lsq)
+end
 
 """
 `function initdb(basedir, dbname)`
@@ -75,12 +86,12 @@ end
 
 # ------------- Append New Data to the DB -----------------
 
-function push!(db::LsqDB, d::Dat;
-               datidx = length(data(db)+1))
+
+
+function push!(db::LsqDB, d::Dat; datidx = length(data(db)+1))
    # TODO: check whether d already exists in the database
-   datfname = joinpath(dbdir(db), "dat_$(datidx).jld2")
    lsqdict = Lsq.evallsq(d, basis(db))
-   save(datfname, "data", d, "lsq", lsqdict)
+   save(datfilename(db, datidx), "data", d, "lsq", lsqdict)
    # if length(db.data) >= datidx then we assume that d has already been
    # inserted into db.data, otherwise push it
    if length(data(db)) < datidx
@@ -93,8 +104,7 @@ function push!(db::LsqDB, d::Dat;
    return db
 end
 
-function append!(db::LsqDB, ds::AbstractVector{TD}; verbose=true
-                 ) where {TD <: Dat}
+function append!(db::LsqDB, ds::AbstractVector{TD}; verbose=true) where {TD <: Dat}
    # append the data
    len_data_old = length(data(db))
    append!(data(db), ds)
@@ -107,18 +117,30 @@ end
 
 # ------------- Append New Basis Functions to the DB -----------------
 
-push!(db::LsqDB, b::AbstractCalculator) = append!(db, [b])
+push!(db::LsqDB, b::AbstractCalculator; kwargs...) = append!(db, [b]; kwargs...)
 
-function append!(db::LsqDB, bs::AbstractVector{TB}) where {TB <: AbstractCalculator}
-   if length(data(db)) > 0
-      error("cannot yet add basis functions to an existing database [TODO]")
-   end
+function append!(db::LsqDB, bs::AbstractVector{TB};
+                 verbose=true) where {TB <: AbstractCalculator}
    # TODO : check whether bs already exist in the database?
    append!(basis(db), bs)
    save_basis(db)
+   # loop through all existing datafiles and append the new basis functions
+   # to each of them
+   tfor( n -> _append_basis_to_dat!(db, bs, n), 1:length(data(db));
+         verbose=verbose, msg="Append New LSQ blocks" )
    return db
 end
 
+function _append_basis_to_dat!(db, bs, datidx)
+   datfname = datfilename(db, datidx)
+   lsqdict = load(datfname, "lsq")
+   lsqnew = Lsq.evallsq(data(db, datidx), bs)
+   for key in keys(lsqdict)
+      append!(lsqdict[key], lsqneq[key])
+   end
+   save_dat(db, datidx, lsqdict)
+   return db 
+end
 
 # --------- Auxiliaries -------------
 
@@ -147,6 +169,22 @@ function _arr2vec(A_arr::AbstractArray{TA}) where {TA <: Real}
 end
 
 _arr2vec(A_vec::AbstractVector{TA}) where {TA <: Real} = [a for a in A_vec]
+
+function _vec2arr(Dvec::Dict{String, Vector})
+   Darr = Dict{String, Array}()
+   for (key, val) in Dvec
+      Darr[key] = _vec2arr(val)
+   end
+   return Darr
+end
+
+function _arr2vec(Darr::Dict{String, Array})
+   Dvec = Dict{String, Vector}()
+   for (key, val) in Darr
+      Dvec[key] = _arr2vec(val)
+   end
+   return Dvec
+end
 
 
 end

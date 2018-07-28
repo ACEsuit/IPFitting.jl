@@ -19,13 +19,13 @@ end
 ##
 println("Testing _vec2arr and _arr2vec")
 A = rand(10)
-display(@test DB._vec2arr(A) == A)
-display(@test DB._arr2vec(A) == A)
-display(A = rand(3, 10))
-display(B = [rand(3) for n = 1:10])
+display(@test(DB._vec2arr(A) == A))
+display(@test(DB._arr2vec(A) == A))
+A = rand(3, 10)
+B = [rand(3) for n = 1:10]
 display(@test DB._vec2arr(DB._arr2vec(A)) == A)
 display(@test DB._arr2vec(DB._vec2arr(B)) == B)
-display(A = rand(3,4, 10))
+A = rand(3,4, 10)
 B = [rand(3,4) for n = 1:10]
 display(@test DB._vec2arr(DB._arr2vec(A)) == A)
 display(@test DB._arr2vec(DB._vec2arr(B)) == B)
