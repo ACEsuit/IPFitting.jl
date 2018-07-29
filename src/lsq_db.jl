@@ -3,6 +3,7 @@ module DB
 
 using StaticArrays: SVector
 using JuLIP: vecs, mat, AbstractCalculator
+using FileIO
 
 using NBodyIPFitting: Dat, LsqDB
 using NBodyIPFitting.Tools: tfor, decode
@@ -19,8 +20,8 @@ import Base: append!, push!
 #        del_data!
 
 const DBFILETYPE = ".h5"
-const DATAFILE = "data" * DBFILETYPE
-const BASISFILE = "basis" * DBFILETYPE
+const DATAFILE = "data.jld2"
+const BASISFILE = "basis.jld2"
 
 # function _checkfname(fname)
 #    if length(fname) >= 3
@@ -62,7 +63,7 @@ datafile(db::LsqDB) = datafile(dbdir(db))
 load_data(dbdir::AbstractString) =
    Vector{Dat{Float64}}(Dat.(load(datafile(dbdir), "data")))
 load_data(db::LsqDB) = load(dbdir(db))
-save_data(dbdir::AbstractString, data) = _save(datafile(dbdir), "data" => Dict.(data))
+save_data(dbdir::AbstractString, data) = save(datafile(dbdir), "data", Dict.(data))
 save_data(db::LsqDB) = save_data(dbdir(db), data(db))
 
 basisfile(dbdir::AbstractString) = joinpath(dbdir, BASISFILE)
@@ -70,18 +71,17 @@ basisfile(db::LsqDB) = basisfile(dbdir(db))
 load_basis(dbdir::AbstractString) =
    Vector{AbstractCalculator}(decode.(load(basisfile(dbdir), "basis")))
 load_basis(db::LsqDB) = load(dbdir(db))
-save_basis(dbdir::AbstractString, basis) =
-   _save(basisfile(dbdir), "basis" => Dict.(basis))
+save_basis(dbdir::AbstractString, basis) = save(basisfile(dbdir), "basis", Dict.(basis))
 save_basis(db::LsqDB) = save_basis(dbdir(db), basis(db))
 
 datfilename(db, datidx) = joinpath(dbdir(db), "dat_$(datidx)" * DBFILETYPE)
 
 save_dat(db, datidx, lsq_dict) =
-   _save(datfilename(db, datidx), "dat_" => data(db, datidx),
-                                  collect(lsq_dict)...)
+   FIO.save(datfilename(db, datidx), "dat" => Dict(data(db, datidx)),
+                                     collect(_vec2arr(lsq_dict))...)
 
 function load_dat(db, datidx)
-   DD = _load(datfilename(db, datidx), "data", "lsq")
+   DD = _load(datfilename(db, datidx), "dat", "lsq")
    @assert dat == data(db, datidx)
    return _arr2vec(lsq)
 end
@@ -119,7 +119,7 @@ end
 function push!(db::LsqDB, d::Dat; datidx = length(data(db)+1))
    # TODO: check whether d already exists in the database
    lsqdict = Lsq.evallsq(d, basis(db))
-   save(datfilename(db, datidx), "data", d, "lsq", lsqdict)
+   save_dat(db, datidx, lsqdict)
    # if length(db.data) >= datidx then we assume that d has already been
    # inserted into db.data, otherwise push it
    if length(data(db)) < datidx
@@ -160,8 +160,7 @@ function append!(db::LsqDB, bs::AbstractVector{TB};
 end
 
 function _append_basis_to_dat!(db, bs, datidx)
-   datfname = datfilename(db, datidx)
-   lsqdict = load(datfname, "lsq")
+   lsqdict = load_dat(lsq, datidx)
    lsqnew = Lsq.evallsq(data(db, datidx), bs)
    for key in keys(lsqdict)
       append!(lsqdict[key], lsqnew[key])

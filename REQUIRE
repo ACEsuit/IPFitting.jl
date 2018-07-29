@@ -2,7 +2,8 @@ julia 0.6
 NBodyIPs
 PyCall
 ASE
-HDF5 
+HDF5
+JLD2
 JSON
 BenchmarkTools
 DataFrames

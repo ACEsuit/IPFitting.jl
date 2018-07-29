@@ -57,23 +57,23 @@ end
 
 ##
 print("Add some basis functions: ")
-try
+# try
    append!(db, basis1)
    append!(db, basis2)
    basis = DB.basis(db)
    println(@test true)
-catch
-   println(@test false)
-end
+# catch
+#    println(@test false)
+# end
 
 print("Add some data to db: ")
-try
-   append!(db, data1)
-   append!(db, data2)
-   println(@test true)
-catch
-   println(@test false)
-end
+# try
+append!(db, data1)
+append!(db, data2)
+println(@test true)
+# catch
+#    println(@test false)
+# end
 
 println("Reload the db")
 db_dir = DB.dbdir(db)
