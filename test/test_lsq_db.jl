@@ -1,7 +1,7 @@
 ##
 using Base.Test
 using NBodyIPFitting, NBodyIPs, ProgressMeter
-using NBodyIPs.Polys: poly_basis
+using NBodyIPs: blpolys
 Fit = NBodyIPFitting
 DB = NBodyIPFitting.DB
 Data = Fit.Data
@@ -30,8 +30,8 @@ println(@test DB._arr2vec(DB._vec2arr(B)) == B)
 
 ##
 println("Check serialisation of basis: ")
-basis1 = poly_basis(2, "exp( - 2 * (r/3-1))", "(:cos, 5.0, 7.0)", 10)
-basis2 = poly_basis(3, "exp( - 2.5 * (r/3-1))", "(:cos2s, 2.0, 2.5, 4.0, 5.5)", 6)
+basis1 = blpolys(2, "exp( - 2 * (r/3-1))", "(:cos, 5.0, 7.0)", 10)
+basis2 = blpolys(3, "exp( - 2.5 * (r/3-1))", "(:cos2s, 2.0, 2.5, 4.0, 5.5)", 6)
 println(@test Fit.Tools.decode.( Dict.( basis1 ) ) == basis1)
 println(@test Fit.Tools.decode.( Dict.( basis2 ) ) == basis2)
 
@@ -85,7 +85,7 @@ println(@test all(db.data .== db1.data))
 
 # ##
 # println("Add additional basis functions")
-# basis3 = poly_basis(3, "(3/r)^5", "(:cos2s, 2.0, 2.5, 3.5, 5.5)", 5)
+# basis3 = blpolys(3, "(3/r)^5", "(:cos2s, 2.0, 2.5, 3.5, 5.5)", 5)
 # append!(db, basis3)
 #
 # ## Confirm that the LSQ entries load correctly and

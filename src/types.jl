@@ -41,7 +41,7 @@ Dat(at, E, F, V, w, config_type) =
    Dat(at, E, F, V, w, config_type, Dict{String, Any}())
 
 Base.Dict(d::Dat) =
-   Dict("id" => "NBodyIPFitting.Dat",
+   Dict("__id__" => "NBodyIPFitting.Dat",
          "X" => positions(d.at) |> mat,
          "Z" => numbers(d.at),
          "cell" => cell(d.at) |> Matrix,
@@ -52,7 +52,6 @@ Base.Dict(d::Dat) =
          "w" => d.w, "config_type" => d.config_type, "D" => d.D)
 
 function Dat(D::Dict)
-   X =
    at = Atoms( X = D["X"] |> vecs,
                Z = D["Z"],
                cell = JMat(D["cell"]),

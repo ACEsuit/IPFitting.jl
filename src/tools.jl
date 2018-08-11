@@ -34,7 +34,6 @@ function tfor(f, rg; verbose=true, msg="")
    return nothing
 end
 
-
-decode(D::Dict) = convert(Val(Symbol(D["id"])), D)
+decode(D::Dict) = convert(Val(Symbol(D["__id__"])), D)
 
 end
