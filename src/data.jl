@@ -19,7 +19,6 @@ module Data
 
 using JuLIP, ASE, ProgressMeter, FileIO
 using NBodyIPFitting: Dat
-using NBodyIPFitting.Aliases
 import JuLIP: Atoms, energy, forces, virial
 import Base: length, Dict
 
@@ -29,12 +28,12 @@ using PyCall
 export config_type, weight, load_data
 
 Atoms(d) = d.at
+energy(d::Dat) = d.E
+forces(d::Dat) = d.F
+virial(d::Dat) = d.V
+weight(d::Dat) = d.w
 length(d::Dat) = length(d.at)
 config_type(d::Dat) = d.config_type
-energy(d::Dat) = haskey(d.D, ENERGY) ? d.D[ENERGY] : nothing
-forces(d::Dat) = haskey(d.D, FORCES) ? d.D[FORCES] : nothing
-virial(d::Dat) = haskey(d.D, VIRIAL) ? d.D[VIRIAL] : nothing
-# weight(d::Dat) = d.w
 
 function read_energy(atpy)
    for key in keys(atpy[:info])
@@ -122,10 +121,12 @@ function read_xyz(fname; verbose=true, index = ":",
 
       idx += 1
       data[idx] = Dat( Atoms(ASEAtoms(atpy)),
-                       config_type;
-                       E = read_energy(atpy),
-                       F = read_forces(atpy),
-                       V = read_virial(atpy) )
+                       read_energy(atpy),
+                       read_forces(atpy),
+                       read_virial(atpy),
+                       nothing,
+                       config_type,
+                       Dict{String,Any}() )
    end
    verbose && toc()
    return data[1:idx]

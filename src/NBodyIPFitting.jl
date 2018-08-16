@@ -19,9 +19,7 @@ include("tools.jl")
 
 include("fio.jl")
 
-include("prototypes.jl")
-
-include("datatypes.jl")
+include("types.jl")
 
 # loading data
 include("data.jl")

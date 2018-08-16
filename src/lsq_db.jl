@@ -13,9 +13,39 @@ import NBodyIPFitting.Lsq,
 
 import Base: append!, push!
 
+# export get_basis,
+#        observations, get_lsq_system,
+#        regularise, table,
+#        config_types,
+#        del_data!
+
 const DBFILETYPE = ".h5"
-const DATAFILE = "data.jld2"   # => switch to JSON?
+const DATAFILE = "data.jld2"
 const BASISFILE = "basis.jld2"
+
+# function _checkfname(fname)
+#    if length(fname) >= 3
+#       if fname[end-2:end] == ".h5"
+#          return fname
+#       end
+#    end
+#    return fname * ".h5"
+# end
+
+# function _save(fname, args...)
+#    h5open(_checkfname(fname), "w") do file
+#       for (key, val) in args
+#          write(file, key, val)
+#       end
+#    end
+# end
+#
+# function _load(fname, args...)
+#    file = h5open(_checkfname(fname), "r")
+#    ret = [file[key] for key in args]
+#    close(file)
+#    return ret...
+# end
 
 
 """
@@ -31,7 +61,7 @@ basis(db::LsqDB, i::Integer) = db.basis[i]
 datafile(dbdir::AbstractString) = joinpath(dbdir, DATAFILE)
 datafile(db::LsqDB) = datafile(dbdir(db))
 load_data(dbdir::AbstractString) =
-   Vector{Dat}(Dat.(load(datafile(dbdir), "data")))
+   Vector{Dat{Float64}}(Dat.(load(datafile(dbdir), "data")))
 load_data(db::LsqDB) = load(dbdir(db))
 save_data(dbdir::AbstractString, data) = save(datafile(dbdir), "data", Dict.(data))
 save_data(db::LsqDB) = save_data(dbdir(db), data(db))
@@ -71,7 +101,7 @@ function initdb(basedir, dbname)
    dbdir = joinpath(basedir, dbname)
    @assert !isdir(dbdir)
    mkdir(dbdir)
-   save_data(dbdir, Dat[])
+   save_data(dbdir, Dat{Float64}[])
    save_basis(dbdir, AbstractCalculator[])
    return LsqDB(dbdir)
 end
@@ -102,7 +132,7 @@ function push!(db::LsqDB, d::Dat; datidx = length(data(db)+1))
    return db
 end
 
-function append!(db::LsqDB, ds::AbstractVector{Dat}; verbose=true)
+function append!(db::LsqDB, ds::AbstractVector{TD}; verbose=true) where {TD <: Dat}
    # append the data
    len_data_old = length(data(db))
    append!(data(db), ds)
@@ -177,12 +207,12 @@ big multi-dimensional arrays for efficient storage
 function _vec2arr(Dvec::Dict{String})
    Darr = Dict{String, Array}()
    for (key, val) in Dvec
-      if key == ENERGY
+      if key == "E"
          Darr[key] = val
-      elseif key == VIRIAL
+      elseif key == "V"
          # each element of val is a R^6 vector representing a virial stress
          Darr[key] = mat(val)
-      elseif key == FORCES
+      elseif key == "F"
          # mat.(val) : convert each collection of forces into a matrix
          # _vec2arr( : convert a Vector of matrices into a multi-dimensional array
          Darr[key] = _vec2arr( mat.(val) )
@@ -202,11 +232,11 @@ atomistic/JuLIP format
 function _arr2vec(Darr::Dict{String,Array})
    Dvec = Dict{String, Vector}()
    for (key, val) in Darr
-      if key == ENERGY
+      if key == "E"
          Dvec[key] = val
-      elseif key == VIRIAL
+      elseif key == "V"
          Dvec[key] = reinterpret(SVector{6,Float64}, val, (size(val,2),))
-      elseif key == FORCES
+      elseif key == "F"
          Dvec[key] = vecs.(_arr2vec(val))
       else
          error("unknown key `$key`")

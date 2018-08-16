@@ -6,7 +6,7 @@ export fiterrors, scatter_data, scatter_E, scatter_F
 
 _fiterrsdict() = Dict("E-RMS" => 0.0, "F-RMS" => 0.0, "V-RMS" => 0.0,
                       "E-MAE" => 0.0, "F-MAE" => 0.0, "V-MAE" => 0.0)
-_cnterrsdict() = Dict(ENERGY => 0, FORCES => 0, VIRIAL => 0)
+_cnterrsdict() = Dict("E" => 0, "F" => 0, "V" => 0)
 
 struct FitErrors
    errs::Dict{String, Dict{String,Float64}}
@@ -61,13 +61,13 @@ function fiterrors(lsq, c, Ibasis; include=nothing, exclude=nothing)
       obs[ct]["E-RMS"] += (E_data / len)^2
       errs[ct]["E-MAE"] += Emae
       obs[ct]["E-MAE"] += abs(E_data / len)
-      num[ct][ENERGY] += 1
+      num[ct]["E"] += 1
       # - - - - - - - - - - - - - - - -
       errs["set"]["E-RMS"] += Erms
       obs["set"]["E-RMS"] += (E_data / len)^2
       errs["set"]["E-MAE"] += Emae
       obs["set"]["E-MAE"] += abs(E_data / len)
-      num["set"][ENERGY] += 1
+      num["set"]["E"] += 1
       idx += 1
       # ------- - scatter E -------
       push!(scatterE[ct][1], E_data/len)
@@ -83,13 +83,13 @@ function fiterrors(lsq, c, Ibasis; include=nothing, exclude=nothing)
          obs[ct]["F-RMS"] += norm(f_data)^2
          errs[ct]["F-MAE"] += Fmae
          obs[ct]["F-MAE"] += norm(f_data, 1)
-         num[ct][FORCES] += 3 * len
+         num[ct]["F"] += 3 * len
          # - - - - - - - - - - - - - - - -
          errs["set"]["F-RMS"] += Frms
          obs["set"]["F-RMS"] += norm(f_data)^2
          errs["set"]["F-MAE"] += Fmae
          obs["set"]["F-MAE"] += norm(f_data, 1)
-         num["set"][FORCES] += 3 * len
+         num["set"]["F"] += 3 * len
          idx += 3 * len
          # -------- scatter F ------
          append!(scatterF[ct][1], f_data)
@@ -105,22 +105,22 @@ function fiterrors(lsq, c, Ibasis; include=nothing, exclude=nothing)
          obs[ct]["V-RMS"] += V_nrm^2
          errs[ct]["V-MAE"] += V_err
          obs[ct]["V-MAE"] += V_nrm
-         num[ct][VIRIAL] += 1
+         num[ct]["V"] += 1
          # - - - - - - - - - - - - - - - -
          errs["set"]["V-RMS"] += V_err^2
          obs["set"]["V-RMS"] += V_nrm^2
          errs["set"]["V-MAE"] += V_err
          obs["set"]["V-MAE"] += V_nrm
-         num["set"][VIRIAL] += 1
+         num["set"]["V"] += 1
          idx += length(_IS)
       end
    end
 
    # NORMALISE
    for key in keys(errs)
-      nE = num[key][ENERGY]
-      nF = num[key][FORCES]
-      nV = num[key][VIRIAL]
+      nE = num[key]["E"]
+      nF = num[key]["F"]
+      nV = num[key]["V"]
       errs[key]["E-RMS"] = sqrt(errs[key]["E-RMS"] / nE)
       obs[key]["E-RMS"] = sqrt(obs[key]["E-RMS"] / nE)
       errs[key]["F-RMS"] = sqrt(errs[key]["F-RMS"] / nF)
