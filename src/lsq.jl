@@ -3,7 +3,7 @@ module Lsq
 
 using StaticArrays
 using JuLIP: AbstractCalculator, Atoms, energy, forces, virial
-using NBodyIPFitting: Dat
+using NBodyIPFitting: Dat, LsqDB
 
 # components of the stress (up to symmetry)
 const _IS = SVector(1,2,3,5,6,9)
@@ -42,21 +42,24 @@ function evallsq(d::Dat, B::AbstractVector{TB}
 
    D = Dict{String, Any}()
    if energy(d) != nothing
-      D["E"] = energy(B, at)
+      D[ENERGY] = energy(B, at)
    end
    if (forces(d) != nothing) && len > 1
-      D["F"] = forces(B, at)
+      D[FORCES] = forces(B, at)
    end
    if (virial(d) != nothing)
       Vs = virial(B, at)
       # store a vector rather than a matrix
-      D["V"] = [ v[_IS] for v in Vs ]
+      D[VIRIAL] = [ v[_IS] for v in Vs ]
    end
    # TODO: allow generic types of data
 
    return D
 end
 
+"""
+concatenate several arrays along the last dimension
+"""
 function _cat_(As, Iord)
    TA = eltype(As[1])
    A = Vector{TA}(sum(size(AA)[end] for AA in As))
