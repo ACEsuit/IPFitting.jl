@@ -1,4 +1,57 @@
+"""
+`module DB`
 
+This module implements a very basic "database" for storing a precomputed
+LSQ system. This is useful for fitting NBodyIPs since it allows one to
+precompute the <basis, data> inner products which are very expensive,
+and then quickly construct LSQ systems from them using e.g., many variants
+of weighting and regularisation.
+
+A db called (e.g.) 'lsqdb' consists of two files:
+ * `lsqdb_info.json` : this stores a list of basis functions and a list of
+"data", i.e. configurations
+ * `lsqdb_kron.h5` : this stores all the inner products <basis, data>
+
+## The INFO file
+
+### Basis Functions
+
+The basis is (for the time being) simply represented as a list (Vector) of
+JuLIP.AbstractCalculator. These are stored as `INFO["basis"]`.
+
+### Data Groups
+
+Each "datum" is an atomistic configuration, which must have a "configtype".
+Two data with the same configtype are required to contain the same number of
+atoms (informally, they should also represent "similar" kinds of configurations).
+`data = INFO["data"]` is a Dictionary where the keys are the configtypes.
+E.g. suppose there is a configtype "vacancy", then `d = data["vacancy"]` is
+a vector of `Dat` instances (stored as Dictionaries); see `?Dat` for more
+information.
+
+
+## The KRON file
+
+The KRON file contains several dictionaries (groups in HDF5 terminology)
+where each group represents a configtype. E.g., take a configtype "vacancy",
+then "D = KRON["vacancy"] is a dictionary where each key represents a type of
+data, e.g., energy, forces, virial. E.g., let the key "F" represent forces,
+then `d["F"]` is a 3-dimensional array where `d["F"][i, j, :]` contains the
+forces obtained from <basis[i], data[j]> into vectorised format.
+
+### (De-)Vectorising Data
+
+Forces in `JuLIP` are represented as `Vector{SVector{...}}`, which is the
+same memory layout as a 3 x N matrix (`JuLIP.mat`), which can can then be
+vectorised (`[:]`), and this vectoriation is readily undone again.
+Analogously, any data must be stored in such a vectorised format. This is
+achieved (e.g. for forces) via
+* `Base.vec(::Val{:F}, F) -> Vector`
+* `NBodyIPFitting.devec(::Val{:F}, Fvec) -> Vector{SVector{...}}`
+
+## Usage
+
+"""
 module DB
 
 using StaticArrays: SVector
@@ -13,45 +66,14 @@ import NBodyIPFitting.Lsq,
 
 import Base: append!, push!
 
-# export get_basis,
-#        observations, get_lsq_system,
-#        regularise, table,
-#        config_types,
-#        del_data!
-
-const DBFILETYPE = ".h5"
-const DATAFILE = "data.jld2"
-const BASISFILE = "basis.jld2"
-
-# function _checkfname(fname)
-#    if length(fname) >= 3
-#       if fname[end-2:end] == ".h5"
-#          return fname
-#       end
-#    end
-#    return fname * ".h5"
-# end
-
-# function _save(fname, args...)
-#    h5open(_checkfname(fname), "w") do file
-#       for (key, val) in args
-#          write(file, key, val)
-#       end
-#    end
-# end
-#
-# function _load(fname, args...)
-#    file = h5open(_checkfname(fname), "r")
-#    ret = [file[key] for key in args]
-#    close(file)
-#    return ret...
-# end
+const KRONFILE = "_kron.h5"
+const INFOFILE = "_info.json"
 
 
 """
-`dbdir(db::LsqDB)` : return the absolute path to the database
+`dbpath(db::LsqDB)` : return the absolute path to the database
 """
-dbdir(db::LsqDB) = db.dirname
+dbpath(db::LsqDB) = db.dirname
 
 data(db::LsqDB) = db.data
 data(db::LsqDB, i::Integer) = db.data[i]
