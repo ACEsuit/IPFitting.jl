@@ -85,7 +85,7 @@ convert some real data, in some generic format, into a vector to be stored
 in a `Dat` or Lsq system. E.g.,
 ```
 F = forces(...)::Vector{JVecF}
-todata(::Val{:F}, F) = mat(F)[:]
+vec(::Val{:F}, F) = mat(F)[:]
 ```
 """
 vec
