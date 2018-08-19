@@ -1,16 +1,24 @@
 module FIO
 
-using HDF5
+using HDF5, JSON
+import FileIO
 
 struct FHDF5 end
+struct FJSON end
+struct FJLD2 end
 
-const NOTHING = UInt8(0)
+# WARNING: this seems dumb. maybe we can use empty array instead?
+const NOTHING_H5 = UInt8(0)
 
 function _format(fname)
-   if length(fname) >= 3
-      if fname[end-2:end] == ".h5"
-         return FHDF5()
-      end
+   if length(fname) >= 3 && fname[end-2:end] == ".h5"
+      return FHDF5()
+   end
+   if length(fname) >= 5 && fname[end-4:end] == ".json"
+      return FJSON()
+   end
+   if length(fname) >= 5 && fname[end-4:end] == ".jld2"
+      return FJLD2()
    end
    error("unsupported file format `$fname`")
 end
@@ -19,6 +27,34 @@ save(fname, args...) = save(fname, Dict(args...))
 save(fname, D::Dict) = _save(_format(fname), fname, D)
 load(fname, args...) = _load(_format(fname), fname, args...)
 
+
+# ------------- JSON LOAD AND SAVE -------------
+
+function _load(::FJSON, fname)
+   return JSON.parsefile(fname)
+end
+
+function _save(::FJSON, fname, D::Dict)
+   f = open(fname, "w")
+   JSON.print(f, D)
+   close(f)
+   return nothing
+end
+
+# ------------- JLD2 LOAD AND SAVE -------------
+
+function _load(::FJSON, fname)
+   return JSON.parsefile(fname)
+end
+
+function _save(::FJSON, fname, D::Dict)
+   f = open(fname, "w")
+   JSON.print(f, D)
+   close(f)
+   return nothing
+end
+
+# ----------- HDF5 LOAD AND SAVE
 
 function _cleanup!(X::Vector)
    for (i, x) in enumerate(X)
@@ -35,7 +71,7 @@ function _cleanup!(D::Dict)
 end
 
 _cleanup!(val::Any) = val
-_cleanup!(val::UInt8) = (val === NOTHING ? nothing : val)
+_cleanup!(val::UInt8) = (val === NOTHING_H5 ? nothing : val)
 
 function _load(::FHDF5, fname, args...)
    fid = h5open(fname, "r")
@@ -80,7 +116,7 @@ function _hdf5_write_group!(g, D)
          sub_g = g_create(g, key)
          _hdf5_write_group!(sub_g, val)
       elseif val == nothing
-         g[key] = NOTHING
+         g[key] = NOTHING_H5
       else
          g[key] = val
       end

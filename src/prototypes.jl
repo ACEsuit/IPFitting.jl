@@ -1,5 +1,5 @@
 
-import Base: ==, convert
+import Base: ==, convert, vec
 
 using JuLIP: Atoms, JVec, JMat, JVecs, AbstractCalculator, mat, vecs,
              numbers, positions, cell, pbc
@@ -23,8 +23,8 @@ If information is missing, the relevant function will return `nothing` instead
 """
 mutable struct Dat
    at::Atoms
-   config_type::Union{Void, String}
-   D::Dict{String, Any}
+   config_type::String
+   D::Dict{String, Vector{Float64}}
 end
 
 ==(d1::Dat, d2::Dat) = (
@@ -62,23 +62,24 @@ end
 
 convert(::Val{Symbol("NBodyIPFitting.Dat")}, D::Dict) = Dat(D)
 
+const KronGroup = Dict{String, Array{Float64, 3}}
+const DataGroup = Vector{Dat}
 
 """
 `mutable struct LsqDB{TD, TB}`
 
 A representation of a least-squares system stored on disk, which can
-be extended by adding data, or
+be extended by adding data, or basis functions 
 """
 mutable struct LsqDB
-   data::Vector{Dat}
    basis::Vector{AbstractCalculator}
-   dirname::String
+   data_groups::Dict{String, DataGroup}
+   kron_groups::Dict{String, KronGroup}
+   dbpath::String
 end
 
 
 # prototypes
-
-import Base.vec
 
 """
 convert some real data, in some generic format, into a vector to be stored

@@ -1,6 +1,8 @@
 """
 `module DB`
 
+## Overview
+
 This module implements a very basic "database" for storing a precomputed
 LSQ system. This is useful for fitting NBodyIPs since it allows one to
 precompute the <basis, data> inner products which are very expensive,
@@ -8,20 +10,40 @@ and then quickly construct LSQ systems from them using e.g., many variants
 of weighting and regularisation.
 
 A db called (e.g.) 'lsqdb' consists of two files:
- * `lsqdb_info.json` : this stores a list of basis functions and a list of
-"data", i.e. configurations
+ * `lsqdb_info.xxxx` : (`xxxx` will be either `json` or `jld2` - to be decided)
+this stores a list of "basis" functions and a list of "data", i.e. configurations
  * `lsqdb_kron.h5` : this stores all the inner products <basis, data>
 
-## The INFO file
+            DB
+           /  \
+       INFO    KRON_________________ ...
+     /     \           |    |    |
+  BASIS    DATA       CT1  CT2  CT3
+       _____|_____ ...
+      |    |    |
+     CT1  CT2  CT3
 
-### Basis Functions
+ * BASIS : Vector{AbstractCalculator}
+ * DATA : Vector{Dat}
+ * CTj < INFO: config types; a `Vector{Dat}`;
+ * CTj < KRON: a dictionary with the following structure
 
-The basis is (for the time being) simply represented as a list (Vector) of
+       CT1
+    ___|___ __...
+   |   |   |
+   E   F   V
+
+where E, F, V are Array{Float64, 3}, these ids can in principle by anything
+but need to be "registered in `datatypes.jl`
+
+## More details and remarks
+
+### INFO
+
+* BASIS: The basis is (for the time being) simply represented as a list (Vector) of
 JuLIP.AbstractCalculator. These are stored as `INFO["basis"]`.
 
-### Data Groups
-
-Each "datum" is an atomistic configuration, which must have a "configtype".
+* DATA: Each "datum" is an atomistic configuration, which must have a "configtype".
 Two data with the same configtype are required to contain the same number of
 atoms (informally, they should also represent "similar" kinds of configurations).
 `data = INFO["data"]` is a Dictionary where the keys are the configtypes.
@@ -29,15 +51,14 @@ E.g. suppose there is a configtype "vacancy", then `d = data["vacancy"]` is
 a vector of `Dat` instances (stored as Dictionaries); see `?Dat` for more
 information.
 
-
-## The KRON file
+### KRON
 
 The KRON file contains several dictionaries (groups in HDF5 terminology)
 where each group represents a configtype. E.g., take a configtype "vacancy",
 then "D = KRON["vacancy"] is a dictionary where each key represents a type of
 data, e.g., energy, forces, virial. E.g., let the key "F" represent forces,
-then `d["F"]` is a 3-dimensional array where `d["F"][i, j, :]` contains the
-forces obtained from <basis[i], data[j]> into vectorised format.
+then `d["F"]` is a 3-dimensional array where `d["F"][:, i, j]` contains the
+forces obtained from <data[i], basis[j]> into vectorised format.
 
 ### (De-)Vectorising Data
 
@@ -49,225 +70,265 @@ achieved (e.g. for forces) via
 * `Base.vec(::Val{:F}, F) -> Vector`
 * `NBodyIPFitting.devec(::Val{:F}, Fvec) -> Vector{SVector{...}}`
 
-## Usage
+## Usage and Examples
 
 """
 module DB
 
-using StaticArrays: SVector
-using JuLIP: vecs, mat, AbstractCalculator
-using FileIO
 
-using NBodyIPFitting: Dat, LsqDB
-using NBodyIPFitting.Tools: tfor, decode
+using Threads:               SpinLock
+using StaticArrays:          SVector
+using JuLIP:                 vecs, mat, AbstractCalculator
+using NBodyIPFitting:        Dat, LsqDB, KronGroup, DataGroup
+using NBodyIPFitting.Tools:  tfor, decode
 
 import NBodyIPFitting.Lsq,
        NBodyIPFitting.FIO
 
-import Base: append!, push!
-
+import Base: flush, append!
 
 const KRONFILE = "_kron.h5"
-const INFOFILE = "_info.json"
-
+const INFOFILE = "_info.jld2"
 
 """
-`dbdir(db::LsqDB)` : return the absolute path to the database
-`dbpath(db::LsqDB)` : return the absolute path to the database
+`dbpath(db::LsqDB)` : return the absolute path to the database files, not
+including the '_kron.h5' and '_info.json' endings.
 """
-dbdir(db::LsqDB) = db.dirname
-dbpath(db::LsqDB) = db.dirname
+dbpath(db::LsqDB) = db.dbpath
 
-data(db::LsqDB) = db.data
-data(db::LsqDB, i::Integer) = db.data[i]
 basis(db::LsqDB) = db.basis
 basis(db::LsqDB, i::Integer) = db.basis[i]
 
-datafile(dbdir::AbstractString) = joinpath(dbdir, DATAFILE)
-datafile(db::LsqDB) = datafile(dbdir(db))
-load_data(dbdir::AbstractString) =
-   Vector{Dat}(Dat.(load(datafile(dbdir), "data")))
-load_data(db::LsqDB) = load(dbdir(db))
-save_data(dbdir::AbstractString, data) = save(datafile(dbdir), "data", Dict.(data))
-save_data(db::LsqDB) = save_data(dbdir(db), data(db))
+data(db::LsqDB) = db.data
+# data(db::LsqDB, i::Integer) = db.data[i]
 
-basisfile(dbdir::AbstractString) = joinpath(dbdir, BASISFILE)
-basisfile(db::LsqDB) = basisfile(dbdir(db))
-load_basis(dbdir::AbstractString) =
-   Vector{AbstractCalculator}(decode.(load(basisfile(dbdir), "basis")))
-load_basis(db::LsqDB) = load(dbdir(db))
-save_basis(dbdir::AbstractString, basis) = save(basisfile(dbdir), "basis", Dict.(basis))
-save_basis(db::LsqDB) = save_basis(dbdir(db), basis(db))
+infofile(dbpath::AbstractString) = dbpath * INFOFILE
 
-datfilename(db, datidx) = joinpath(dbdir(db), "dat_$(datidx)" * DBFILETYPE)
+kronfile(dbpath::AbstractString) = dbpath * KRONFILE
 
-save_dat(db, datidx, lsq_dict) =
-   FIO.save(datfilename(db, datidx), "dat" => Dict(data(db, datidx)),
-                                     collect(_vec2arr(lsq_dict))...)
-
-function load_dat(db, datidx)
-   DD = _load(datfilename(db, datidx), "dat", "lsq")
-   @assert dat == data(db, datidx)
-   return _arr2vec(lsq)
+function load_info(dbpath)
+   info = FIO.load(infofile(dbpath))
+   basis = decode.(info["basis"])
+   data_groups = Dict{String, Dat}()
+   for (key, val) in info["data"]
+      data_groups[key] = Dat.(val)
+   end
+   return basis, data_groups
 end
 
+function save_info(dbpath, db)
+   data = Dict()
+   for (key, val) in db.data
+      data[key] = Dict.(val)
+   end
+   FIO.save(infofile(dbpath),
+            Dict("basis" => Dict.(db.basis), "data" => data))
+   return nothing
+end
+
+save_info(db) = save_info(dbpath(db), db)
+
+function save_kron(dbpath, db)
+   if isfile(kronfile(dbpath))
+      warn("""trying to save `kron`, but kronfile already exists; aborting""")
+   end
+   FIO.save(kronfile(dbpath), db.kron_groups)
+end
+
+save_kron(db) = save_kron(dbpath(db), db)
+
+function LsqDB(dbpath::AbstractString)
+   basis, data_groups = load_info(dbpath)
+   @assert isfile(kronfile(dbpath))
+   return LsqDB(basis, data_groups, Dict{String, KronGroup}(), dbpath)
+end
+
+
 """
-`function initdb(basedir, dbname)`
-
-Initialise an empty lsq database.
-
-* `basedir`: base directory where the database will be stored
-* `dbname`: name of the database (this will be the name of a directory where
-all files will be stored
+for the time being, this just checks that the db director and db name are
+admissible. In the future, this should initialise the DB files.
 """
 function initdb(basedir, dbname)
    @assert !('/' in dbname)
    @assert isdir(basedir)
-   dbdir = joinpath(basedir, dbname)
-   @assert !isdir(dbdir)
-   mkdir(dbdir)
-   save_data(dbdir, Dat[])
-   save_basis(dbdir, AbstractCalculator[])
-   return LsqDB(dbdir)
+   dbpath = joinpath(basedir, dbname)
+   initdb(dbpath)
+   return nothing
 end
 
-function LsqDB(dbdir::AbstractString)
-   if !isdir(dbdir)
-      error("""`dbdir` is not a directory. If you want to create a new `LsqDB`
-               please use `initdb`.""")
+function initdb(dbpath)
+   @assert !isfile(infofile(dbpath))
+   @assert !isfile(kronfile(dbpath))
+   # check that we can actually create and delete this file
+   FIO.save(infofile(dbpath), Dict("basis" => [], "data" => []))
+   rm(infofile(dbpath))
+   FIO.save(kronfile(dbpath), Dict("a" => rand(10), "b" => rand()))
+   rm(kronfile(dbpath))
+   return nothing
+end
+
+
+
+function LsqDB(dbpath::AbstractString,
+               basis::AbstractVector{<: AbstractCalculator},
+               data::AbstractVector{Dat};
+               verbose=true)
+   data_groups = Dict{String, DataGroup}()
+   kron_groups = Dict{String, KronGroup}()
+   config_types = unique(config_type.(data))
+   for key in config_types
+      kron_groups[key] = KronGroup()
    end
-   return LsqDB(load_data(dbdir), load_basis(dbdir), dbdir)
-end
-
-# ------------- Append New Data to the DB -----------------
-
-function push!(db::LsqDB, d::Dat; datidx = length(data(db)+1))
-   # TODO: check whether d already exists in the database
-   lsqdict = Lsq.evallsq(d, basis(db))
-   save_dat(db, datidx, lsqdict)
-   # if length(db.data) >= datidx then we assume that d has already been
-   # inserted into db.data, otherwise push it
-   if length(data(db)) < datidx
-      @assert length(data(db)) == datidx-1
-      push!(data(db), d)
-      save_data(db)
-   else
-      @assert data(db)[datidx] == d
+   db = LsqDB(basis, data_groups, kron_groups, dbpath)
+   db_lock = SpinLock()
+   # parallel assembly of the LSQ matrix
+   tfor( n -> safe_append!(db, db_lock, data[n]), 1:length(data);
+         verbose=verbose, msg = "Assemble LSQ blocks" )
+   verbose && info("Writing db to disk...")
+   try
+      flush(db)
+   catch
+      warn("""something went wrong trying to save the db to disk, but the data
+            should be ok; if it is crucial to keep it, try to save manually.""")
    end
+   verbose && info("... done")
    return db
 end
 
-function append!(db::LsqDB, ds::AbstractVector{Dat}; verbose=true)
-   # append the data
-   len_data_old = length(data(db))
-   append!(data(db), ds)
-   save_data(db)
-   # create the dat_x_basis files in parallel
-   tfor( n -> push!(db, ds[n]; datidx = len_data_old + n), 1:length(ds);
-         verbose=verbose, msg = "Assemble LSQ blocks")
-   return db
-end
 
-# ------------- Append New Basis Functions to the DB -----------------
-
-push!(db::LsqDB, b::AbstractCalculator; kwargs...) = append!(db, [b]; kwargs...)
-
-function append!(db::LsqDB, bs::AbstractVector{TB};
-                 verbose=true) where {TB <: AbstractCalculator}
-   # TODO : check whether bs already exist in the database?
-   append!(basis(db), bs)
-   save_basis(db)
-   # loop through all existing datafiles and append the new basis functions
-   # to each of them
-   tfor( n -> _append_basis_to_dat!(db, bs, n), 1:length(data(db));
-         verbose=verbose, msg="Append New LSQ blocks" )
-   return db
-end
-
-function _append_basis_to_dat!(db, bs, datidx)
-   lsqdict = load_dat(lsq, datidx)
-   lsqnew = Lsq.evallsq(data(db, datidx), bs)
-   for key in keys(lsqdict)
-      append!(lsqdict[key], lsqnew[key])
-   end
-   save_dat(db, datidx, lsqdict)
-   return db
-end
-
-# --------- Auxiliaries -------------
-
-
-"""
-`function _vec2arr(As)`
-
-concatenate several arrays along the last dimension
-"""
-function _vec2arr(A_vec::AbstractVector{TA}) where {TA <: Array}
-   B = vcat( [A[:] for A in A_vec]... )
-   return reshape(B, tuple(size(A_vec[1])..., length(A_vec)))
-end
-
-_vec2arr(A_vec::AbstractVector{TA}) where {TA <: Real} = [a for a in A_vec]
-
-"""
-`function _arr2vec(A_arr)`
-
-split a long multi-dimensional array into a vector of lower-dimensional
-arrays along the last dimension.
-"""
-function _arr2vec(A_arr::AbstractArray{TA}) where {TA <: Real}
-   colons = ntuple(_->:, length(size(A_arr))-1)
-   return [ A_arr[colons..., n] for n = 1:size(A_arr)[end] ]
-end
-
-_arr2vec(A_vec::AbstractVector{TA}) where {TA <: Real} = [a for a in A_vec]
-
-
-"""
-`function _vec2arr(Dvec::Dict{String})`
-
-convert LSQ matrix entries stored in atomistic/JuLIP format into a
-big multi-dimensional arrays for efficient storage
-"""
-function _vec2arr(Dvec::Dict{String})
-   Darr = Dict{String, Array}()
-   for (key, val) in Dvec
-      if key == ENERGY
-         Darr[key] = val
-      elseif key == VIRIAL
-         # each element of val is a R^6 vector representing a virial stress
-         Darr[key] = mat(val)
-      elseif key == FORCES
-         # mat.(val) : convert each collection of forces into a matrix
-         # _vec2arr( : convert a Vector of matrices into a multi-dimensional array
-         Darr[key] = _vec2arr( mat.(val) )
-      else
-         error("unknown key `$key`")
+function _append_inner!(db::LsqDB, d::Dat, lsqrow::Dict)
+   ct = configtype(d)
+   # if this config_type does not yet exist in db.kron_groups, then
+   # initialise this group.
+   if !haskey(db.kron_groups, ct)
+      @assert !haskey(db.data_groups, ct)
+      D_ct = db.kron_groups[ct] = KronGroup()
+      D_d = db.data_groups[ct] = DataGroup()
+      # add empty sub-groups for the datatypes present in d
+      for key in keys(d.D)
+         D_ct[key] = Array{Float64, 3}()
       end
    end
-   return Darr
+   # append d to INFO ...
+   push!(D_d[ct], d)
+   # and append lsqrow to kron_groups[ct]
+   # here, lsqrow is a dict with the same keys as kron_groups[ct], but
+   # containing 2D arrays
+   for datatype in keys(d.D)
+      db.kron_groups[ct][datatype] = _append!(db.kron_groups[ct][datatype],
+                                              lsqrow[datatype])
+   end
+   return nothing
+end
+
+function safe_append!(db::LsqDB, db_lock, d::Dat)
+   # computing the lsq blocks ("rows") can be done in parallel,
+   lsqrow = Lsq.evallsq(d, basis(db))
+   # but writing them into the DB must be done in a threadsafe way
+   lock(db_lock)
+   _append_inner!(db, d, lsqrow)
+   unlock(db_lock)
+   return nothing
+end
+
+function flush(db::LsqDB)
+   save_info(db)
+   save_kron(db)
+   return nothing
 end
 
 """
-function _arr2vec(Darr::Dict{String})`
-
-convert LSQ matrix entries stored as multi-dimensional arrays back into
-atomistic/JuLIP format
+if A = n x m x k and B = n x m, then this functions creates "appends"
+B to A converting it into an n x m x (k+1) array.
 """
-function _arr2vec(Darr::Dict{String,Array})
-   Dvec = Dict{String, Vector}()
-   for (key, val) in Darr
-      if key == ENERGY
-         Dvec[key] = val
-      elseif key == VIRIAL
-         Dvec[key] = reinterpret(SVector{6,Float64}, val, (size(val,2),))
-      elseif key == FORCES
-         Dvec[key] = vecs.(_arr2vec(val))
-      else
-         error("unknown key `$key`")
-      end
+function _append!(A::Array{T, 3}, B::Array{T, 2}) where {T}
+   szA = size(A)
+   @assert szA[1:2] == size(B)
+   Avec = vec(A)
+   append!(Avec, B[:])
+   return reshape(Avec, szA[1], szA[2], szA[3]+1)
+end
+
+
+# ------------------- Evaluating LSQ Blocks -----------------
+
+"""
+Take a basis and split it into individual basis groups.
+"""
+function split_basis(basis)
+   # get the types of the individual basis elements
+   tps = typeof.(basis)
+   Iord = Vector{Int}[]
+   Bord = Any[]
+   for tp in unique(tps)
+      # find which elements of basis have type `tp`
+      I = find( tp .== tps )
+      push!(Iord, I)
+      push!(Bord, [b for b in basis[I]])
    end
-   return Dvec
+   return Bord, Iord
+end
+
+
+# fill the LSQ system, i.e. evaluate basis at data points
+function evallsq(d::Dat, B::AbstractVector{TB}
+                 ) where {TB <: AbstractCalculator}
+   if !(isleaftype(TB))
+      return evallsq_split(d, B)
+   end
+   # TB is a leaf-type so we can use "evaluate_many"
+   return Dict( key => _evallsq(Val(Symbol(key)), B, Atoms(d)) )
+end
+
+"""
+evaluate one specific kind of datum, such as energy, forces, etc
+for one Dat across a large section of the basis; implicitly this will
+normally be done via `evaluate_many` or similar. The line
+```
+vals = evaluate_lsq(vDT, B, at)
+```
+should likely be the bottleneck of `evallsq`
+"""
+function _evallsq(vDT::Val,
+                  B::AbstractVector{<:AbstractCalculator},
+                  at::AbstractAtoms)
+   vals = evaluate_lsq(vDT, B, at)
+   vec1 = vec(vDT, vals[1])
+   A = Array{Float64}(length(vec1), length(B))
+   A[:, 1] = vec1
+   for n = 2:length(B)
+      A[:, n] = vec(vDT, vals[n])
+   end
+   return A
+end
+
+"""
+concatenate several arrays Ai of shape ni x m  along the last dimension into
+an array ∑ni x m.
+"""
+function _cat_(As, Iord)
+   TA = eltype(As[1])
+   A = Vector{TA}(size(As[1],2),
+                  sum(size(AA, 1) for AA in As))
+   for i = 1:length(As)
+      A[:, Iord[i]] = As[i]
+   end
+   return A
+end
+
+"""
+split the Basis `B` into subsets of identical types and evaluate
+those independently (fast).
+"""
+function evallsq_split(d, basis)
+   # TB is not a leaf-type so we should split the basis to be able to
+   # evaluate_many & co
+   Bord, Iord = split_basis(basis)
+   D_ord = [ evallsq(d, BB)  for BB in Bord ]
+   # each D_ord[i] is a Dict storing the LSQ system components.
+   # we assume that all D_ord[i] contain the same keys.
+   return Dict( key => _cat_( [DD[key] for DD in D_ord], Iord ),
+                for key in keys(D_ord[1]) )
 end
 
 

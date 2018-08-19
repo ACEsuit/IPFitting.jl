@@ -3,7 +3,6 @@ NBodyIPs
 PyCall
 ASE
 HDF5
-JLD2
 JSON
 BenchmarkTools
 DataFrames
