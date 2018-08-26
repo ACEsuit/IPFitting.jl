@@ -142,4 +142,8 @@ system.
 """
 
 
+# # assemble crude error tables and scatter plots
+# include("errors.jl")
+
+
 end

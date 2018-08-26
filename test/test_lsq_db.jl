@@ -31,8 +31,9 @@ println(@test Dat.(Dict.(data2)) == data2)
 println("Create a temporary database.")
 tmpdir = mktempdir()
 dbpath = joinpath(tmpdir, "temp")
-basis = basis1
+basis = [basis1; basis2]
 data = [data1; data2]
+db = nothing
 try
    db = DB.LsqDB(dbpath, basis, data)
    println(@test true)

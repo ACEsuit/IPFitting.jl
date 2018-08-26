@@ -327,7 +327,7 @@ an array ∑ni x m.
 """
 function _cat_(As, Iord)
    TA = eltype(As[1])
-   A = Array{TA}(sum(size(AA, 1) for AA in As), size(As[1],2))
+   A = Array{TA}(size(As[1],1), sum(size(AA, 2) for AA in As))
    for i = 1:length(As)
       A[:, Iord[i]] = As[i]
    end
@@ -345,6 +345,8 @@ function evallsq_split(d, basis)
    D_ord = [ evallsq(d, BB)  for BB in Bord ]
    # each D_ord[i] is a Dict storing the LSQ system components.
    # we assume that all D_ord[i] contain the same keys.
+   sizes = Dict( key => [size(DD[key]) for DD in D_ord]
+                 for key in keys(D_ord[1]) )
    return Dict( key => _cat_( [DD[key] for DD in D_ord], Iord )
                 for key in keys(D_ord[1]) )
 end

@@ -1,7 +1,7 @@
 #
 # TODO
 #  * change datatypes => observationtypes
-#  * load the kron_groups on demand 
+#  * load the kron_groups on demand
 #
 
 """
@@ -32,16 +32,10 @@ include("datatypes.jl")
 include("data.jl")
 @reexport using NBodyIPFitting.Data
 
-include("lsq.jl")
-
 include("lsq_db.jl")
 
-# # lsq and other fits
-# include("fitting.jl")
-#
-# # assemble crude error tables and scatter plots
-# include("errors.jl")
-#
+include("lsq.jl")
+
 # #visualisation module
 # include("PIPplot.jl")
 # @reexport using NBodyIPs.PIPplot
