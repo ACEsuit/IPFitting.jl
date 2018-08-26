@@ -3,7 +3,7 @@
 # `module Data`
 
 Provides methods to read files containing simulation data. Primarily this is
-intended to load `.xyz` files and convert them to JuLIP-compatible data:
+intended to load `.xyz` files and convert them to JuLIP/NBodyIPs-compatible data:
 ```
 data = NBodyIPs.Data.load_data("mydata.xyz")
 ```
@@ -18,8 +18,8 @@ loaded information.
 module Data
 
 using JuLIP, ASE, ProgressMeter, FileIO
-using NBodyIPFitting: Dat
-using NBodyIPFitting.Aliases
+using NBodyIPFitting: Dat, vec, devec 
+using NBodyIPFitting.DataTypes
 import JuLIP: Atoms, energy, forces, virial
 import Base: length, Dict
 
@@ -31,9 +31,9 @@ export config_type, weight, load_data
 Atoms(d) = d.at
 length(d::Dat) = length(d.at)
 config_type(d::Dat) = d.config_type
-energy(d::Dat) = haskey(d.D, ENERGY) ? d.D[ENERGY] : nothing
-forces(d::Dat) = haskey(d.D, FORCES) ? d.D[FORCES] : nothing
-virial(d::Dat) = haskey(d.D, VIRIAL) ? d.D[VIRIAL] : nothing
+energy(d::Dat) = haskey(d.D, ENERGY) ? devec(Val(:E), d.D[ENERGY]) : nothing
+forces(d::Dat) = haskey(d.D, FORCES) ? devec(Val(:F), d.D[FORCES]) : nothing
+virial(d::Dat) = haskey(d.D, VIRIAL) ? devec(Val(:V), d.D[VIRIAL]) : nothing
 observation(d::Dat, key::String) = d.data[key]
 hasobservation(d::Dat, key::String) = haskey(d.data, key)
 

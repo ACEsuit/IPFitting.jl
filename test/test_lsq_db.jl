@@ -14,19 +14,6 @@ function rand_data(sym, N, config_type="rand")
    return Dat(at, config_type; E = rand(), F = F, V = rand(3,3))
 end
 
-##
-println("Testing _vec2arr and _arr2vec")
-A = rand(10)
-println(@test(DB._vec2arr(A) == A))
-println(@test(DB._arr2vec(A) == A))
-A = rand(3, 10)
-B = [rand(3) for n = 1:10]
-println(@test DB._vec2arr(DB._arr2vec(A)) == A)
-println(@test DB._arr2vec(DB._vec2arr(B)) == B)
-A = rand(3,4, 10)
-B = [rand(3,4) for n = 1:10]
-println(@test DB._vec2arr(DB._arr2vec(A)) == A)
-println(@test DB._arr2vec(DB._vec2arr(B)) == B)
 
 ##
 println("Check serialisation of basis: ")

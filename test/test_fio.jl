@@ -52,7 +52,3 @@ run(`rm $fname1 $fname2`)
 end
 
 println("===================================")
-
-
-
-tuple(collect(D)...)

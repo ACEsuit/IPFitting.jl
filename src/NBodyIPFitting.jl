@@ -19,14 +19,14 @@ include("tools.jl")
 
 include("fio.jl")
 
-# include("prototypes.jl")
-#
-# include("datatypes.jl")
-#
-# # loading data
-# include("data.jl")
-# @reexport using NBodyIPFitting.Data
-#
+include("prototypes.jl")
+
+include("datatypes.jl")
+
+# loading data
+include("data.jl")
+@reexport using NBodyIPFitting.Data
+
 # include("lsq.jl")
 #
 # include("lsq_db.jl")

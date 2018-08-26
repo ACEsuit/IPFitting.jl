@@ -69,7 +69,7 @@ const DataGroup = Vector{Dat}
 `mutable struct LsqDB{TD, TB}`
 
 A representation of a least-squares system stored on disk, which can
-be extended by adding data, or basis functions 
+be extended by adding data, or basis functions
 """
 mutable struct LsqDB
    basis::Vector{AbstractCalculator}
@@ -99,21 +99,3 @@ devec(::Val{:F}, x) = vecs( resize(x, 3, length(x) ÷ 3) )
 ```
 """
 function devec end
-
-
-
-
-# """
-# `mutable struct LsqSys`: type storing all information to perform a
-# LSQ fit for an interatomic potential. To assemble the LsqSys use
-# ```
-# kron(data, basis)
-# LsqSys(data, basis)
-# ```
-# """
-# mutable struct LsqSys{TD}
-#    data::Vector{TD}
-#    basis::Vector{AbstractCalculator}
-#    Iord::Vector{Vector{Int}}     # result of split_basis
-#    Ψ::Matrix{Float64}
-# end
