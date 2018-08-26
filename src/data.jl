@@ -34,7 +34,9 @@ config_type(d::Dat) = d.config_type
 energy(d::Dat) = haskey(d.D, ENERGY) ? d.D[ENERGY] : nothing
 forces(d::Dat) = haskey(d.D, FORCES) ? d.D[FORCES] : nothing
 virial(d::Dat) = haskey(d.D, VIRIAL) ? d.D[VIRIAL] : nothing
-# weight(d::Dat) = d.w
+observation(d::Dat, key::String) = d.data[key]
+hasobservation(d::Dat, key::String) = haskey(d.data, key)
+
 
 function read_energy(atpy)
    for key in keys(atpy[:info])

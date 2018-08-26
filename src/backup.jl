@@ -1,0 +1,202 @@
+function hess_weights_hook!(w, d::Dat)
+   at = Atoms(d)
+   if energy(d) == nothing || forces(d) == nothing
+      warn("""hess_weights_hook!: a training configuration does not contain
+              energy and forces => ignore""")
+     return w
+  end
+   # compute R vectors
+   X = positions(at)
+   h = 0.01 # norm(X[1])
+   # if h < 1e-5 || h > 0.02
+   #    warn("unexpected location of X[1] in hess_weights_hook => ignore")
+   #    @show X[1], h
+   #    return w
+   # end
+
+   # give this energy a lot of weight to make sure we match the
+   # ground state (which we assume this is)
+   w[1] = 0.0
+
+   # now fix the scaling for the force weights
+   # X[1] *= 0
+   R = [ JuLIP.project_min(at, x - X[1])  for x in X ]
+   r = norm.(R)
+   r3 = (ones(3) * r')[:]
+   If = 2:(1+3*length(R))
+   w[If] .= w[If] .* (r3.^7) / h
+   w[2] = 0.0
+   return w
+end
+
+
+function regularise(Ψ, Y, P::Matrix)
+   @assert size(Ψ,2) == size(P,2)
+   return vcat(Ψ, P), vcat(Y, zeros(size(P,1)))
+end
+
+
+using NBodyIPs.Data: config_type
+
+function Base.info(lsq::LsqSys)
+   println(repeat("=", 60))
+   println(" LsqSys Summary")
+   println(repeat("-", 60))
+   println("      #configs: $(length(lsq.data))")
+   println("    #basisfcns: $(length(lsq.basis))")
+   println("  config_types: ",
+         prod(s*", " for s in config_types(lsq)))
+
+   Bord, _ = split_basis(lsq.basis)
+   println(" #basis groups: $(length(Bord))")
+   println(repeat("-", 60))
+
+   for (n, B) in enumerate(Bord)
+      println("   Group $n:")
+      info(B; indent = 6)
+   end
+   println(repeat("=", 60))
+end
+
+
+function Base.append!(lsq::NBodyIPs.LsqSys, data::Vector{TD}) where TD <: NBodyIPs.Data.Dat
+   return append!(lsq, kron(data, lsq.basis))
+end
+
+function Base.append!(lsq::NBodyIPs.LsqSys, lsq2::NBodyIPs.LsqSys)
+   lsq.data = [lsq.data; lsq2.data]
+   lsq.Ψ = [lsq.Ψ; lsq2.Ψ]
+   return lsq
+end
+
+
+
+
+function analyse_subbasis(lsq, order, degrees, Ibasis)
+   not_nothing = length(find( [order, degrees, Ibasis] .!= nothing ))
+   if not_nothing > 1
+      @show order, degrees, Ibasis
+      error("at most one of the keyword arguments `order`, `degrees`, `Ibasis` maybe provided")
+   end
+
+   # if the user has given no information, then we just take the entire basis
+   if not_nothing == 0
+      order = Inf
+   end
+
+   # if basis is chosen by maximum body-order ...
+   if order != nothing
+      Ibasis = find(1 .< bodyorder.(lsq.basis) .<= order) |> sort
+
+   # if basis is chosen by maximum degrees body-order ...
+   # degrees = array of
+   elseif degrees != nothing
+      # check that the constant is excluded
+      @assert degrees[1] == 0
+      Ibasis = Int[]
+      for (deg, I) in zip(degrees, lsq.Iord)
+         if deg == 0
+            continue
+         end
+         # loop through all basis functions in the current group
+         for i in I
+            # and add all those to Ibasis which have degree <= deg
+            if degree(lsq.basis[i]) <= deg
+               push!(Ibasis, i)
+            end
+         end
+      end
+
+   # of indeed if the basis is just constructed through individual indices
+   else
+      Ibasis = Int[i for i in Ibasis]
+   end
+
+   return Ibasis
+end
+
+
+"""
+
+## Keyword Arguments:
+
+* weights: either `nothing` or a tuple of `Pair`s, i.e.,
+```
+weights = (:E => 100.0, :F => 1.0, :V => 0.01)
+```
+Here `:E` stand for energy, `:F` for forces and `:V` for virial .
+
+* config_weights: a tuple of string, value pairs, e.g.,
+```
+config_weights = ("solid" => 10.0, "liquid" => 0.1)
+```
+this adjusts the weights on individual configurations from these categories
+if no weight is provided then the weight provided with the is used.
+Note in particular that `config_weights` takes precedence of Dat.w!
+If a weight 0.0 is used, then those configurations are removed from the LSQ
+system.
+"""
+function regression(lsq;
+                    verbose = true,
+                    kwargs...)
+   # TODO
+   #  * regulariser
+   #  * stabstyle or stabiliser => think about this carefully!
+
+   # apply all the weights, get rid of anything that isn't needed or wanted
+   # in particular subtract E0 from the energies and remove B1 from the
+   # basis set
+   Y, Ψ, Ibasis = get_lsq_system(lsq; kwargs...)
+
+   # QR factorisation
+   verbose && println("solve $(size(Ψ)) LSQ system using QR factorisation")
+   QR = qrfact(Ψ)
+   verbose && @show cond(QR[:R])
+   # back-substitution to get the coefficients # same as QR \ ???
+   c = QR \ Y
+
+   # check error on training set: i.e. the naive errors using the
+   # weights that are provided
+   if verbose
+      z = Ψ * c - Y
+      rel_rms = norm(z) / norm(Y)
+      verbose && println("naive relative rms error on training set: ", rel_rms)
+   end
+
+   # now add the 1-body term and convert this into an IP
+   # (I assume that the first basis function is the 1B function)
+   @assert bodyorder(lsq.basis[1]) == 1
+   return NBodyIP(lsq.basis, [1.0; c])
+end
+
+
+function NBodyIP(lsq::LsqSys, c::Vector, Ibasis::Vector{Int})
+   if !(1 in Ibasis)
+      @assert bodyorder(lsq.basis[1]) == 1
+      c = [1.0; c]
+      Ibasis = [1; Ibasis]
+   end
+   return NBodyIP(lsq.basis[Ibasis], c)
+end
+
+
+* `exclude`, `include`: arrays of strings of config_types to either
+include or exclude in the fit (default: all config types are included)
+
+* `order`: integer specifying up to which body-order to include the basis
+in the fit. (default: all basis functions are included)
+
+               normalise_E = true, normalise_V = true,
+               hooks = Dict("hess" => hess_weights_hook!)) =
+
+
+      # TODO: this should be generalised to be able to hook into
+      #       other kinds of weight modifications
+      idx_end = idx
+      if w != 0 && length(config_type(d)) >= 4 && config_type(d)[1:4] == "hess"
+         if haskey(hooks, "hess")
+            w = hooks["hess"](W[idx_init:idx_end], d)
+            W[idx_init:idx_end] = w
+         end
+      end
+   end
