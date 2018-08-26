@@ -2,8 +2,8 @@
 module DataTypes
 
 using StaticArrays
-using JuLIP: vecs, mat, JVec
-import NBodyIPFitting: vec, devec
+using JuLIP: vecs, mat, JVec, energy, forces, virial 
+import NBodyIPFitting: vec, devec, evaluate_lsq
 
 export ENERGY, FORCES, VIRIAL
 
@@ -20,12 +20,14 @@ const ENERGY = "E"
 const ValE = Val{:E}
 vec(::ValE, E::Real) = [E]
 devec(::ValE, x::AbstractVector) = ((@assert length(x) == 1); x[1])
+evaluate_lsq(::ValE, B, at) = energy(B, at)
 
 const FORCES = "F"
 const ValF = Val{:F}
 vec(v::ValF, F::Vector{<:JVec}) = vec(v, mat(F))
 vec(::ValF, F::Matrix) = F[:]
 devec(::ValF, x::AbstractVector) = vecs(reshape(x, 3, :))
+evaluate_lsq(::ValF, B, at) = forces(B, at)
 
 const VIRIAL = "V"
 const ValV = Val{:V}
@@ -36,6 +38,7 @@ devec(::ValV, x::AbstractVector) =
    #  1  6  5
    #  6  2  4
    #  5  4  3
+evaluate_lsq(::ValV, B, at) = virial(B, at)
 
 
 end

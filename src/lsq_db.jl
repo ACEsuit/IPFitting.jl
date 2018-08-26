@@ -76,14 +76,15 @@ achieved (e.g. for forces) via
 module DB
 
 
-using Threads:               SpinLock
+using Base.Threads:          SpinLock
 using StaticArrays:          SVector
-using JuLIP:                 vecs, mat, AbstractCalculator
-using NBodyIPFitting:        Dat, LsqDB, KronGroup, DataGroup
+using JuLIP:                 vecs, mat, AbstractCalculator, AbstractAtoms, Atoms
+using NBodyIPFitting:        Dat, LsqDB, KronGroup, DataGroup, data, basis,
+                             evaluate_lsq
+using NBodyIPFitting.Data:   configtype
 using NBodyIPFitting.Tools:  tfor, decode
 
-import NBodyIPFitting.Lsq,
-       NBodyIPFitting.FIO
+import NBodyIPFitting.FIO
 
 import Base: flush, append!
 
@@ -96,29 +97,23 @@ including the '_kron.h5' and '_info.json' endings.
 """
 dbpath(db::LsqDB) = db.dbpath
 
-basis(db::LsqDB) = db.basis
-basis(db::LsqDB, i::Integer) = db.basis[i]
-
-data(db::LsqDB) = db.data
-# data(db::LsqDB, i::Integer) = db.data[i]
-
 infofile(dbpath::AbstractString) = dbpath * INFOFILE
 
 kronfile(dbpath::AbstractString) = dbpath * KRONFILE
 
-function load_info(dbpath)
+function load_info(dbpath::String)
    info = FIO.load(infofile(dbpath))
    basis = decode.(info["basis"])
-   data_groups = Dict{String, Dat}()
+   data_groups = Dict{String, DataGroup}()
    for (key, val) in info["data"]
-      data_groups[key] = Dat.(val)
+      data_groups[key] = [Dat(v) for v in val]
    end
    return basis, data_groups
 end
 
-function save_info(dbpath, db)
+function save_info(dbpath::String, db)
    data = Dict()
-   for (key, val) in db.data
+   for (key, val) in db.data_groups
       data[key] = Dict.(val)
    end
    FIO.save(infofile(dbpath),
@@ -137,10 +132,18 @@ end
 
 save_kron(db) = save_kron(dbpath(db), db)
 
+function load_kron(dbpath::String)
+   kron_groups = FIO.load(kronfile(dbpath))
+   return kron_groups
+end
+
+load_kron(db::LsqDB) = load_kron(dbpath(db))
+
 function LsqDB(dbpath::AbstractString)
    basis, data_groups = load_info(dbpath)
    @assert isfile(kronfile(dbpath))
-   return LsqDB(basis, data_groups, Dict{String, KronGroup}(), dbpath)
+   kron_groups = load_kron(dbpath)
+   return LsqDB(basis, data_groups, kron_groups, dbpath)
 end
 
 
@@ -175,10 +178,10 @@ function LsqDB(dbpath::AbstractString,
                verbose=true)
    data_groups = Dict{String, DataGroup}()
    kron_groups = Dict{String, KronGroup}()
-   config_types = unique(config_type.(data))
-   for key in config_types
-      kron_groups[key] = KronGroup()
-   end
+   config_types = unique(configtype.(data))
+   # for key in config_types
+   #    kron_groups[key] = KronGroup()
+   # end
    db = LsqDB(basis, data_groups, kron_groups, dbpath)
    db_lock = SpinLock()
    # parallel assembly of the LSQ matrix
@@ -204,26 +207,29 @@ function _append_inner!(db::LsqDB, d::Dat, lsqrow::Dict)
       @assert !haskey(db.data_groups, ct)
       D_ct = db.kron_groups[ct] = KronGroup()
       D_d = db.data_groups[ct] = DataGroup()
-      # add empty sub-groups for the datatypes present in d
+      # add empty sub-groups for the datatypes (observationtypes) present in d
       for key in keys(d.D)
-         D_ct[key] = Array{Float64, 3}()
+         D_ct[key] = Array{Float64}(length(d.D[key]), 0, length(db.basis))
       end
+   else
+      D_ct = db.kron_groups[ct]
+      D_d = db.data_groups[ct]
    end
    # append d to INFO ...
-   push!(D_d[ct], d)
+   push!(D_d, d)
    # and append lsqrow to kron_groups[ct]
    # here, lsqrow is a dict with the same keys as kron_groups[ct], but
    # containing 2D arrays
    for datatype in keys(d.D)
-      db.kron_groups[ct][datatype] = _append!(db.kron_groups[ct][datatype],
-                                              lsqrow[datatype])
+      db.kron_groups[ct][datatype] = _append(db.kron_groups[ct][datatype],
+                                             lsqrow[datatype])
    end
    return nothing
 end
 
 function safe_append!(db::LsqDB, db_lock, d::Dat)
    # computing the lsq blocks ("rows") can be done in parallel,
-   lsqrow = Lsq.evallsq(d, basis(db))
+   lsqrow = evallsq(d, basis(db))
    # but writing them into the DB must be done in a threadsafe way
    lock(db_lock)
    _append_inner!(db, d, lsqrow)
@@ -237,16 +243,24 @@ function flush(db::LsqDB)
    return nothing
 end
 
+# TODO: the following function suggests that the ordering of
+#       <values, data, basis> was poorly chosen and it should instead be
+#       <values, basis, data> => reconsider this!!!!
+
 """
-if A = n x m x k and B = n x m, then this functions creates "appends"
-B to A converting it into an n x m x (k+1) array.
+if A = n x m x k and B = n x k, then this functions creates "appends"
+B to A converting it into an n x (m+1) x k array.
+ * n : the dimension of <data[i], basis[j]>
+ * m : the number of Dat
+ * k : the number of basis functions
 """
-function _append!(A::Array{T, 3}, B::Array{T, 2}) where {T}
+function _append(A::Array{T, 3}, B::Array{T, 2}) where {T}
    szA = size(A)
-   @assert szA[1:2] == size(B)
-   Avec = vec(A)
-   append!(Avec, B[:])
-   return reshape(Avec, szA[1], szA[2], szA[3]+1)
+   @assert szA[1] == size(B,1) && szA[3] == size(B, 2)
+   Anew = Array{T}(szA[1], szA[2]+1, szA[3])
+   Anew[:, 1:szA[2], :] .= A
+   Anew[:, end, :] .= B
+   return Anew
 end
 
 
@@ -273,11 +287,13 @@ end
 # fill the LSQ system, i.e. evaluate basis at data points
 function evallsq(d::Dat, B::AbstractVector{TB}
                  ) where {TB <: AbstractCalculator}
+   B = [b for b in B]
    if !(isleaftype(TB))
       return evallsq_split(d, B)
    end
    # TB is a leaf-type so we can use "evaluate_many"
-   return Dict( key => _evallsq(Val(Symbol(key)), B, Atoms(d)) )
+   return Dict( key => _evallsq(Val(Symbol(key)), B, Atoms(d))
+                for key in keys(d.D) )
 end
 
 """
@@ -292,8 +308,11 @@ should likely be the bottleneck of `evallsq`
 function _evallsq(vDT::Val,
                   B::AbstractVector{<:AbstractCalculator},
                   at::AbstractAtoms)
+   # vals will be a vector containing multiple evaluations
    vals = evaluate_lsq(vDT, B, at)
+   # vectorise the first so we know the length of the data
    vec1 = vec(vDT, vals[1])
+   # create a multi-D array to reshape these into
    A = Array{Float64}(length(vec1), length(B))
    A[:, 1] = vec1
    for n = 2:length(B)
@@ -308,8 +327,7 @@ an array ∑ni x m.
 """
 function _cat_(As, Iord)
    TA = eltype(As[1])
-   A = Vector{TA}(size(As[1],2),
-                  sum(size(AA, 1) for AA in As))
+   A = Array{TA}(sum(size(AA, 1) for AA in As), size(As[1],2))
    for i = 1:length(As)
       A[:, Iord[i]] = As[i]
    end
@@ -327,7 +345,7 @@ function evallsq_split(d, basis)
    D_ord = [ evallsq(d, BB)  for BB in Bord ]
    # each D_ord[i] is a Dict storing the LSQ system components.
    # we assume that all D_ord[i] contain the same keys.
-   return Dict( key => _cat_( [DD[key] for DD in D_ord], Iord ),
+   return Dict( key => _cat_( [DD[key] for DD in D_ord], Iord )
                 for key in keys(D_ord[1]) )
 end
 

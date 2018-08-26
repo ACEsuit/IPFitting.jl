@@ -1,3 +1,8 @@
+#
+# TODO
+#  * change datatypes => observationtypes
+#  * load the kron_groups on demand 
+#
 
 """
 # `NBodyIPFitting.jl`
@@ -27,9 +32,9 @@ include("datatypes.jl")
 include("data.jl")
 @reexport using NBodyIPFitting.Data
 
-# include("lsq.jl")
-#
-# include("lsq_db.jl")
+include("lsq.jl")
+
+include("lsq_db.jl")
 
 # # lsq and other fits
 # include("fitting.jl")

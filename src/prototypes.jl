@@ -15,7 +15,7 @@ energy(d)
 forces(d)
 virial(d)
 # weight(d)
-config_type(d)
+configtype(d)
 length(d)    # number of atoms
 ```
 If information is missing, the relevant function will return `nothing` instead
@@ -23,21 +23,22 @@ If information is missing, the relevant function will return `nothing` instead
 """
 mutable struct Dat
    at::Atoms
-   config_type::String
+   configtype::String
    D::Dict{String, Vector{Float64}}
 end
 
 ==(d1::Dat, d2::Dat) = (
-      (d1.config_type == d2.config_type) && (d1.D == d2.D) &&
+      (d1.configtype == d2.configtype) && (d1.D == d2.D) &&
       all( f(d1.at) == f(d2.at) for f in (positions, numbers, cell, pbc) )
    )
 
 function Dat(at::Atoms, config_type::AbstractString; kwargs...)
-   dat = Dat(at, config_type, Dict{String, Any}())
+   dat = Dat(at, config_type, Dict{String, Vector{Float64}}())
    for (key, val) in kwargs
+      str_key = string(key)
       # interpret `nothing` as `missing`
       if val != nothing
-         dat.D[string(key)] = val
+         dat.D[str_key] = vec(Val(Symbol(str_key)), val)
       end
    end
    return dat
@@ -49,7 +50,7 @@ Base.Dict(d::Dat) =
          "Z" => numbers(d.at),
          "cell" => cell(d.at) |> Matrix,
          "pbc" => Int.([pbc(d.at)...]),
-         "config_type" => d.config_type,
+         "configtype" => d.configtype,
          "D" => d.D )
 
 function Dat(D::Dict)
@@ -57,10 +58,12 @@ function Dat(D::Dict)
                Z = D["Z"],
                cell = JMat(D["cell"]),
                pbc = tuple(Bool.(D["pbc"])...) )
-   return Dat(at, D["config_type"], Dict{String, Any}(D["D"]))
+   return Dat(at, D["configtype"], Dict{String, Any}(D["D"]))
 end
 
 convert(::Val{Symbol("NBodyIPFitting.Dat")}, D::Dict) = Dat(D)
+
+# -----------------------------------------------------------------
 
 const KronGroup = Dict{String, Array{Float64, 3}}
 const DataGroup = Vector{Dat}
@@ -77,6 +80,10 @@ mutable struct LsqDB
    kron_groups::Dict{String, KronGroup}
    dbpath::String
 end
+
+basis(db::LsqDB) = db.basis
+basis(db::LsqDB, i::Integer) = db.basis[i]
+data(db::LsqDB) = db.data
 
 
 # prototypes
@@ -99,3 +106,5 @@ devec(::Val{:F}, x) = vecs( resize(x, 3, length(x) ÷ 3) )
 ```
 """
 function devec end
+
+function evaluate_lsq end

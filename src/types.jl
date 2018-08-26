@@ -15,7 +15,7 @@ energy(d)
 forces(d)
 virial(d)
 weight(d)
-config_type(d)
+configtype(d)
 length(d)    # number of atoms
 ```
 If information is missing, the relevant function will return `nothing` instead
@@ -27,13 +27,13 @@ mutable struct Dat{T}
    F::Union{Void, JVecs{T}}  # forces
    V::Union{Void, JMat{T}}   # stress
    w                         # weight, could be anything?
-   config_type::Union{Void, String}
+   configtype::Union{Void, String}
    D::Dict{String, Any}
 end
 
 ==(d1::Dat, d2::Dat) = (
       (d1.E == d2.E) && (d1.F == d2.F) && (d1.V == d2.V) &&
-      (d1.config_type == d2.config_type) && (d1.D == d2.D) &&
+      (d1.configtype == d2.configtype) && (d1.D == d2.D) &&
       all( f(d1.at) == f(d2.at) for f in (positions, numbers, cell, pbc) )
    )
 
@@ -49,7 +49,7 @@ Base.Dict(d::Dat) =
          "E" => d.E,
          "F" => d.F == nothing ? nothing : mat(d.F),
          "V" => d.V == nothing ? nothing : Matrix(d.V),
-         "w" => d.w, "config_type" => d.config_type, "D" => d.D)
+         "w" => d.w, "configtype" => d.configtype, "D" => d.D)
 
 function Dat(D::Dict)
    at = Atoms( X = D["X"] |> vecs,
@@ -60,7 +60,7 @@ function Dat(D::Dict)
    F = D["F"] == nothing ? nothing : vecs(Matrix{Float64}(D["F"]))
    V = D["V"] == nothing ? nothing : JMat(Matrix{Float64}(D["V"]))
    w = D["w"]
-   return Dat(at, E, F, V, D["w"], D["config_type"], Dict{String, Any}(D["D"]))
+   return Dat(at, E, F, V, D["w"], D["configtype"], Dict{String, Any}(D["D"]))
 end
 
 

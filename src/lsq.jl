@@ -10,8 +10,7 @@ module Lsq
 
 using StaticArrays
 using JuLIP: AbstractCalculator, Atoms
-using NBodyIPFitting: Dat, LsqDB
-using NBodyIPFitting.DB: data, lsqblock
+using NBodyIPFitting: Dat, LsqDB, data
 using NBodyIPFitting.Data: observation, hasobservation
 
 

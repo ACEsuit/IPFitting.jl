@@ -18,7 +18,7 @@ loaded information.
 module Data
 
 using JuLIP, ASE, ProgressMeter, FileIO
-using NBodyIPFitting: Dat, vec, devec 
+using NBodyIPFitting: Dat, vec, devec
 using NBodyIPFitting.DataTypes
 import JuLIP: Atoms, energy, forces, virial
 import Base: length, Dict
@@ -26,11 +26,11 @@ import Base: length, Dict
 using PyCall
 @pyimport ase.io as ase_io
 
-export config_type, weight, load_data
+export configtype, weight, load_data
 
 Atoms(d) = d.at
 length(d::Dat) = length(d.at)
-config_type(d::Dat) = d.config_type
+configtype(d::Dat) = d.configtype
 energy(d::Dat) = haskey(d.D, ENERGY) ? devec(Val(:E), d.D[ENERGY]) : nothing
 forces(d::Dat) = haskey(d.D, FORCES) ? devec(Val(:F), d.D[FORCES]) : nothing
 virial(d::Dat) = haskey(d.D, VIRIAL) ? devec(Val(:V), d.D[VIRIAL]) : nothing

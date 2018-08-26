@@ -1,5 +1,5 @@
 using JuLIP
-using NBodyIPs.Data: Dat, weight, config_type, energy, forces
+using NBodyIPs.Data: Dat, weight, configtype, energy, forces
 
 export fiterrors, scatter_data, scatter_E, scatter_F
 

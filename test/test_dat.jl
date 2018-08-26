@@ -2,7 +2,7 @@
 using Base.Test, JuLIP
 using NBodyIPFitting
 using NBodyIPFitting: Dat
-using NBodyIPFitting.Data: config_type
+using NBodyIPFitting.Data: configtype
 
 ##
 
@@ -20,7 +20,7 @@ dat = Dat(at, "test",
                 "F" => vec(Val(:F), forces(lj, at)),
                 "V" => vec(Val(:V), virial(lj, at)) ) )
 
-println(@test(config_type(dat) == "test"))
+println(@test(configtype(dat) == "test"))
 println(@test(energy(dat) == energy(lj, at)))
 println(@test(forces(dat) == forces(lj, at)))
 println(@test(virial(dat) ≈ virial(lj, at)))
