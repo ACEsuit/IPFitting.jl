@@ -10,6 +10,7 @@ struct FJLD2 end
 # WARNING: this seems dumb. maybe we can use empty array instead?
 const NOTHING_H5 = UInt8(0)
 
+
 function _format(fname)
    if length(fname) >= 3 && fname[end-2:end] == ".h5"
       return FHDF5()
@@ -27,6 +28,13 @@ save(fname, args...) = save(fname, Dict(args...))
 save(fname, D::Dict) = _save(_format(fname), fname, D)
 load(fname, args...) = _load(_format(fname), fname, args...)
 
+function _load(format, fname, args...)
+   D = _load(format, fname)
+   if length(args) == 1
+      return D[args[1]]
+   end
+   return tuple([D[key] for key in args]...)
+end
 
 # ------------- JSON LOAD AND SAVE -------------
 
@@ -43,15 +51,12 @@ end
 
 # ------------- JLD2 LOAD AND SAVE -------------
 
-function _load(::FJSON, fname)
-   return JSON.parsefile(fname)
+function _load(::FJLD2, fname, args...)
+   return FileIO.load(fname, args...)
 end
 
-function _save(::FJSON, fname, D::Dict)
-   f = open(fname, "w")
-   JSON.print(f, D)
-   close(f)
-   return nothing
+function _save(::FJLD2, fname, args...)
+   return FileIO.save(fname, args...)
 end
 
 # ----------- HDF5 LOAD AND SAVE

@@ -1,19 +1,30 @@
 
-##
+
 using Base.Test
 import NBodyIPFitting
 import NBodyIPFitting.FIO
 
-println("----------------------------")
+##
+println("===================================")
 println("Testing NBodyIPFitting.FIO")
+println("===================================")
 
-fname1 = tempname() * ".h5"
-fname2 = tempname() * ".h5"
+for filetype in [".h5", ".jld2", ".json"]
+
+println("-----------------------------")
+println("Testing FIO with $filetype.")
+println("-----------------------------")
+fname1 = tempname() * filetype
+fname2 = tempname() * filetype
 
 D = Dict( "a" => rand(),
           "b" => rand(3,4,10),
           "c" => Dict( "d" => rand(10), "e" => "mystring"),
           "f" => nothing )
+
+if filetype == ".json"
+   D["b"] = D["b"][:]
+end
 
 println("Save and Load Entire Dict")
 FIO.save(fname1, D)
@@ -29,10 +40,19 @@ FIO.save(fname2, collect(D)...)
 D2 = FIO.load(fname2)
 println(@test D2 == D)
 
-println("Read from multi-dim array")
-bsub = FIO.load(fname1, ("b", (:,:,2:5)) )
-println(@test bsub == D["b"][:,:,2:5])
+if filetype == ".h5"
+   println("Read from multi-dim array")
+   bsub = FIO.load(fname1, ("b", (:,:,2:5)) )
+   println(@test bsub == D["b"][:,:,2:5])
+end
 
 println("Delete temporary files")
 run(`rm $fname1 $fname2`)
-println("----------------------------")
+
+end
+
+println("===================================")
+
+
+
+tuple(collect(D)...)
