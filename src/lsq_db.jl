@@ -187,14 +187,18 @@ function LsqDB(dbpath::AbstractString,
    # parallel assembly of the LSQ matrix
    tfor( n -> safe_append!(db, db_lock, data[n]), 1:length(data);
          verbose=verbose, msg = "Assemble LSQ blocks" )
-   verbose && info("Writing db to disk...")
-   try
-      flush(db)
-   catch
-      warn("""something went wrong trying to save the db to disk, but the data
-            should be ok; if it is crucial to keep it, try to save manually.""")
+   if dbpath != ""
+      verbose && info("Writing db to disk...")
+      try
+         flush(db)
+      catch
+         warn("""something went wrong trying to save the db to disk, but the data
+               should be ok; if it is crucial to keep it, try to save manually.""")
+      end
+      verbose && info("... done")
+   else
+      verbose && info("db is not writtent o disk since `dbpath` is empty.")
    end
-   verbose && info("... done")
    return db
 end
 

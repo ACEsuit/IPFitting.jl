@@ -6,7 +6,6 @@ using BenchmarkTools
    @testset "FIO" begin include("test_fio.jl") end
    @testset "Dat" begin include("test_dat.jl") end
    @testset "LsqDB" begin include("test_lsq_db.jl") end
-   # @testset "Fitting" begin include("test_fit.jl") end
-   # TODO: Data testset
-   # TODO: IO / serialization testset
+   @testset "Lsq" begin include("test_lsq.jl") end
+   @testset "Fitting" begin include("test_fit.jl") end
 end

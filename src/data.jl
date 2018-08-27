@@ -34,8 +34,8 @@ configtype(d::Dat) = d.configtype
 energy(d::Dat) = haskey(d.D, ENERGY) ? devec(Val(:E), d.D[ENERGY]) : nothing
 forces(d::Dat) = haskey(d.D, FORCES) ? devec(Val(:F), d.D[FORCES]) : nothing
 virial(d::Dat) = haskey(d.D, VIRIAL) ? devec(Val(:V), d.D[VIRIAL]) : nothing
-observation(d::Dat, key::String) = d.data[key]
-hasobservation(d::Dat, key::String) = haskey(d.data, key)
+observation(d::Dat, key::String) = d.D[key]
+hasobservation(d::Dat, key::String) = haskey(d.D, key)
 
 
 function read_energy(atpy)
