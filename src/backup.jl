@@ -169,25 +169,11 @@ function regression(lsq;
    return NBodyIP(lsq.basis, [1.0; c])
 end
 
-
-function NBodyIP(lsq::LsqSys, c::Vector, Ibasis::Vector{Int})
-   if !(1 in Ibasis)
-      @assert bodyorder(lsq.basis[1]) == 1
-      c = [1.0; c]
-      Ibasis = [1; Ibasis]
-   end
-   return NBodyIP(lsq.basis[Ibasis], c)
-end
-
-
-* `exclude`, `include`: arrays of strings of config_types to either
-include or exclude in the fit (default: all config types are included)
-
 * `order`: integer specifying up to which body-order to include the basis
 in the fit. (default: all basis functions are included)
 
-               normalise_E = true, normalise_V = true,
-               hooks = Dict("hess" => hess_weights_hook!)) =
+normalise_E = true, normalise_V = true,
+hooks = Dict("hess" => hess_weights_hook!)) =
 
 
       # TODO: this should be generalised to be able to hook into

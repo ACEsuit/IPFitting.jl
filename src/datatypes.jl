@@ -2,10 +2,8 @@
 module DataTypes
 
 using StaticArrays
-using JuLIP: vecs, mat, JVec, energy, forces, virial 
+using JuLIP: vecs, mat, JVec, energy, forces, virial
 import NBodyIPFitting: vec, devec, evaluate_lsq
-
-export ENERGY, FORCES, VIRIAL
 
 # using Voigt convention for vectorising  symmetric 3 x 3 matrix
 #  1  6  5

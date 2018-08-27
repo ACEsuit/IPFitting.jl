@@ -33,8 +33,13 @@ include("data.jl")
 @reexport using NBodyIPFitting.Data
 
 include("lsq_db.jl")
+@reexport using NBodyIPFitting.DB
+
+include("lsqerrors.jl")
+@reexport using NBodyIPFitting.Errors
 
 include("lsq.jl")
+@reexport using NBodyIPFitting.Lsq
 
 # #visualisation module
 # include("PIPplot.jl")

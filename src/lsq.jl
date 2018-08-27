@@ -26,9 +26,10 @@ using JuLIP: AbstractCalculator, Atoms
 using NBodyIPs: OneBody, NBodyIP
 using NBodyIPFitting: Dat, LsqDB, data
 using NBodyIPFitting.Data: observation, hasobservation
+import NBodyIPFitting
+const Err = NBodyIPFitting.Errors
 
-
-export fit_nbodyip
+export lsqfit
 
 _keys(configweights, dataweights) = collect(keys(configweights)),
                                     collect(keys(dataweights))
@@ -63,7 +64,7 @@ end
 
 
 # TODO: this function here suggests that the ordering we are usig at the moment
-#       is perfectly fine, and is in fact the more performance ordering
+#       is perfectly fine, and is in fact the more performant ordering
 #       and we should not switch it
 function lsq_matrix!(Ψ, db, configtypes, datatypes, Ibasis)
    idx = 0
@@ -89,12 +90,13 @@ function get_lsq_system(db::LsqDB; verbose = true,
                         dataweights = nothing,
                         E0 = nothing,
                         Ibasis = : )
-
-   if Ibasis == Colon()
-      Jbasis = 1:length(db.basis)
-   else
-      Jbasis = Ibasis
-   end
+   # we need to be able to call `length` on `Ibasis`
+   Jbasis = ((Ibasis == Colon()) ? (1:length(db.basis)) : Ibasis)
+   # if Ibasis == Colon()
+   #    Jbasis = 1:length(db.basis)
+   # else
+   #    Jbasis = Ibasis
+   # end
 
    # # reference energy => we assume the first basis function is 1B
    # # TODO TODO TODO => create some suitable "hooks"
@@ -140,12 +142,16 @@ function get_lsq_system(db::LsqDB; verbose = true,
 end
 
 
-function fit(db::LsqDB; solver=:qr, verbose=true, E0 = nothing, Ibasis = :, kwargs...)
+function lsqfit(db::LsqDB;
+                solver=:qr, verbose=true, E0 = nothing,
+                Ibasis = :, configweights=nothing, kwargs...)
    @assert solver == :qr
    @assert E0 != nothing
+   Jbasis = ((Ibasis == Colon()) ? (1:length(db.basis)) : Ibasis)
 
    verbose && info("assemble lsq system")
-   Ψ, Y = get_lsq_system(db; verbose=verbose, E0=E0, Ibasis=Ibasis, kwargs...)
+   Ψ, Y = get_lsq_system(db; verbose=verbose, E0=E0, Ibasis=Ibasis,
+                             configweights=configweights, kwargs...)
 
    verbose && info("solve $(size(Ψ)) LSQ system using QR factorisation")
    qrΨ = qrfact(Ψ)
@@ -164,7 +170,10 @@ function fit(db::LsqDB; solver=:qr, verbose=true, E0 = nothing, Ibasis = :, kwar
       basis = db.basis[Ibasis]
    end
 
-   return NBodyIP(basis, c)
+   # compute errors
+   errs = Err.lsqerrors(db, c, Jbasis; configtypes=keys(configweights), E0=E0)
+
+   return NBodyIP(basis, c), errs
 end
 
 
@@ -195,8 +204,8 @@ system.
 """
 
 
-# # assemble crude error tables and scatter plots
-# include("errors.jl")
+# assemble crude error tables and scatter plots
+# include("lsqerrors.jl")
 
 
 end
