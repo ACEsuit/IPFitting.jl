@@ -136,38 +136,7 @@ Note in particular that `config_weights` takes precedence of Dat.w!
 If a weight 0.0 is used, then those configurations are removed from the LSQ
 system.
 """
-function regression(lsq;
-                    verbose = true,
-                    kwargs...)
-   # TODO
-   #  * regulariser
-   #  * stabstyle or stabiliser => think about this carefully!
 
-   # apply all the weights, get rid of anything that isn't needed or wanted
-   # in particular subtract E0 from the energies and remove B1 from the
-   # basis set
-   Y, Ψ, Ibasis = get_lsq_system(lsq; kwargs...)
-
-   # QR factorisation
-   verbose && println("solve $(size(Ψ)) LSQ system using QR factorisation")
-   QR = qrfact(Ψ)
-   verbose && @show cond(QR[:R])
-   # back-substitution to get the coefficients # same as QR \ ???
-   c = QR \ Y
-
-   # check error on training set: i.e. the naive errors using the
-   # weights that are provided
-   if verbose
-      z = Ψ * c - Y
-      rel_rms = norm(z) / norm(Y)
-      verbose && println("naive relative rms error on training set: ", rel_rms)
-   end
-
-   # now add the 1-body term and convert this into an IP
-   # (I assume that the first basis function is the 1B function)
-   @assert bodyorder(lsq.basis[1]) == 1
-   return NBodyIP(lsq.basis, [1.0; c])
-end
 
 * `order`: integer specifying up to which body-order to include the basis
 in the fit. (default: all basis functions are included)
