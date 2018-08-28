@@ -76,10 +76,13 @@ pass an empty string as the filename.
 
 ### Step 4: Lsq fit, Analyse the fitting errors
 
-
+(todo) For now, see `?NBodyIPFitting.Lsq.lsqfit`, which gives decent amount
+of detail.
 
 ### Step 5: Usage
 
+the output `IP` of `lsqfit` is a `JuLIP.AbstractCalculator` which supports
+`energy, forces, virial, site_energies`.
 
 ## More on Descriptors
 
@@ -87,4 +90,4 @@ pass an empty string as the filename.
 ## Regularisation
 
 
-## Hooks 
+## Hooks

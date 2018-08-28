@@ -84,7 +84,15 @@ function lsq_matrix!(Ψ, db, configtypes, datatypes, Ibasis)
 end
 
 
+"""
+`get_lsq_system(db::LsqDB; kwargs...) -> Ψ, Y`
 
+Assemble the least squares system + rhs (observations). The `kwargs` can be used
+to select a subset of the available data or basis set, and to adjust the
+weights by config_type and observation type. See `lsqfit` for a list
+of keyword arguments. Allowed kwargs are `verbose, configweights, dataweights,
+E0, Ibasis`.
+"""
 function get_lsq_system(db::LsqDB; verbose = true,
                         configweights = nothing,
                         dataweights = nothing,
@@ -92,11 +100,6 @@ function get_lsq_system(db::LsqDB; verbose = true,
                         Ibasis = : )
    # we need to be able to call `length` on `Ibasis`
    Jbasis = ((Ibasis == Colon()) ? (1:length(db.basis)) : Ibasis)
-   # if Ibasis == Colon()
-   #    Jbasis = 1:length(db.basis)
-   # else
-   #    Jbasis = Ibasis
-   # end
 
    # # reference energy => we assume the first basis function is 1B
    # # TODO TODO TODO => create some suitable "hooks"
@@ -141,7 +144,40 @@ function get_lsq_system(db::LsqDB; verbose = true,
    return Ψ, Y
 end
 
+"""
+`lsqfit(db; kwargs...) -> IP, errs`
 
+Given the pre-computed least-squares system `db` (cf `LsqDB`) setup a least
+squares system, compute the solution and return an interatomic potential
+`IP` as well as the associated error estiamates `errs`.
+
+## Keyword Arguments:
+
+* `E0` (required) : energy of the `OneBody` term
+* `configweights` (required) : A dictionary specifying the weights for different
+types of configurations, e.g.,
+```
+configweights = Dict("solid" => 10.0, "liquid" => 0.1)
+```
+The keys, `["solid", "liquid"]` in the above example, specify which configtypes
+are to be fitted - all other configtypes are ignored.
+* `dataweights` (required) : a `Dict` specifying how different kinds of
+observations (data) should be weighted, e.g.,
+```
+dataweights = Dict("E" => 100.0, "F" => 1.0, "V" => 0.1)
+```
+* `Ibasis` : indices of basis functions to be used in the fit, default is `:`
+* `verbose` : true or false
+* `solver` : at the moment this should be ignored, only admissible choice
+is `:qr`. On request we can try others.
+
+## Return types
+
+* `IP::NBodyIP`: see documentation of `NBodyIPS.jl`
+* `errs::LsqErrors`: stores individual RMSE and MAE for the different
+configtypes and datatypes. Use `table_relative(errs)` and `table_absolute(errs)`
+to display these as tables and `rmse, mae` to access individual errors. 
+"""
 function lsqfit(db::LsqDB;
                 solver=:qr, verbose=true, E0 = nothing,
                 Ibasis = :, configweights=nothing, kwargs...)
@@ -177,35 +213,6 @@ function lsqfit(db::LsqDB;
 end
 
 
-"""
-`get_lsq_system(lsq; kwargs...) -> Ψ, Y, Ibasis`
-
-Assemble the least squares system + rhs. The `kwargs` can be used to
-select a subset of the available data or basis set, and to adjust the
-weights by config_type. For more complex weight adjustments, one
-can directly modify the `lsq.data[n].w` coefficients.
-
-## Keyword Arguments:
-
-* weights: A dictionary specifying the
-```
-weights = Dict("E" => 100.0, "F" => 1.0, "V" => 0.01)
-```
-
-* config_weights: a tuple of string, value pairs, e.g.,
-```
-configweights = Dict("solid" => 10.0, "liquid" => 0.1)
-```
-this adjusts the weights on individual configurations from these categories
-if no weight is provided then the weight provided with the is used.
-Note in particular that `config_weights` takes precedence of Dat.w!
-If a weight 0.0 is used, then those configurations are removed from the LSQ
-system.
-"""
-
-
-# assemble crude error tables and scatter plots
-# include("lsqerrors.jl")
 
 
 end

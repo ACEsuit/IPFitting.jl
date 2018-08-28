@@ -116,27 +116,6 @@ function analyse_subbasis(lsq, order, degrees, Ibasis)
 end
 
 
-"""
-
-## Keyword Arguments:
-
-* weights: either `nothing` or a tuple of `Pair`s, i.e.,
-```
-weights = (:E => 100.0, :F => 1.0, :V => 0.01)
-```
-Here `:E` stand for energy, `:F` for forces and `:V` for virial .
-
-* config_weights: a tuple of string, value pairs, e.g.,
-```
-config_weights = ("solid" => 10.0, "liquid" => 0.1)
-```
-this adjusts the weights on individual configurations from these categories
-if no weight is provided then the weight provided with the is used.
-Note in particular that `config_weights` takes precedence of Dat.w!
-If a weight 0.0 is used, then those configurations are removed from the LSQ
-system.
-"""
-
 
 * `order`: integer specifying up to which body-order to include the basis
 in the fit. (default: all basis functions are included)
