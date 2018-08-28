@@ -2,7 +2,7 @@
 module Errors
 
 using JuLIP: Atoms, energy, forces
-using NBodyIPFitting: LsqDB, Dat, configtype
+using NBodyIPFitting: LsqDB, Dat, configtype, weighthook
 using NBodyIPFitting.Data: observation
 
 export lsqerrors, table, table_relative, table_absolute
@@ -62,10 +62,11 @@ function lsqerrors(db, c, Ibasis; configtypes = Colon(), E0 = nothing)
          # get the lsq block
          block = reshape(db.kron_groups[ct][ot][:,:,Ibasis], :, length(Ibasis))
          # compute the various errors for this ct/ot combination
-         errs.rmse[ct][ot] = norm(block * c - y) / sqrt(length(y))
-         errs.nrm2[ct][ot] = norm(y) / sqrt(length(y))
-         errs.mae[ct][ot]  = norm(block * c - y, 1) / length(y)
-         errs.nrm1[ct][ot] = norm(y, 1) / length(y)
+         w = weighthook(ot, db.data_groups[ct][1])
+         errs.rmse[ct][ot] = w * norm(block * c - y) / sqrt(length(y))
+         errs.nrm2[ct][ot] = w * norm(y) / sqrt(length(y))
+         errs.mae[ct][ot]  = w * norm(block * c - y, 1) / length(y)
+         errs.nrm1[ct][ot] = w * norm(y, 1) / length(y)
       end
    end
 

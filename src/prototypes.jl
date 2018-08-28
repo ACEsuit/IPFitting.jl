@@ -108,3 +108,6 @@ devec(::Val{:F}, x) = vecs( resize(x, 3, length(x) ÷ 3) )
 function devec end
 
 function evaluate_lsq end
+
+weighthook(::Val, d::Dat) = 1.0
+weighthook(s::String, d::Dat) = weighthook(Val(Symbol(s)), d) 

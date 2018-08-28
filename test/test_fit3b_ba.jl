@@ -46,7 +46,7 @@ for deg3 in degrees
    IP, errs = Lsq.lsqfit( db,
                          E0 = 0.0,
                          configweights = Dict("rand" => 1.0),
-                         dataweights   = Dict("E" => 1.0, "F" => 1.0) )
+                         dataweights   = Dict("E" => 100.0, "F" => 1.0) )
    push!(err_erms, Err.relrmse(errs, "rand", "E"))
    push!(err_frms, Err.relrmse(errs, "rand", "F"))
 end
@@ -62,12 +62,13 @@ display(df)
 
 
 # BOND LENGTH
-# │ Row │ degrees │ rms_E       │ rms_F      │
+# │ Row │ degrees │ relrms_E    │ relrms_F   │
 # ├─────┼─────────┼─────────────┼────────────┤
-# │ 1   │ 4       │ 0.00134475  │ 0.118625   │
-# │ 2   │ 6       │ 0.000244722 │ 0.0362398  │
-# │ 3   │ 8       │ 0.000115287 │ 0.0179257  │
-# │ 4   │ 10      │ 5.28124e-5  │ 0.00888845 │
+# │ 1   │ 4       │ 0.00148527  │ 0.127316   │
+# │ 2   │ 6       │ 0.000233944 │ 0.0358468  │
+# │ 3   │ 8       │ 0.000121926 │ 0.0190422  │
+# │ 4   │ 10      │ 6.61715e-5  │ 0.00992364 │
+# │ 5   │ 12      │ 3.71398e-5  │ 0.00677842 │
 
 # BOND ANGLE
 # │ Row │ degrees │ relrms_E    │ relrms_F   │

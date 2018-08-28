@@ -197,7 +197,7 @@ function LsqDB(dbpath::AbstractString,
       end
       verbose && info("... done")
    else
-      verbose && info("db is not writtent o disk since `dbpath` is empty.")
+      verbose && info("db is not written to disk since `dbpath` is empty.")
    end
    return db
 end

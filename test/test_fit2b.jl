@@ -23,7 +23,7 @@ r0 = rnn(:Cu)
 calc = let r0=r0
    LennardJones(r0=r0) * C2Shift(2.5*r0)
 end
-data = generate_data(:Cu, 3, 0.25*r0, 100, calc)
+data = generate_data(:Cu, 3, 0.25*r0, 30, calc)
 rcut2 = cutoff(calc)
 # D2 = BondLengthDesc("exp( - 2 * (r/$r0 - 1) )", (:cos, rcut2-1, rcut2))
 D2 = BondLengthDesc("($r0)/r", (:cos, rcut2-1, rcut2))
@@ -41,8 +41,8 @@ for d in degrees
    db = LsqDB("", B2, data)
    IP, errs = Lsq.lsqfit(db, E0 = 0.0,
                              configweights = Dict("rand" => 1.0),
-                             dataweights   = Dict("E" => 1.0, "F" => 1.0) )
-   Err.table_relative(errs)
+                             dataweights   = Dict("E" => 100.0, "F" => 1.0) )
+   Err.table_absolute(errs)
    V2 = IP.components[1]
    ev2 = vecnorm(V2.(rr) - 0.5 * calc.(rr), Inf)
    dev2 = vecnorm(evaluate_d.(V2, rr) - 0.5 * evaluate_d.(calc, rr), Inf)
@@ -53,6 +53,8 @@ for d in degrees
    push!(err_frms, Err.rmse(errs, "rand", "F"))
 end
 
+
+
 df = DataFrame( :degrees => degrees,
                 :unif_E => err_eunif,
                 :unif_F => err_funif,
@@ -60,7 +62,7 @@ df = DataFrame( :degrees => degrees,
                 :rms_F => err_frms )
 display(df)
 
-(@test minimum(err_erms) < 1e-5) |> println
+(@test minimum(err_erms) < 1e-4) |> println
 (@test minimum(err_frms) < 1e-3) |> println
 (@test minimum(err_eunif) < 2e-4) |> println
 (@test minimum(err_funif) < 4e-4) |> println

@@ -24,8 +24,9 @@ module Lsq
 using StaticArrays
 using JuLIP: AbstractCalculator, Atoms
 using NBodyIPs: OneBody, NBodyIP
-using NBodyIPFitting: Dat, LsqDB, data
+using NBodyIPFitting: Dat, LsqDB, data, weighthook
 using NBodyIPFitting.Data: observation, hasobservation
+using NBodyIPFitting.DataTypes: ENERGY
 import NBodyIPFitting
 const Err = NBodyIPFitting.Errors
 
@@ -43,18 +44,30 @@ in `keys(configweights)` and only those datatypes are loaded whose
 ids are in `keys(dataweights)`.
 """
 function observations(db::LsqDB,
-                      configtypes::Vector{String}, datatypes::Vector{String},
-                      ctweights::Dict, dtweights::Dict)
+                      configtypes::Vector{String},
+                      datatypes::Vector{String},
+                      ctweights::Dict,
+                      dtweights::Dict, E0 )
    Y = Float64[]
    W = Float64[]
+   # loop through configuration groups
    for ct in configtypes
       ctweight = ctweights[ct]
+      # loop through the datatypes / observation types to be assembled
       for dt in datatypes
+         # loop through the observations (x, f(x)) of the current configuration group
          for dat in db.data_groups[ct]
+            # TODO: move this `if` after the `for dt` line
             if hasobservation(dat, dt)
+               w = weighthook(dt, dat)
                o = observation(dat, dt)
+               # TODO: This is a hack => can we replace it with a hook?
+               if dt == ENERGY
+                  # subtract the 1-body reference energy
+                  o[1] -= length(dat) * E0
+               end
                append!(Y, o)
-               append!(W, ctweight * dtweights[dt] * ones(length(o)) )
+               append!(W, ctweight * dtweights[dt] * (w .* ones(length(o))) )
             end
          end
       end
@@ -112,7 +125,7 @@ function get_lsq_system(db::LsqDB; verbose = true,
    # need to by paranoid that the ordering does not change!
    configtypes, datatypes = _keys(configweights, dataweights)
    # get the observations vector and the weights vector
-   Y, W = observations(db, configtypes, datatypes, configweights, dataweights)
+   Y, W = observations(db, configtypes, datatypes, configweights, dataweights, E0)
    # check for NaNs
    any(isnan, Y) && error("NaN detected in observations vector")
    any(isnan, W) && error("NaN detected in weights vector")
@@ -176,7 +189,7 @@ is `:qr`. On request we can try others.
 * `IP::NBodyIP`: see documentation of `NBodyIPS.jl`
 * `errs::LsqErrors`: stores individual RMSE and MAE for the different
 configtypes and datatypes. Use `table_relative(errs)` and `table_absolute(errs)`
-to display these as tables and `rmse, mae` to access individual errors. 
+to display these as tables and `rmse, mae` to access individual errors.
 """
 function lsqfit(db::LsqDB;
                 solver=:qr, verbose=true, E0 = nothing,
