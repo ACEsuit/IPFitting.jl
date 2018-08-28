@@ -142,7 +142,7 @@ function get_lsq_system(db::LsqDB; verbose = true,
    # now rescale Y and Ψ according to W => Y_W, Ψ_W; then the two systems
    #   \| Y_W - Ψ_W c \| -> min  and (Y - Ψ*c)^T W (Y - Ψ*x) => MIN
    # are equivalent
-   W .= sqrt.(W)
+   # W .= sqrt.(W)
    Y .*= W
    scale!(W, Ψ)
 

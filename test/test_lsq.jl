@@ -30,17 +30,18 @@ D2 = BondLengthDesc("exp( - 2 * (r/$r0 - 1) )", (:cos, rcut2-1, rcut2))
 B2 = nbpolys(2, D2, 6)
 
 ## generate a LSQ system by hand
+atlen = length(data[1])
 len = 1 + length(observation(data[1], "F"))
 Y = zeros(length(data) * len)
 Ψ = zeros(length(data) * len, length(B2))
 rowidx = 0
-for (okey, evalb) in zip(["E", "F"], (energy, forces))
+for (okey, evalb, w) in zip(["E", "F"], (energy, forces), (1/atlen, 1.0))
    for d in data
       o = observation(d, okey)
       leno = length(o)
-      Y[(rowidx+1):(rowidx+leno)] = o
+      Y[(rowidx+1):(rowidx+leno)] = w * o
       for colidx = 1:length(B2)
-         Ψ[(rowidx+1):(rowidx+leno), colidx] = vec(Val(Symbol(okey)), evalb(B2[colidx], d.at))
+         Ψ[(rowidx+1):(rowidx+leno), colidx] = w * vec(Val(Symbol(okey)), evalb(B2[colidx], d.at))
       end
       rowidx += leno
    end
@@ -54,6 +55,7 @@ db = LsqDB("", B2, data)
                dataweights = Dict("E" => 1.0, "F" => 1.0)
             )
 
+##
 println(@test Y ≈ Y_man)
 println(@test Ψ ≈ Ψ_man)
 

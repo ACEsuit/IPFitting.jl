@@ -47,9 +47,8 @@ a 4-body basis can be constructed via
 B = [ nbpolys(2, D2, 14); nbpolys(3, D3, 11); nbpolys(4, D4, 8) ]
 ```
 
-#### Environment-dependent NBody basis
+For more complex basis sets, see below.
 
-(todo)
 
 ### Step 3: Precompute a Lsq system
 
@@ -81,10 +80,18 @@ of detail.
 
 ### Step 5: Usage
 
-the output `IP` of `lsqfit` is a `JuLIP.AbstractCalculator` which supports
-`energy, forces, virial, site_energies`.
+The output `IP` of `lsqfit` is a `JuLIP.AbstractCalculator` which supports
+`energy, forces, virial, site_energies`. (todo: write more here)
 
-## More on Descriptors
+
+
+## More on Descriptors and Basis sets
+
+### Bond-length descriptor
+
+### Bond-angle descriptor
+
+### Environment-dependent N-Body potentials
 
 
 ## Regularisation
