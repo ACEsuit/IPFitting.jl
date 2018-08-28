@@ -288,15 +288,15 @@ function split_basis(basis)
 end
 
 
+
 # fill the LSQ system, i.e. evaluate basis at data points
-function evallsq(d::Dat, B::AbstractVector{TB}
-                 ) where {TB <: AbstractCalculator}
-   B = [b for b in B]
-   if !(isleaftype(TB))
-      return evallsq_split(d, B)
+function evallsq(d::Dat, B::AbstractVector{TB}) where {TB <: AbstractCalculator}
+   B1 = [b for b in B]
+   if !(isleaftype(eltype(B1)))
+      return evallsq_split(d, B1)
    end
    # TB is a leaf-type so we can use "evaluate_many"
-   return Dict( key => _evallsq(Val(Symbol(key)), B, Atoms(d))
+   return Dict( key => _evallsq(Val(Symbol(key)), B1, Atoms(d))
                 for key in keys(d.D) )
 end
 
