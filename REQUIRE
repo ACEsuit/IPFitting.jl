@@ -1,10 +1,9 @@
-julia 0.6
+julia 0.6 0.7-
 NBodyIPs
 PyCall
-ASE
 HDF5
 JSON
 BenchmarkTools
 DataFrames
 ProgressMeter
-Sobol 
+Sobol

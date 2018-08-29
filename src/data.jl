@@ -17,7 +17,7 @@ loaded information.
 """
 module Data
 
-using JuLIP, ASE, ProgressMeter, FileIO
+using JuLIP, ProgressMeter, FileIO
 using NBodyIPFitting: Dat, vec, devec
 using NBodyIPFitting.DataTypes
 import JuLIP: Atoms, energy, forces, virial
@@ -83,6 +83,13 @@ function read_configtype(atpy)
    return nothing
 end
 
+read_Atoms(atpy) = Atoms( vecs(atpy[:get_positions]()'),
+                          vecs(atpy[:get_momenta]()'),
+                          atpy[:get_masses](),
+                          atpy[:get_atomic_numbers](),
+                          atpy[:get_cell](),
+                          tuple(atpy[:get_pbc]()...) )
+
 """
 ```
 function read_xyz(fname; verbose=true, index = ":",
@@ -123,7 +130,7 @@ function read_xyz(fname; verbose=true, index = ":",
       end
 
       idx += 1
-      data[idx] = Dat( Atoms(ASEAtoms(atpy)),
+      data[idx] = Dat( read_Atoms(atpy),
                        config_type;
                        E = read_energy(atpy),
                        F = read_forces(atpy),
