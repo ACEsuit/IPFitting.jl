@@ -30,11 +30,6 @@ function hess_weights_hook!(w, d::Dat)
 end
 
 
-function regularise(Ψ, Y, P::Matrix)
-   @assert size(Ψ,2) == size(P,2)
-   return vcat(Ψ, P), vcat(Y, zeros(size(P,1)))
-end
-
 
 using NBodyIPs.Data: config_type
 

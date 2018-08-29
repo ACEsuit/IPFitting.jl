@@ -6,4 +6,5 @@ HDF5
 JSON
 BenchmarkTools
 DataFrames
-ProgressMeter 
+ProgressMeter
+Sobol 

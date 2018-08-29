@@ -97,6 +97,18 @@ function lsq_matrix!(Ψ, db, configtypes, datatypes, Ibasis)
 end
 
 
+function regularise!(Ψ, Y, P::Vector{<:Matrix})
+   @assert all( (size(p, 2) == ncols) for p in P )
+   nrold = size(Ψ, 1)
+   nrows = sum(size(p, 1) for p in P)
+   ncols = size(Ψ, 2)
+   append!(Y, zeros(nrows))
+   Ψ = Ψ[:]
+   append!(Ψ, vcat(P...))
+   return reshape(Ψ, nrold+nrows, ncols), Y
+end
+
+
 """
 `get_lsq_system(db::LsqDB; kwargs...) -> Ψ, Y`
 
@@ -110,7 +122,8 @@ function get_lsq_system(db::LsqDB; verbose = true,
                         configweights = nothing,
                         dataweights = nothing,
                         E0 = nothing,
-                        Ibasis = : )
+                        Ibasis = :,
+                        regularisers = nothing )
    # we need to be able to call `length` on `Ibasis`
    Jbasis = ((Ibasis == Colon()) ? (1:length(db.basis)) : Ibasis)
 
@@ -146,12 +159,11 @@ function get_lsq_system(db::LsqDB; verbose = true,
    Y .*= W
    scale!(W, Ψ)
 
-   # TODO
-   # # regularise
-   # if regulariser != nothing
-   #    P = regulariser(lsq.basis[Jbasis])
-   #    Ψ, Y = regularise(Ψ, Y, P)
-   # end
+   # regularise
+   if regularisers != nothing
+      P = [ r(lsq.basis[Jbasis]) for r in regularisers ]
+      Ψ, Y = regularise!(Ψ, Y, P)
+   end
 
    # this should be it ...
    return Ψ, Y
