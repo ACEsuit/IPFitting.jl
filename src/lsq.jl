@@ -97,8 +97,19 @@ function lsq_matrix!(Ψ, db, configtypes, datatypes, Ibasis)
 end
 
 
-function regularise!(Ψ, Y, P::Vector{<:Matrix})
+function _regularise!(Ψ::Matrix{T}, Y::Vector{T}, basis, regularisers) where {T}
+   # assemble the regularisers
+   P = Matrix{T}[]
+   for reg in regularisers
+      if reg is Matrix
+         push!(P, reg)
+      else
+         push!(P, Matrix(reg, basis))
+      end
+   end
+   # check they all have the correct size
    @assert all( (size(p, 2) == ncols) for p in P )
+   # append them to Y, Ψ
    nrold = size(Ψ, 1)
    nrows = sum(size(p, 1) for p in P)
    ncols = size(Ψ, 2)
@@ -127,7 +138,6 @@ function get_lsq_system(db::LsqDB; verbose = true,
    # we need to be able to call `length` on `Ibasis`
    Jbasis = ((Ibasis == Colon()) ? (1:length(db.basis)) : Ibasis)
 
-   # # reference energy => we assume the first basis function is 1B
    # # TODO TODO TODO => create some suitable "hooks"
    # E0 = lsq.basis[1]()
    # # and while we're at it, subtract E0 from Y
@@ -161,8 +171,7 @@ function get_lsq_system(db::LsqDB; verbose = true,
 
    # regularise
    if regularisers != nothing
-      P = [ r(lsq.basis[Jbasis]) for r in regularisers ]
-      Ψ, Y = regularise!(Ψ, Y, P)
+      Ψ, Y = regularise!(Ψ, Y, lsq.basis[Jbasis], regularisers)
    end
 
    # this should be it ...
