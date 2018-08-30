@@ -25,7 +25,7 @@ using StaticArrays
 using JuLIP: AbstractCalculator, Atoms
 using NBodyIPs: OneBody, NBodyIP
 using NBodyIPFitting: Dat, LsqDB, data, weighthook
-using NBodyIPFitting.Data: observation, hasobservation
+using NBodyIPFitting.Data: observation, hasobservation, configname, configtype
 using NBodyIPFitting.DataTypes: ENERGY
 import NBodyIPFitting
 const Err = NBodyIPFitting.Errors
@@ -119,6 +119,23 @@ function _regularise!(Ψ::Matrix{T}, Y::Vector{T}, basis, regularisers) where {T
    return reshape(Ψ, nrold+nrows, ncols), Y
 end
 
+"""
+generate a new dictionary of configtype weights where configweights is a
+dictionary of configname weights
+"""
+function _extend_configweights(configweights::Dict, configtypes)
+   names = keys(configweights) |> collect
+   newweights = Dict{String, Float64}()
+   for ct in configtypes
+      cn = configname(ct)
+      if cn in names
+         newweights[ct] = configweights[cn]
+      end
+   end
+   return newweights
+end
+
+
 
 """
 `get_lsq_system(db::LsqDB; kwargs...) -> Ψ, Y`
@@ -137,6 +154,8 @@ function get_lsq_system(db::LsqDB; verbose = true,
                         regularisers = nothing )
    # we need to be able to call `length` on `Ibasis`
    Jbasis = ((Ibasis == Colon()) ? (1:length(db.basis)) : Ibasis)
+
+   configweights = _extend_configweights(configweights, keys(db.data_groups))
 
    # # TODO TODO TODO => create some suitable "hooks"
    # E0 = lsq.basis[1]()
@@ -177,6 +196,7 @@ function get_lsq_system(db::LsqDB; verbose = true,
    # this should be it ...
    return Ψ, Y
 end
+
 
 """
 `lsqfit(db; kwargs...) -> IP, errs`
@@ -233,15 +253,15 @@ function lsqfit(db::LsqDB;
       verbose && println("Relative RMSE on training set: ", rel_rms)
    end
 
+   # compute errors
+   errs = Err.lsqerrors(db, c, Jbasis; confignames=keys(configweights), E0=E0)
+
    if E0 != 0
       basis = [ OneBody(E0); db.basis[Ibasis] ]
       c = [1.0; c]
    else
       basis = db.basis[Ibasis]
    end
-
-   # compute errors
-   errs = Err.lsqerrors(db, c, Jbasis; configtypes=keys(configweights), E0=E0)
 
    return NBodyIP(basis, c), errs
 end

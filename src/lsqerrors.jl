@@ -3,7 +3,7 @@ module Errors
 
 using JuLIP: Atoms, energy, forces
 using NBodyIPFitting: LsqDB, Dat, configtype, weighthook
-using NBodyIPFitting.Data: observation
+using NBodyIPFitting.Data: observation, hasobservation, configname
 
 export lsqerrors, table, table_relative, table_absolute
 # , scatter_E, scatter_F
@@ -39,21 +39,37 @@ LsqErrors(configtypes) =
          LsqErrors(errdict(configtypes), errdict(configtypes),
                    errdict(configtypes), errdict(configtypes) )
 
-function lsqerrors(db, c, Ibasis; configtypes = Colon(), E0 = nothing)
-   if configtypes isa Colon
-      configtypes = collect(keys(db.data_groups))
+function lsqerrors(db, c, Ibasis; confignames = Colon(), E0 = nothing)
+   if confignames isa Colon
+      confignames = configname.(collect(keys(db.data_groups)))
    end
    @assert E0 != nothing
 
    # create the dict for the fit errors
-   errs = LsqErrors(configtypes)
+   errs = LsqErrors(confignames)
+   lengths = Dict{String, Dict{String, Int}}()
+   for cn in confignames
+      lengths[cn] = Dict{String, Int}()
+   end
+
    # scatterE = Dict{String, Tuple{Vector{Float64}, Vector{Float64}}}()
    # scatterF = Dict{String, Tuple{Vector{Float64}, Vector{Float64}}}()
 
    idx = 0
-   for ct in configtypes
+   for ct in keys(db.data_groups)
+      cn = configname(ct)
+      if !(cn in confignames)
+         continue
+      end
       # loop through observation types in the current config type
       for ot in keys(db.kron_groups[ct])
+         if !haskey(errs.rmse[cn], ot)
+            errs.rmse[cn][ot] = 0.0
+            errs.nrm2[cn][ot] = 0.0
+            errs.mae[cn][ot] = 0.0
+            errs.nrm1[cn][ot] = 0.0
+            lengths[cn][ot] = 0
+         end
          # assemble the observation vector
          y = Float64[]
          for d in db.data_groups[ct]
@@ -63,10 +79,21 @@ function lsqerrors(db, c, Ibasis; configtypes = Colon(), E0 = nothing)
          block = reshape(db.kron_groups[ct][ot][:,:,Ibasis], :, length(Ibasis))
          # compute the various errors for this ct/ot combination
          w = weighthook(ot, db.data_groups[ct][1])
-         errs.rmse[ct][ot] = w * norm(block * c - y) / sqrt(length(y))
-         errs.nrm2[ct][ot] = w * norm(y) / sqrt(length(y))
-         errs.mae[ct][ot]  = w * norm(block * c - y, 1) / length(y)
-         errs.nrm1[ct][ot] = w * norm(y, 1) / length(y)
+         errs.rmse[cn][ot] += w^2 * norm(block * c - y)^2
+         errs.nrm2[cn][ot] += w^2 * norm(y)^2
+         errs.mae[cn][ot]  += w^2 * norm(block * c - y, 1)
+         errs.nrm1[cn][ot] += w^2 * norm(y, 1)
+         lengths[cn][ot] += length(y)
+      end
+   end
+
+   for cn in confignames
+      for ot in keys(errs.rmse[cn])
+         len = lengths[cn][ot]
+         errs.rmse[cn][ot] = sqrt( errs.rmse[cn][ot] / len )
+         errs.nrm2[cn][ot] = sqrt( errs.nrm2[cn][ot] / len )
+         errs.mae[cn][ot] = errs.mae[cn][ot] / len
+         errs.nrm1[cn][ot] = errs.nrm1[cn][ot] / len
       end
    end
 
@@ -124,8 +151,8 @@ function table_absolute(errs::LsqErrors)
    s_set = ""
    for ct in keys(errs.rmse)  # ct in configtypes
 
-      lct = min(length(ct), 13)
-      s = @sprintf(" %13s || %7.4f | %7.4f | %7.4f || %7.4f | %7.4f | %7.4f \n",
+      lct = min(length(ct), 16)
+      s = @sprintf(" %16s || %7.4f | %7.4f | %7.4f || %7.4f | %7.4f | %7.4f \n",
                    ct[1:lct],
                    rmse(errs, ct, "E"), rmse(errs, ct, "F"), rmse(errs, ct, "V"),
                     mae(errs, ct, "E"),  mae(errs, ct, "F"),  mae(errs, ct, "V") )

@@ -31,8 +31,8 @@ export configtype, configname, weight, load_data
 Atoms(d) = d.at
 length(d::Dat) = length(d.at)
 configtype(d::Dat) = d.configtype
-configname(d::Dat) = configname(s::String)
-configname(d::Dat) = match(r"[a-z]*", configtype(d)).match
+configname(d::Dat) = configname(configtype(d))
+configname(s::String) = match(r"[a-z,0-9,_]*", s).match
 energy(d::Dat) = haskey(d.D, ENERGY) ? devec(Val(:E), d.D[ENERGY]) : nothing
 forces(d::Dat) = haskey(d.D, FORCES) ? devec(Val(:F), d.D[FORCES]) : nothing
 virial(d::Dat) = haskey(d.D, VIRIAL) ? devec(Val(:V), d.D[VIRIAL]) : nothing
@@ -133,11 +133,17 @@ function read_xyz(fname; verbose=true, index = ":",
 
       idx += 1
       at = read_Atoms(atpy)
+      E = read_energy(atpy)
+      F = read_forces(atpy)
+      V = read_virial(atpy)
+      EFV = ""
+      (E != nothing) && (EFV *= "E")
+      (F != nothing) && (EFV *= "F")
+      (V != nothing) && (EFV *= "V")
+
       data[idx] = Dat( at,
-                       config_type * ":$(length(at))";
-                       E = read_energy(atpy),
-                       F = read_forces(atpy),
-                       V = read_virial(atpy) )
+                       config_type * ":$(length(at))$(EFV)";
+                       E = E, F = F, V = V )
    end
    verbose && toc()
    return data[1:idx]
