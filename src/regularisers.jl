@@ -30,7 +30,11 @@ terms.
 """
 module Regularisers
 
+using StaticArrays
 using Sobol: SobolSeq, next!
+using JuLIP: AbstractCalculator
+
+import Base: Matrix
 
 export NBRegulariser, NBReg
 
@@ -53,8 +57,8 @@ NBRegulariser(N, r0, r1;
    NBRegulariser(N, npoints, creg, r0, r1, sequence, Val(N))
 
 
-Matrix(reg::NBRegulariser{N}, basis) =
-      _regularise(N, basis, reg.r0, reg.r1, reg.sequence, reg.creg, reg.npoints)
+Matrix(reg::NBRegulariser, basis) =
+      _regularise(reg.N, basis, reg.r0, reg.r1, reg.sequence, reg.creg, reg.npoints)
 
 
 function regularise_2b(B::Vector, r0::Number, r1::Number, creg, Nquad)
@@ -225,7 +229,7 @@ end
 function laplace_regulariser(x::SVector{DIM,T}, B::Vector{TB},
                              temp::Vector{T},
                              inv_t
-                             ) where {DIM, T, TB <: NBody}
+                             ) where {DIM, T, TB <: AbstractCalculator}
    if !isleaftype(TB)
       warn("laplace_regulariser: `TB` is not a leaf type")
    end

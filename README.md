@@ -37,8 +37,8 @@ desc = BondAngleDesc("exp(- (r/$r0 - 1.0))", (:cos, $(rcut-1), $rcut))
 ```
 We can then generate basis functions using `nbpolys`, e.g.,
 ```julia
-#         body-order, descriptor, degree
-B4 = nbpolys(4,        desc,       8)
+#            body-order, descriptor, degree
+B4 = nbpolys(4,          desc,       8)
 ```
 In practise, one would normally specify different cut-offs and space transforms
 for different body-orders. Suppose these give descriptors `D2, D3, D4`, then
@@ -47,7 +47,7 @@ a 4-body basis can be constructed via
 B = [ nbpolys(2, D2, 14); nbpolys(3, D3, 11); nbpolys(4, D4, 8) ]
 ```
 
-For more complex basis sets, see below.
+For more details and more complex basis sets, see below.
 
 
 ### Step 3: Precompute a Lsq system

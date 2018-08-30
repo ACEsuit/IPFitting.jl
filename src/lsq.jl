@@ -101,7 +101,7 @@ function _regularise!(Ψ::Matrix{T}, Y::Vector{T}, basis, regularisers) where {T
    # assemble the regularisers
    P = Matrix{T}[]
    for reg in regularisers
-      if reg is Matrix
+      if reg isa Matrix
          push!(P, reg)
       else
          push!(P, Matrix(reg, basis))

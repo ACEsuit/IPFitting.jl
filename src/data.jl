@@ -26,11 +26,13 @@ import Base: length, Dict
 using PyCall
 @pyimport ase.io as ase_io
 
-export configtype, weight, load_data
+export configtype, configname, weight, load_data
 
 Atoms(d) = d.at
 length(d::Dat) = length(d.at)
 configtype(d::Dat) = d.configtype
+configname(d::Dat) = configname(s::String)
+configname(d::Dat) = match(r"[a-z]*", configtype(d)).match
 energy(d::Dat) = haskey(d.D, ENERGY) ? devec(Val(:E), d.D[ENERGY]) : nothing
 forces(d::Dat) = haskey(d.D, FORCES) ? devec(Val(:F), d.D[FORCES]) : nothing
 virial(d::Dat) = haskey(d.D, VIRIAL) ? devec(Val(:V), d.D[VIRIAL]) : nothing
@@ -104,7 +106,7 @@ function read_xyz(fname; verbose=true, index = ":",
       println("Reading in $fname ...")
    end
    at_list = ase_io.read(fname, index=index)
-   data = Vector{Dat{Float64}}(length(at_list))
+   data = Vector{Dat}(length(at_list))
    idx = 0
    if verbose
       println("Processing data ...")
@@ -130,8 +132,9 @@ function read_xyz(fname; verbose=true, index = ":",
       end
 
       idx += 1
-      data[idx] = Dat( read_Atoms(atpy),
-                       config_type;
+      at = read_Atoms(atpy)
+      data[idx] = Dat( at,
+                       config_type * ":$(length(at))";
                        E = read_energy(atpy),
                        F = read_forces(atpy),
                        V = read_virial(atpy) )

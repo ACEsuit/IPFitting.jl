@@ -110,4 +110,4 @@ function devec end
 function evaluate_lsq end
 
 weighthook(::Val, d::Dat) = 1.0
-weighthook(s::String, d::Dat) = weighthook(Val(Symbol(s)), d) 
+weighthook(s::String, d::Dat) = weighthook(Val(Symbol(s)), d)

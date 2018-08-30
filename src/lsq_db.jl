@@ -88,6 +88,8 @@ import NBodyIPFitting.FIO
 
 import Base: flush, append!
 
+export LsqDB
+
 const KRONFILE = "_kron.h5"
 const INFOFILE = "_info.jld2"
 
@@ -126,6 +128,8 @@ save_info(db) = save_info(dbpath(db), db)
 function save_kron(dbpath, db)
    if isfile(kronfile(dbpath))
       warn("""trying to save `kron`, but kronfile already exists; aborting""")
+      # TODO: try to save it in a temp file
+      return nothing
    end
    FIO.save(kronfile(dbpath), db.kron_groups)
 end
@@ -160,6 +164,7 @@ function initdb(basedir, dbname)
 end
 
 function initdb(dbpath)
+   # TODO: seems this fails to detect an existing database?
    @assert !isfile(infofile(dbpath))
    @assert !isfile(kronfile(dbpath))
    # check that we can actually create and delete this file
@@ -260,7 +265,10 @@ B to A converting it into an n x (m+1) x k array.
 """
 function _append(A::Array{T, 3}, B::Array{T, 2}) where {T}
    szA = size(A)
-   @assert szA[1] == size(B,1) && szA[3] == size(B, 2)
+   if !(szA[1] == size(B,1) && szA[3] == size(B, 2))
+      @show size(A), size(B)
+      @assert (szA[1] == size(B,1) && szA[3] == size(B, 2))
+   end
    Anew = Array{T}(szA[1], szA[2]+1, szA[3])
    Anew[:, 1:szA[2], :] .= A
    Anew[:, end, :] .= B
