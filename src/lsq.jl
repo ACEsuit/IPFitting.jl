@@ -62,8 +62,8 @@ function observations(db::LsqDB,
                w = weighthook(dt, dat)
                o = observation(dat, dt)
                # TODO: This is a hack => can we replace it with a hook?
-               if dt == ENERGY
-                  # subtract the 1-body reference energy
+               if dt == ENERGY # subtract the 1-body reference energy
+                  o = copy(o)
                   o[1] -= length(dat) * E0
                end
                append!(Y, o)
@@ -190,7 +190,7 @@ function get_lsq_system(db::LsqDB; verbose = true,
 
    # regularise
    if regularisers != nothing
-      Ψ, Y = regularise!(Ψ, Y, lsq.basis[Jbasis], regularisers)
+      Ψ, Y = _regularise!(Ψ, Y, db.basis[Jbasis], regularisers)
    end
 
    # this should be it ...

@@ -73,7 +73,13 @@ function lsqerrors(db, c, Ibasis; confignames = Colon(), E0 = nothing)
          # assemble the observation vector
          y = Float64[]
          for d in db.data_groups[ct]
-            append!(y, observation(d, ot))
+            o = observation(d, ot)
+            # TODO: hack again!!!
+            if ot == "E"
+               o = copy(o)
+               o[1] -= length(d) * E0
+            end
+            append!(y, o)
          end
          # get the lsq block
          block = reshape(db.kron_groups[ct][ot][:,:,Ibasis], :, length(Ibasis))

@@ -189,9 +189,11 @@ function LsqDB(dbpath::AbstractString,
    # end
    db = LsqDB(basis, data_groups, kron_groups, dbpath)
    db_lock = SpinLock()
+   lens = [length(d) for d in data]
    # parallel assembly of the LSQ matrix
    tfor( n -> safe_append!(db, db_lock, data[n]), 1:length(data);
-         verbose=verbose, msg = "Assemble LSQ blocks" )
+         verbose=verbose, msg = "Assemble LSQ blocks",
+         costs = lens)
    if dbpath != ""
       verbose && info("Writing db to disk...")
       try

@@ -3,20 +3,22 @@ module Tools
 
 using ProgressMeter, Base.Threads
 
-function tfor(f, rg; verbose=true, msg="")
+function tfor(f, rg; verbose=true, msg="tfor", costs = ones(Int, length(rg)))
+   p = Progress(sum(costs))
+   p_ctr = 0
    if nthreads() == 1
       verbose && println("$msg in serial")
       dt = verbose ? 1.0 : Inf
       tic()
-      @showprogress dt for n in rg
+      for (i, n) in enumerate(rg)
          f(n)
+         p_ctr += costs[i]
+         ProgressMeter.update!(p, p_ctr)
       end
       verbose && toc()
    else
       if verbose
          println("$msg with $(nthreads()) threads")
-         p = Progress(length(rg))
-         p_ctr = 0
          p_lock = SpinLock()
       end
       tic()
@@ -24,7 +26,7 @@ function tfor(f, rg; verbose=true, msg="")
          f(n)
          if verbose
             lock(p_lock)
-            p_ctr += 1
+            p_ctr += costs[i]
             ProgressMeter.update!(p, p_ctr)
             unlock(p_lock)
          end

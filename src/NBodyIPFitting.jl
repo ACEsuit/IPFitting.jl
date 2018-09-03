@@ -1,7 +1,9 @@
 #
 # TODO
 #  * change datatypes => observationtypes
-#  * load the kron_groups on demand
+#  * load the kron_groups on demand (mmap)
+#  * create LsqSettings struct => to store inside IP
+#    as well as pass around the hooks
 #
 
 """
@@ -34,7 +36,7 @@ include("data.jl")
 
 include("lsq_db.jl")
 @reexport using NBodyIPFitting.DB
-# export LsqDB 
+# export LsqDB
 
 include("lsqerrors.jl")
 @reexport using NBodyIPFitting.Errors

@@ -31,14 +31,17 @@ terms.
 module Regularisers
 
 using StaticArrays
-using Sobol: SobolSeq, next!
 using JuLIP: AbstractCalculator
+using JuLIP.Potentials: evaluate_d
+using NBodyIPs: bodyorder
 
 import Base: Matrix
 
-export NBRegulariser, NBReg
+export BLRegulariser, BLReg, AbstractRegulariser
 
-struct NBRegulariser{N, T}
+abstract type AbstractRegulariser{N} end
+
+struct BLRegulariser{N, T} <: AbstractRegulariser{N}
    N::Int
    npoints::Int
    creg::T
@@ -48,17 +51,38 @@ struct NBRegulariser{N, T}
    valN::Val{N}
 end
 
-const NBReg = NBRegulariser
+struct BARegulariser{N, T} <: AbstractRegulariser{N}
+   N::Int
+   npoints::Int
+   creg::T
+   r0::T
+   r1::T
+   sequence::Symbol
+   valN::Val{N}
+end
 
-NBRegulariser(N, r0, r1;
+const BLReg = BLRegulariser
+const BAReg = BARegulariser
+
+BLRegulariser(N, r0, r1;
              npoints = Nquad(Val(N)),
              creg = 0.1,
              sequence = :sobol) =
-   NBRegulariser(N, npoints, creg, r0, r1, sequence, Val(N))
+   BLRegulariser(N, npoints, creg, r0, r1, sequence, Val(N))
 
+BARegulariser(N, r0, r1;
+             npoints = Nquad(Val(N)),
+             creg = 0.1,
+             sequence = :sobol) =
+   BARegulariser(N, npoints, creg, r0, r1, sequence, Val(N))
 
-Matrix(reg::NBRegulariser, basis) =
-      _regularise(reg.N, basis, reg.r0, reg.r1, reg.sequence, reg.creg, reg.npoints)
+# ---------------------------------------------------------------------------
+
+include("sobol.jl")
+
+# ---------------------------------------------------------------------------
+
+Matrix(reg::BLRegulariser, basis) = _regularise(reg, basis)
 
 
 function regularise_2b(B::Vector, r0::Number, r1::Number, creg, Nquad)
@@ -67,116 +91,9 @@ function regularise_2b(B::Vector, r0::Number, r1::Number, creg, Nquad)
    Φ = zeros(Nquad, length(B))
    h = (r1 - r0) / (Nquad-1)
    for (ib, b) in zip(I2, B[I2]), (iq, r) in enumerate(rr)
-      Φ[iq, ib] = evaluate_dd(b, r) * sqrt(creg * h)
+      Φ[iq, ib] = (evaluate_d(b, r+1e-2)-evaluate_d(b, r-1e-2))/(2e-2) * sqrt(creg * h)
    end
    return Φ
-end
-
-function inv_transform(x::T, r0::T, r1::T, transform)::T where {T}
-   TOL = 1e-6
-   # Secant Bisection Method (transform is monotone)
-   # Roots.jl is too slow (why?!?)
-   t0 = transform(r0) - x
-   t1 = transform(r1) - x
-   r = 0.5*(r0+r1)
-   while abs(r1 - r0) > TOL
-      r = (r1 * t0 - r0 * t1) / (t0 - t1)
-      t = transform(r) - x
-      if abs(t) < 1e-7
-         return r
-      end
-      if t*t0 > 0
-         r0 = r
-         t0 = t
-      else
-         r1 = r
-         t1 = t
-      end
-   end
-   return r
-end
-
-function cayley_menger(r::SVector{6, T}) where {T}
-   A = SMatrix{5,5,T}(
-      #       r12     r13     r14
-      0.0,    r[1]^2, r[2]^2, r[3]^2, 1.0,
-      # r12           r23     r24
-      r[1]^2, 0.0,    r[4]^2, r[5]^2, 1.0,
-      # r13   r23             r34
-      r[2]^2, r[4]^2, 0.0,    r[6]^2, 1.0,
-      # r14   r24     r34
-      r[3]^2, r[5]^2, r[6]^2, 0.0,    1.0,
-      1.0,    1.0,    1.0,    1.0,    0.0 )
-   return det(A)
-end
-
-is_simplex(r::SVector{3}) = ((r[1] <= r[2]+r[3]+1e-4) &&
-                             (r[2] <= r[3]+r[1]+1e-4) &&
-                             (r[3] <= r[1]+r[2]+1e-4))
-
-is_simplex(r::SVector{6}) = is_simplex(r[SVector(1,2,3)]) &&
-                            cayley_menger(r) >= -1e-4
-
-"""
-* N : body-order
-* D : dictionary
-* r0, r1 : upper and lower bound on the bond-lengths
-"""
-function _sobol_seq(npoints, N, D, r0, r1;
-                    inv_t = x -> inv_transform(x, r0, r1, D.transform),
-                    verbose = false)
-   # compute the boundary in transformed coordinates
-   x0 = D.transform(r1)
-   x1 = D.transform(r0)
-   # call the inner sobol function (function barrier)
-   return _sobol_inner(Val((N*(N-1)) ÷ 2), npoints, inv_t, x0, x1, verbose)
-end
-
-function _sobol_inner(::Val{DIM}, npoints, inv_t, x0::T, x1::T, verbose=false ) where {DIM, T}
-   # upper and lower bounds on the transformed variables
-   @assert x0 < x1
-   # Sobol sequence in the [x0, x1]^dim hypercube
-   s = SobolSeq(DIM, x0*ones(DIM), x1*ones(DIM))
-   # temporary storage
-   t = zero(MVector{DIM, T})
-   # output storage
-   X = SVector{DIM, T}[]
-   # generate points
-   failed = 0
-   succesful = 0
-   while length(X) < npoints
-      next!(s, t)
-      r = inv_t.(t)::SVector{DIM,T}
-      if is_simplex(r)
-         push!(X, SVector(t))
-         succesful += 1
-      else
-         failed += 1
-      end
-   end
-   if verbose
-      @show failed, succesful
-   end
-   return X
-end
-
-function _cartesian_seq(npoint, N, D, r0, r1; inv_t=inv_t)
-   dim = (N*(N-1))÷2
-   ndim = ceil(Int, npoint^(1/dim))
-   x0 = D.transform(r0)
-   x1 = D.transform(r1)
-   xx = linspace(x0, x1, ndim) |> collect
-   oo = ones(ndim)
-   if N == 2
-      return xx
-   end
-   if N == 3
-      Xmat = [kron(xx, oo, oo) kron(oo, xx, oo) kron(oo, oo, xx)]'
-      X = vecs(Xmat)
-      X1 = X[ [ is_simplex(inv_t.(x)) for x in X ] ]
-      return X1
-   end
-   error("`_cartesian_seq` is only implemented for N = 2, 3")
 end
 
 
@@ -184,15 +101,18 @@ Nquad(::Val{2}) = 20
 Nquad(::Val{3}) = 1000
 Nquad(::Val{4}) = 10_000
 
-
-function _regularise(N::Integer, B::Vector{<: AbstractCalculator}, r0, r1,
-                    sequence, creg, npoints, inv_t = nothing )
+#
+# this converts the Regulariser type information to a matrix that can be
+# attached to the LSQ problem .
+#
+function Matrix(reg::AbstractRegulariser{N}, B::Vector{<: AbstractCalculator})
 
    # 2B is a bit simpler than the rest, treat it separately
    if N == 2
-      return regularise_2b(B, r0, r1, creg, npoints)
+      return regularise_2b(B, reg.r0, reg.r1, reg.creg, reg.npoints)
    end
 
+   # TODO: this assumes that all elements of B have the same descriptor
    # get the indices of the N-body basis functions
    Ib = find(bodyorder.(B) .== N)
    D = B[Ib[1]].D
@@ -200,31 +120,51 @@ function _regularise(N::Integer, B::Vector{<: AbstractCalculator}, r0, r1,
    # if not, then this regularisation is not valid
    @assert all(b.D == D  for b in B[Ib])
 
-   if inv_t == nothing
-      inv_t = x -> inv_transform(x, r0, r1, D.transform)
+   # inverse transform
+   inv_t = x -> inv_transform(x, reg.r0, reg.r1, D.transform)
+
+   # filter
+   if reg isa BLRegulariser
+      filter = x -> bl_is_simplex( inv_t.(x) )
+      x0 = D.transform(reg.r0) * SVector(ones((N*(N-1))÷2)...)
+      x1 = D.transform(reg.r1) * SVector(ones((N*(N-1))÷2)...)
+   else if reg isa BARegulariser
+      filter = x -> ba_is_simplex( inv_t.(SVector(x[1], x[2], x[3])),
+                                   SVector(x[4], x[5], x[6]) )
+      x0 = vcat( D.transform(reg.r0) * SVector(ones(N)...),
+                 - SVector(ones( ((N-1)*(N-2))÷2 )...) )
+      x1 = vcat( D.transform(reg.r1) * SVector(ones(N)...),
+                 SVector(ones( ((N-1)*(N-2))÷2 )...) )
+   else
+      error("Unknown type of reg: `typeof(reg) == $(typeof(reg))`")
    end
 
-   if sequence == :sobol
+   if reg.sequence == :sobol
       # construct a low discrepancy sequence
-      X = _sobol_seq(npoints, N, D, r0, r1; inv_t=inv_t)
-   elseif sequence == :cart
-      X = _cartesian_seq(npoints, N, D, r0, r1; inv_t=inv_t)
-   elseif sequence isa Vector # assume it is a data vector
-      X = _data_seq(npoints, N, D, r0, r1; inv_t=inv_t)
+      X = filtered_sobol(x0, x1, filter; npoints = 100*reg.npoints, nfiltered=reg.npoints)
+   elseif reg.sequence == :cart
+      error("TODO: implement `sequence == :cart`")
+   elseif reg.sequence isa Vector # assume it is a data vector
+      # X = _data_seq(npoints, N, D, r0, r1; inv_t=inv_t)
+      error("TODO: implement `sequence isa Vector`")
    else
       error("unknown argument `sequence = $sequence`")
    end
 
    # loop through sobol points and collect the laplacians at each point.
-   dim = (N * (N-1)) ÷ 2
+   return reg.creg * assemble_reg_matrix(X, [b for b in B[Ib]], nB, Ib, inv_t)
+end
+
+
+function assemble_reg_matrix(X, B, nB, Ib, inv_t)
    Ψ = zeros(length(X), length(B))
    temp = zeros(length(Ib))
-   B_N = [b for b in B[Ib]]
    for (ix, x) in enumerate(X)
-      Ψ[ix, Ib] = creg * laplace_regulariser(x, B_N, temp, inv_t)
+      Ψ[ix, Ib] = laplace_regulariser(x, B, temp, inv_t)
    end
    return Ψ
 end
+
 
 function laplace_regulariser(x::SVector{DIM,T}, B::Vector{TB},
                              temp::Vector{T},
@@ -249,7 +189,4 @@ function laplace_regulariser(x::SVector{DIM,T}, B::Vector{TB},
    end
 
    return L/h^2
-end
-
-
 end
