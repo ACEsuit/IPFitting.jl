@@ -99,24 +99,19 @@ end
 
 function _regularise!(Ψ::Matrix{T}, Y::Vector{T}, basis, regularisers) where {T}
    # assemble the regularisers
-   P = Matrix{T}[]
+   Ψreg = Matrix{Float64}(0, size(Ψ, 2))
+   Yreg = Float64[]
    for reg in regularisers
       if reg isa Matrix
-         push!(P, reg)
+         P = reg
       else
-         push!(P, Matrix(reg, basis))
+         P = Matrix(reg, basis)
       end
+      Ψreg = vcat(Ψreg, P)
+      Yreg = vcat(Yreg, zeros(size(P, 1)))
    end
    # check they all have the correct size
-   @assert all( (size(p, 2) == ncols) for p in P )
-   # append them to Y, Ψ
-   nrold = size(Ψ, 1)
-   nrows = sum(size(p, 1) for p in P)
-   ncols = size(Ψ, 2)
-   append!(Y, zeros(nrows))
-   Ψ = Ψ[:]
-   append!(Ψ, vcat(P...))
-   return reshape(Ψ, nrold+nrows, ncols), Y
+   return vcat(Ψ, Ψreg), vcat(Y, Yreg)
 end
 
 """

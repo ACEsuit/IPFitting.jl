@@ -33,11 +33,12 @@ module Regularisers
 using StaticArrays
 using JuLIP: AbstractCalculator
 using JuLIP.Potentials: evaluate_d
-using NBodyIPs: bodyorder
+using NBodyIPs: bodyorder, transform, evaluate_many_ricoords!
 
 import Base: Matrix
 
-export BLRegulariser, BLReg, AbstractRegulariser
+export BLRegulariser, BLReg, BARegulariser, BAReg
+
 
 abstract type AbstractRegulariser{N} end
 
@@ -93,19 +94,28 @@ function regularise_2b(B::Vector, r0::Number, r1::Number, creg, Nquad)
    for (ib, b) in zip(I2, B[I2]), (iq, r) in enumerate(rr)
       Φ[iq, ib] = (evaluate_d(b, r+1e-2)-evaluate_d(b, r-1e-2))/(2e-2) * sqrt(creg * h)
    end
-   return Φ
+   @show creg
+   return creg * Φ
 end
 
 
-Nquad(::Val{2}) = 20
+Nquad(::Val{2}) = 100
 Nquad(::Val{3}) = 1000
 Nquad(::Val{4}) = 10_000
+
+_bainvt(inv_t, x::StaticVector{1}) =
+      inv_t.(x), SVector()
+_bainvt(inv_t, x::StaticVector{3}) =
+      SVector(inv_t(x[1]), inv_t(x[2])), SVector(x[3])
+_bainvt(inv_t, x::StaticVector{6}) =
+      SVector(inv_t(x[1]), inv_t(x[2]), inv_t(x[3])),  SVector(x[4], x[5], x[6])
 
 #
 # this converts the Regulariser type information to a matrix that can be
 # attached to the LSQ problem .
 #
-function Matrix(reg::AbstractRegulariser{N}, B::Vector{<: AbstractCalculator})
+function Matrix(reg::AbstractRegulariser{N}, B::Vector{<: AbstractCalculator}
+                ) where {N}
 
    # 2B is a bit simpler than the rest, treat it separately
    if N == 2
@@ -120,20 +130,22 @@ function Matrix(reg::AbstractRegulariser{N}, B::Vector{<: AbstractCalculator})
    # if not, then this regularisation is not valid
    @assert all(b.D == D  for b in B[Ib])
 
-   # inverse transform
-   inv_t = x -> inv_transform(x, reg.r0, reg.r1, D.transform)
+   # scalar inverse transform
+   inv_t = x -> inv_transform(x, reg.r0, reg.r1, D)
 
    # filter
    if reg isa BLRegulariser
-      filter = x -> bl_is_simplex( inv_t.(x) )
-      x0 = D.transform(reg.r0) * SVector(ones((N*(N-1))÷2)...)
-      x1 = D.transform(reg.r1) * SVector(ones((N*(N-1))÷2)...)
-   else if reg isa BARegulariser
-      filter = x -> ba_is_simplex( inv_t.(SVector(x[1], x[2], x[3])),
-                                   SVector(x[4], x[5], x[6]) )
-      x0 = vcat( D.transform(reg.r0) * SVector(ones(N)...),
+      # vectorial inverse transform
+      inv_tv = x -> inv_t.(x)
+      filter = x -> bl_is_simplex( inv_tv(x) )
+      x0 = transform(D, reg.r0) * SVector(ones((N*(N-1))÷2)...)
+      x1 = transform(D, reg.r1) * SVector(ones((N*(N-1))÷2)...)
+   elseif reg isa BARegulariser
+      inv_tv = x -> _bainvt(inv_t, x)
+      filter = x -> ba_is_simplex( inv_tv(x)... )
+      x0 = vcat( transform(D, reg.r0) * SVector(ones(N-1)...),
                  - SVector(ones( ((N-1)*(N-2))÷2 )...) )
-      x1 = vcat( D.transform(reg.r1) * SVector(ones(N)...),
+      x1 = vcat( transform(D, reg.r1) * SVector(ones(N-1)...),
                  SVector(ones( ((N-1)*(N-2))÷2 )...) )
    else
       error("Unknown type of reg: `typeof(reg) == $(typeof(reg))`")
@@ -141,7 +153,7 @@ function Matrix(reg::AbstractRegulariser{N}, B::Vector{<: AbstractCalculator})
 
    if reg.sequence == :sobol
       # construct a low discrepancy sequence
-      X = filtered_sobol(x0, x1, filter; npoints = 100*reg.npoints, nfiltered=reg.npoints)
+      X = filtered_sobol(x0, x1, filter; npoints = 10*reg.npoints, nfiltered=reg.npoints)
    elseif reg.sequence == :cart
       error("TODO: implement `sequence == :cart`")
    elseif reg.sequence isa Vector # assume it is a data vector
@@ -152,41 +164,42 @@ function Matrix(reg::AbstractRegulariser{N}, B::Vector{<: AbstractCalculator})
    end
 
    # loop through sobol points and collect the laplacians at each point.
-   return reg.creg * assemble_reg_matrix(X, [b for b in B[Ib]], nB, Ib, inv_t)
+   @show reg.creg
+   return reg.creg * assemble_reg_matrix(X, [b for b in B[Ib]], length(B), Ib, inv_tv)
 end
 
 
-function assemble_reg_matrix(X, B, nB, Ib, inv_t)
-   Ψ = zeros(length(X), length(B))
+function assemble_reg_matrix(X, B, nB, Ib, inv_tv)
+   Ψ = zeros(length(X), nB)
    temp = zeros(length(Ib))
    for (ix, x) in enumerate(X)
-      Ψ[ix, Ib] = laplace_regulariser(x, B, temp, inv_t)
+      Ψ[ix, Ib] = laplace_regulariser(x, B, temp, inv_tv)
    end
    return Ψ
 end
 
 
-function laplace_regulariser(x::SVector{DIM,T}, B::Vector{TB},
-                             temp::Vector{T},
-                             inv_t
-                             ) where {DIM, T, TB <: AbstractCalculator}
-   if !isleaftype(TB)
+function laplace_regulariser(x::SVector{DIM,T}, B::Vector{<: AbstractCalculator},
+                             temp::Vector{T}, inv_tv) where {DIM, T}
+   if !isleaftype(eltype(B))
       warn("laplace_regulariser: `TB` is not a leaf type")
    end
    h = 1e-2
-   r = inv_t.(x)
-   evaluate_many!(temp, B, r)
+   r = inv_tv(x)
+   evaluate_many_ricoords!(temp, B, r)
    L = 2 * DIM * copy(temp)
 
    EE = @SMatrix eye(DIM)
    for j = 1:DIM
-      rp = inv_t.(x + h * EE[:,j])
-      evaluate_many!(temp, B, rp)
+      rp = inv_tv(x + h * EE[:,j])
+      evaluate_many_ricoords!(temp, B, rp)
       L -= temp
-      rm = inv_t.(x - h * EE[:,j])
-      evaluate_many!(temp, B, rm)
+      rm = inv_tv(x - h * EE[:,j])
+      evaluate_many_ricoords!(temp, B, rm)
       L -= temp
    end
 
    return L/h^2
+end
+
 end

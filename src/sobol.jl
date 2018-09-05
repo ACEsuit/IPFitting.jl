@@ -8,7 +8,7 @@ using Sobol: SobolSeq, next!
 function filtered_sobol(x0, x1, filter; npoints=nothing,
                                         nfiltered=nothing)
    @assert npoints isa Integer && nfiltered isa Integer
-   @assert all(x0 .< x1)
+   x0, x1 = min.(x0, x1), max.(x0, x1) # @assert all(x0 .< x1)
    return _sobol_inner(SVector(x0...), SVector(x1...), npoints, nfiltered, filter)
 end
 
@@ -76,9 +76,9 @@ end
 
 function cayley_menger(r::SVector{10, T}) where {T}
    A = @SMatrix( T[
-      0.0     1.0     1.0     1.0      1.0      1.0 ])
+      0.0     1.0     1.0     1.0      1.0      1.0;
       #                r12     r13      r14     r15
-      1.0     0.0     r[1]^2  r[2]^2   r[3]^2   r[4]^2
+      1.0     0.0     r[1]^2  r[2]^2   r[3]^2   r[4]^2;
       #       r12             r23      r24      r25
       1.0     r[1]^2  0.0     r[5]^2   r[6]^2   r[7]^2;
       #       r13     r23              r34      r35
@@ -123,16 +123,16 @@ ba_is_simplex(r::SVector{3}, ψ::SVector{3}) =
 an auxiliary function to help transform between real and transformed
    coordinates where the Sobol sequence is constructed ...
 """
-function inv_transform(x::T, r0::T, r1::T, transform)::T where {T}
+function inv_transform(x::T, r0::T, r1::T, D)::T where {T}
    TOL = 1e-6
    # Secant Bisection Method (transform is monotone)
    # Roots.jl is too slow (why?!?)
-   t0 = transform(r0) - x
-   t1 = transform(r1) - x
+   t0 = transform(D, r0) - x
+   t1 = transform(D, r1) - x
    r = 0.5*(r0+r1)
    while abs(r1 - r0) > TOL
       r = (r1 * t0 - r0 * t1) / (t0 - t1)
-      t = transform(r) - x
+      t = transform(D, r) - x
       if abs(t) < 1e-7
          return r
       end
