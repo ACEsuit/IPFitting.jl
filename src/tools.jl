@@ -10,10 +10,12 @@ function tfor(f, rg; verbose=true, msg="tfor", costs = ones(Int, length(rg)))
       verbose && println("$msg in serial")
       dt = verbose ? 1.0 : Inf
       tic()
-      for (i, n) in enumerate(rg)
+      for (n, c) in zip(rg, costs)
          f(n)
-         p_ctr += costs[i]
-         ProgressMeter.update!(p, p_ctr)
+         if verbose
+            p_ctr += c
+            ProgressMeter.update!(p, p_ctr)
+         end
       end
       verbose && toc()
    else
@@ -22,8 +24,8 @@ function tfor(f, rg; verbose=true, msg="tfor", costs = ones(Int, length(rg)))
          p_lock = SpinLock()
       end
       tic()
-      @threads for n in rg
-         f(n)
+      @threads for i = 1:length(rg)
+         f(rg[i])
          if verbose
             lock(p_lock)
             p_ctr += costs[i]
@@ -61,6 +63,14 @@ function analyse_include_exclude(set, include, exclude)
    return include
 end
 
+
+macro def(name, definition)
+    return quote
+        macro $(esc(name))()
+            esc($(Expr(:quote, definition)))
+        end
+    end
+end
 
 
 end

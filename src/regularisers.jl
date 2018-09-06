@@ -34,33 +34,35 @@ using StaticArrays
 using JuLIP: AbstractCalculator
 using JuLIP.Potentials: evaluate_d
 using NBodyIPs: bodyorder, transform, evaluate_many_ricoords!
+using NBodyIPFitting.Tools: @def
 
 import Base: Matrix
 
 export BLRegulariser, BLReg, BARegulariser, BAReg
 
+abstract type AbstractRegulariser end
 
-abstract type AbstractRegulariser{N} end
+abstract type NBodyRegulariser{N} end
 
-struct BLRegulariser{N, T} <: AbstractRegulariser{N}
+@def nbregfields begin
    N::Int
    npoints::Int
    creg::T
    r0::T
    r1::T
    sequence::Symbol
+   freg::Function
    valN::Val{N}
 end
 
-struct BARegulariser{N, T} <: AbstractRegulariser{N}
-   N::Int
-   npoints::Int
-   creg::T
-   r0::T
-   r1::T
-   sequence::Symbol
-   valN::Val{N}
+struct BLRegulariser{N, T} <: NBodyRegulariser{N}
+   @nbregfields
 end
+
+struct BARegulariser{N, T} <: NBodyRegulariser{N}
+   @nbregfields
+end
+
 
 const BLReg = BLRegulariser
 const BAReg = BARegulariser
@@ -68,34 +70,22 @@ const BAReg = BARegulariser
 BLRegulariser(N, r0, r1;
              npoints = Nquad(Val(N)),
              creg = 0.1,
-             sequence = :sobol) =
-   BLRegulariser(N, npoints, creg, r0, r1, sequence, Val(N))
+             sequence = :sobol,
+             freg = laplace_regulariser) =
+   BLRegulariser(N, npoints, creg, r0, r1, sequence, freg, Val(N))
 
 BARegulariser(N, r0, r1;
              npoints = Nquad(Val(N)),
              creg = 0.1,
-             sequence = :sobol) =
-   BARegulariser(N, npoints, creg, r0, r1, sequence, Val(N))
+             sequence = :sobol,
+             freg = laplace_regulariser) =
+   BARegulariser(N, npoints, creg, r0, r1, sequence, freg, Val(N))
 
 # ---------------------------------------------------------------------------
 
 include("sobol.jl")
 
 # ---------------------------------------------------------------------------
-
-Matrix(reg::BLRegulariser, basis) = _regularise(reg, basis)
-
-
-function regularise_2b(B::Vector, r0::Number, r1::Number, creg, Nquad)
-   I2 = find(bodyorder.(B) .== 2)
-   rr = linspace(r0, r1, Nquad)
-   Φ = zeros(Nquad, length(B))
-   h = (r1 - r0) / (Nquad-1)
-   for (ib, b) in zip(I2, B[I2]), (iq, r) in enumerate(rr)
-      Φ[iq, ib] = (evaluate_d(b, r+1e-2)-evaluate_d(b, r-1e-2))/(2e-2) * sqrt(creg * h)
-   end
-   return creg * Φ
-end
 
 
 Nquad(::Val{2}) = 100
@@ -113,7 +103,7 @@ _bainvt(inv_t, x::StaticVector{6}) =
 # this converts the Regulariser type information to a matrix that can be
 # attached to the LSQ problem .
 #
-function Matrix(reg::AbstractRegulariser{N}, B::Vector{<: AbstractCalculator}
+function Matrix(reg::NBodyRegulariser{N}, B::Vector{<: AbstractCalculator}
                 ) where {N}
 
    # 2B is a bit simpler than the rest, treat it separately
@@ -163,15 +153,30 @@ function Matrix(reg::AbstractRegulariser{N}, B::Vector{<: AbstractCalculator}
    end
 
    # loop through sobol points and collect the laplacians at each point.
-   return reg.creg * assemble_reg_matrix(X, [b for b in B[Ib]], length(B), Ib, inv_tv)
+   return reg.creg * assemble_reg_matrix(X, [b for b in B[Ib]], length(B), Ib,
+                                         inv_tv, reg.freg)
 end
 
 
-function assemble_reg_matrix(X, B, nB, Ib, inv_tv)
+
+function regularise_2b(B::Vector, r0::Number, r1::Number, creg, Nquad)
+   I2 = find(bodyorder.(B) .== 2)
+   rr = linspace(r0, r1, Nquad)
+   Φ = zeros(Nquad, length(B))
+   h = (r1 - r0) / (Nquad-1)
+   for (ib, b) in zip(I2, B[I2]), (iq, r) in enumerate(rr)
+      Φ[iq, ib] = (evaluate_d(b, r+1e-2)-evaluate_d(b, r-1e-2))/(2e-2) * sqrt(creg * h)
+   end
+   return creg * Φ
+end
+
+
+
+function assemble_reg_matrix(X, B, nB, Ib, inv_tv, freg)
    Ψ = zeros(length(X), nB)
    temp = zeros(length(Ib))
    for (ix, x) in enumerate(X)
-      Ψ[ix, Ib] = laplace_regulariser(x, B, temp, inv_tv)
+      Ψ[ix, Ib] = freg(x, B, temp, inv_tv)
    end
    return Ψ
 end
@@ -198,6 +203,13 @@ function laplace_regulariser(x::SVector{DIM,T}, B::Vector{<: AbstractCalculator}
    end
 
    return L/h^2
+end
+
+
+function energy_regulariser(x::SVector{DIM,T}, B::Vector{<: AbstractCalculator},
+                            temp::Vector{T}, inv_tv) where {DIM, T}
+   evaluate_many_ricoords!(temp, B, r)
+   return - temp
 end
 
 end
