@@ -94,7 +94,6 @@ function regularise_2b(B::Vector, r0::Number, r1::Number, creg, Nquad)
    for (ib, b) in zip(I2, B[I2]), (iq, r) in enumerate(rr)
       Φ[iq, ib] = (evaluate_d(b, r+1e-2)-evaluate_d(b, r-1e-2))/(2e-2) * sqrt(creg * h)
    end
-   @show creg
    return creg * Φ
 end
 
@@ -164,7 +163,6 @@ function Matrix(reg::AbstractRegulariser{N}, B::Vector{<: AbstractCalculator}
    end
 
    # loop through sobol points and collect the laplacians at each point.
-   @show reg.creg
    return reg.creg * assemble_reg_matrix(X, [b for b in B[Ib]], length(B), Ib, inv_tv)
 end
 
