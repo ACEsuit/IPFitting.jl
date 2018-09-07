@@ -33,7 +33,7 @@ to model Si, we first define a descriptor
 ```julia
 r0 = rnn(:Si)
 rcut = 2.5 * r0
-desc = BondAngleDesc("exp(- (r/$r0 - 1.0))", (:cos, $(rcut-1), $rcut))
+desc = BondAngleDesc("exp(- (r/$r0 - 1.0))", "(:cos, $(rcut-1), $rcut)")
 ```
 We can then generate basis functions using `nbpolys`, e.g.,
 ```julia
