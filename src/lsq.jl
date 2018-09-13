@@ -263,6 +263,14 @@ function lsqfit(db::LsqDB;
       basis = db.basis[Ibasis]
    end
 
+   iob = IOBuffer()
+   versioninfo(iob)
+   juliainfo = String(iob)
+
+   nbipinfo = readstring(`git -C $(Pkg.dir("NBodyIPs")) rev-parse HEAD`)
+   nbipfitinfo = readstring(`git -C $(Pkg.dir("NBodyIPFitting")) rev-parse HEAD`)
+
+
    info = Dict("errors" => Dict(errs),
                "solver" => String(solver),
                "E0" => E0,
@@ -271,8 +279,11 @@ function lsqfit(db::LsqDB;
                "configweights" => configweights,
                "confignames" => confignames,
                "dataweights" => dataweights,
-               "regularisers" => string.(typeof.(regularisers))
-               )
+               "regularisers" => string.(typeof.(regularisers)),
+               "juliaversion" => juliainfo,
+               "NBodyIPs_version" => nbipinfo,
+               "NBodyIPFitting_version" => nbipfitinfo
+         )
 
    return NBodyIP(basis, c), info
 end
