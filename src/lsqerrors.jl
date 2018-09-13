@@ -18,6 +18,13 @@ struct LsqErrors
    # scatterF::Dict{String, Tuple{Vector{Float64}, Vector{Float64}}}
 end
 
+Base.Dict(errs::LsqErrors) =
+   Dict("rmse" => errs.rmse, "mae" => errs.mae,
+        "nrm2" => errs.nrm2, "nrm1" => errs.nrm1)
+
+LsqErrors(errs::Dict) =
+   LsqErrors(errs["rmse"], errs["mae"], errs["nrm2"], errs["nrm1"])
+
 rmse(errs::LsqErrors, ct, ot) =
       haskey(errs.rmse[ct], ot) ? errs.rmse[ct][ot] : NaN
 relrmse(errs::LsqErrors, ct, ot) =
@@ -26,6 +33,11 @@ mae(errs::LsqErrors, ct, ot) =
       haskey(errs.mae[ct], ot) ? errs.mae[ct][ot] : NaN
 relmae(errs::LsqErrors, ct, ot) =
       haskey(errs.mae[ct], ot) ? errs.mae[ct][ot]/errs.nrm1[ct][ot] : NaN
+
+rmse(errs::Dict, ct, ot) = rmse(LsqErrors(errs))
+relrmse(errs::Dict, ct, ot) = relrmse(LsqErrors(errs))
+mae(errs::Dict, ct, ot) = mae(LsqErrors(errs))
+relmae(errs::Dict, ct, ot) = relmae(LsqErrors(errs))
 
 function errdict(configtypes)
    D = Dict{String, Dict{String, Float64}}()

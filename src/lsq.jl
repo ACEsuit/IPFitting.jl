@@ -229,14 +229,19 @@ to display these as tables and `rmse, mae` to access individual errors.
 """
 function lsqfit(db::LsqDB;
                 solver=:qr, verbose=true, E0 = nothing,
-                Ibasis = :, configweights=nothing, kwargs...)
+                Ibasis = :, configweights=nothing, dataweights = nothing,
+                regularisers = [],
+                kwargs...)
    @assert solver == :qr
    @assert E0 != nothing
    Jbasis = ((Ibasis == Colon()) ? (1:length(db.basis)) : Ibasis)
 
    verbose && info("assemble lsq system")
    Ψ, Y = get_lsq_system(db; verbose=verbose, E0=E0, Ibasis=Ibasis,
-                             configweights=configweights, kwargs...)
+                             configweights = configweights,
+                             dataweights = dataweights,
+                             regularisers = regularisers
+                             kwargs...)
 
    verbose && info("solve $(size(Ψ)) LSQ system using QR factorisation")
    qrΨ = qrfact(Ψ)
@@ -258,7 +263,18 @@ function lsqfit(db::LsqDB;
       basis = db.basis[Ibasis]
    end
 
-   return NBodyIP(basis, c), errs
+   info = Dict("errors" => Dict(errs),
+               "solver" => String(solver),
+               "E0" => E0,
+               "Ibasis" => Vector{Int}(Ibasis),
+               "dbpath" => dbpath(db),
+               "configweights" => configweights,
+               "confignames" => confignames,
+               "dataweights" => dataweights,
+               "regularisers" => string.(typeof.(regularisers))
+               )
+
+   return NBodyIP(basis, c), info
 end
 
 
