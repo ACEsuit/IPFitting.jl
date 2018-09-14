@@ -275,7 +275,7 @@ function lsqfit(db::LsqDB;
    infodict = Dict("errors" => Dict(errs),
                "solver" => String(solver),
                "E0" => E0,
-               "Ibasis" => Vector{Int}(Ibasis),
+               "Ibasis" => Vector{Int}(Jbasis),
                "dbpath" => dbpath(db),
                "configweights" => configweights,
                "confignames" => keys(configweights),
