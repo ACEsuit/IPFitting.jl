@@ -264,13 +264,27 @@ function lsqfit(db::LsqDB;
       basis = db.basis[Ibasis]
    end
 
+   # --------------------------------------------------------------------
+   # ASSEMBLE INFO DICT
+   # --------------------------------------------------------------------
+   # Julia Version Info
    iob = IOBuffer()
    versioninfo(iob)
    juliainfo = String(iob)
 
+   # NBodyIPs and NBodyIPFitting Version Info
    nbipinfo = readstring(`git -C $(Pkg.dir("NBodyIPs")) rev-parse HEAD`)
    nbipfitinfo = readstring(`git -C $(Pkg.dir("NBodyIPFitting")) rev-parse HEAD`)
 
+   # number of configurations for each configtype
+   numconfigs = Dict{String, Int}()
+   for ct in keys(db.data_groups)
+      cn = configname(ct)
+      if !haskey(numconfigs, cn)
+         numconfigs[cn] = 0
+      end
+      numconfigs[cn] +=  length(db.data_groups[ct])
+   end
 
    infodict = Dict("errors" => Dict(errs),
                "solver" => String(solver),
@@ -283,8 +297,11 @@ function lsqfit(db::LsqDB;
                "regularisers" => string.(typeof.(regularisers)),
                "juliaversion" => juliainfo,
                "NBodyIPs_version" => nbipinfo,
-               "NBodyIPFitting_version" => nbipfitinfo
+               "NBodyIPFitting_version" => nbipfitinfo,
+               "numconfigs" => numconfigs
          )
+   # --------------------------------------------------------------------
+
 
    return NBodyIP(basis, c), infodict
 end
