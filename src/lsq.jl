@@ -27,6 +27,7 @@ using NBodyIPs: OneBody, NBodyIP
 using NBodyIPFitting: Dat, LsqDB, data, weighthook
 using NBodyIPFitting.Data: observation, hasobservation, configname, configtype
 using NBodyIPFitting.DataTypes: ENERGY
+using NBodyIPFitting.DB: dbpath
 import NBodyIPFitting
 const Err = NBodyIPFitting.Errors
 
@@ -240,7 +241,7 @@ function lsqfit(db::LsqDB;
    Ψ, Y = get_lsq_system(db; verbose=verbose, E0=E0, Ibasis=Ibasis,
                              configweights = configweights,
                              dataweights = dataweights,
-                             regularisers = regularisers
+                             regularisers = regularisers,
                              kwargs...)
 
    verbose && info("solve $(size(Ψ)) LSQ system using QR factorisation")
@@ -271,13 +272,13 @@ function lsqfit(db::LsqDB;
    nbipfitinfo = readstring(`git -C $(Pkg.dir("NBodyIPFitting")) rev-parse HEAD`)
 
 
-   info = Dict("errors" => Dict(errs),
+   infodict = Dict("errors" => Dict(errs),
                "solver" => String(solver),
                "E0" => E0,
                "Ibasis" => Vector{Int}(Ibasis),
                "dbpath" => dbpath(db),
                "configweights" => configweights,
-               "confignames" => confignames,
+               "confignames" => keys(configweights),
                "dataweights" => dataweights,
                "regularisers" => string.(typeof.(regularisers)),
                "juliaversion" => juliainfo,
@@ -285,7 +286,7 @@ function lsqfit(db::LsqDB;
                "NBodyIPFitting_version" => nbipfitinfo
          )
 
-   return NBodyIP(basis, c), info
+   return NBodyIP(basis, c), infodict
 end
 
 

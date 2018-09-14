@@ -125,7 +125,7 @@ function lsqerrors(db, c, Ibasis; confignames = Colon(), E0 = nothing)
 end
 
 
-function table(errs::LsqErrors; relative=false)
+function table(errs; relative=false)
    if relative
       table_relative(errs)
    else
@@ -133,7 +133,10 @@ function table(errs::LsqErrors; relative=false)
    end
 end
 
-function table_relative(errs)
+table_relative(errs::Dict) = table_relative(LsqErrors(errs))
+table_absolute(errs::Dict) = table_absolute(LsqErrors(errs))
+
+function table_relative(errs::LsqErrors)
    print("-----------------------------------------------------------------\n")
    print("               ||           RMSE        ||           MAE      \n")
    print("  config type  || E [%] | F [%] | V [%] || E [%] | F [%] | V [%] \n")
