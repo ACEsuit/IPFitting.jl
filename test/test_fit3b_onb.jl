@@ -1,5 +1,5 @@
 
-using NBodyIPs, JuLIP, Base.Test, NBodyIPFitting, DataFrames
+using NBodyIPs, JuLIP, Test, NBodyIPFitting, DataFrames
 using JuLIP.Potentials: evaluate_d
 using NBodyIPFitting: Dat, LsqDB
 using NBodyIPs: BondLengthDesc, BondAngleDesc

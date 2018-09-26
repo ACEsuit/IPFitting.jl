@@ -1,4 +1,4 @@
-info("Loading libraries...")
+@info("Loading libraries...")
 using JuLIP, ASE
 using NBodyIPs
 using NBodyIPs: bodyorder, degree
@@ -7,14 +7,14 @@ using NBodyIPFitting.Lsq
 using NBodyIPFitting.Data: observation, hasobservation, configname
 using FileIO, Plots, DataFrames
 using Distributions
-using Base.Test
+using Test
 
-info("Loading data...")
+@info("Loading data...")
 include(homedir() * "/Dropbox/PIBmat/W_Data/W.jl")
 data = W.loaddb()
 @show length(data)
 
-info("Loading db file...")
+@info("Loading db file...")
 dbname = homedir() * "/Research/01_En_cours/Post-doc/nbodyips/W_2BBL_r2_2"
 @show dbname
 @time db = LsqDB(dbname)

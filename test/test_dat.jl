@@ -1,5 +1,5 @@
 
-using Base.Test, JuLIP
+using Test, JuLIP
 using NBodyIPFitting
 using NBodyIPFitting: Dat
 using NBodyIPFitting.Data: configtype

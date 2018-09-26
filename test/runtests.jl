@@ -1,5 +1,5 @@
 using NBodyIPFitting
-using JuLIP, Base.Test, StaticArrays
+using JuLIP, Test, StaticArrays
 using BenchmarkTools
 
 @testset "NBodyIPFitting" begin

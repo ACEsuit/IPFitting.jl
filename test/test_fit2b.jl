@@ -1,5 +1,5 @@
 
-using NBodyIPs, JuLIP, Base.Test, NBodyIPFitting, DataFrames
+using NBodyIPs, JuLIP, Test, NBodyIPFitting, DataFrames
 using JuLIP.Potentials: evaluate_d
 using NBodyIPFitting: Dat, LsqDB
 using NBodyIPs: BondLengthDesc
@@ -19,7 +19,7 @@ function generate_data(species, L, rmax, N, calc)
    return data
 end
 
-srand(1)
+Random.seed!(1)
 r0 = rnn(:Cu)
 calc = let r0=r0
    LennardJones(r0=r0) * C2Shift(2.5*r0)
@@ -35,7 +35,7 @@ err_funif = Float64[]
 err_erms = Float64[]
 err_frms = Float64[]
 degrees = [4, 6, 8, 10, 12, 14, 16]
-rr = linspace(0.9*r0, cutoff(calc), 200)
+rr = range(0.9*r0, stop=cutoff(calc), length=200)
 for d in degrees
    B2 = nbpolys(2, D2, d)
    @show length(B2)

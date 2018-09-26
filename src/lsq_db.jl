@@ -136,7 +136,7 @@ save_info(db) = save_info(dbpath(db), db)
 
 function save_kron(dbpath, db)
    if isfile(kronfile(dbpath))
-      warn("""trying to save `kron`, but kronfile already exists; aborting""")
+      @warn("""trying to save `kron`, but kronfile already exists; aborting""")
       # TODO: try to save it in a temp file
       return nothing
    end
@@ -204,16 +204,16 @@ function LsqDB(dbpath::AbstractString,
          verbose=verbose, msg = "Assemble LSQ blocks",
          costs = lens)
    if dbpath != ""
-      verbose && info("Writing db to disk...")
+      verbose && @info("Writing db to disk...")
       try
          flush(db)
       catch
-         warn("""something went wrong trying to save the db to disk, but the data
+         @warn("""something went wrong trying to save the db to disk, but the data
                should be ok; if it is crucial to keep it, try to save manually.""")
       end
-      verbose && info("... done")
+      verbose && @info("... done")
    else
-      verbose && info("db is not written to disk since `dbpath` is empty.")
+      verbose && @info("db is not written to disk since `dbpath` is empty.")
    end
    return db
 end
@@ -265,7 +265,7 @@ end
 
 
 function union(db1::LsqDB,db2::LsqDB; dbpath = (db1.dbpath * "_u"))
-   info("Warning: the union implies that the data in the two databases are the same")
+   @info("Warning: the union implies that the data in the two databases are the same")
    configtypes = collect(keys(db1.data_groups))
    basis = cat(1, db1.basis, db2.basis)
    data_groups = db1.data_groups
@@ -338,7 +338,7 @@ function split_basis(basis)
    Bord = Any[]
    for tp in unique(tps)
       # find which elements of basis have type `tp`
-      I = find( [tp == t  for t in tps] )
+      I = findall( [tp == t  for t in tps] )
       push!(Iord, I)
       push!(Bord, [b for b in basis[I]])
    end
@@ -350,7 +350,7 @@ end
 # fill the LSQ system, i.e. evaluate basis at data points
 function evallsq(d::Dat, B::AbstractVector{TB}) where {TB <: AbstractCalculator}
    B1 = [b for b in B]
-   if !(isleaftype(eltype(B1)))
+   if !(isconcretetype(eltype(B1)))
       return evallsq_split(d, B1)
    end
    # TB is a leaf-type so we can use "evaluate_many"

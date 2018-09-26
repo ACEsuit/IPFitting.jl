@@ -1,5 +1,5 @@
 
-using Base.Test
+using Test
 using NBodyIPFitting, NBodyIPs, ProgressMeter, JuLIP
 using NBodyIPs: blpolys
 Fit = NBodyIPFitting

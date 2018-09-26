@@ -1,5 +1,5 @@
 
-using NBodyIPs, JuLIP, Base.Test, NBodyIPFitting, DataFrames
+using NBodyIPs, JuLIP, Test, NBodyIPFitting, DataFrames
 using JuLIP.Potentials: evaluate_d
 using NBodyIPFitting: Dat, LsqDB
 using NBodyIPs: BondLengthDesc, BondAngleDesc
@@ -41,7 +41,7 @@ D3 = BondLengthDesc(TRANSFORM, CUTOFF3)
 err_erms = Float64[]
 err_frms = Float64[]
 degrees = [4, 6, 8, 10] # , 10, 12]
-rr = linspace(0.9*r0, cutoff(calc), 200)
+rr = range(0.9*r0, stop=cutoff(calc), length=200)
 for deg3 in degrees
    # B = [B1; gen_basis(2, D2, deg2); gen_basis(3, D3, deg3)]
    # B = [nbpolys(2, D2, 8, Chebyshev()); nbpolys(3, D3, deg3, Chebyshev())]

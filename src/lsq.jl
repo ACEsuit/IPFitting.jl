@@ -250,7 +250,7 @@ function get_lsq_system(db::LsqDB; verbose = true,
    any(isnan, Ψ) && error("discovered NaNs in LSQ system matrix")
 
    # remove anything with zero-weight
-   Idata = find(W .!== 0.0) |> sort
+   Idata = findall(W .!== 0.0) |> sort
    Y, W, Ψ = Y[Idata], W[Idata], Ψ[Idata, :]
 
    # now rescale Y and Ψ according to W => Y_W, Ψ_W; then the two systems
@@ -278,7 +278,7 @@ function onb(db::LsqDB;
    @assert E0 != nothing
    Jbasis = ((Ibasis == Colon()) ? (1:length(db.basis)) : Ibasis)
 
-   verbose && info("assemble lsq system")
+   verbose && @info("assemble lsq system")
    Ψ, _ = get_lsq_system(db; verbose=verbose, E0=E0, Ibasis=Ibasis,
                              configweights = configweights,
                              dataweights = dataweights,
@@ -340,7 +340,7 @@ function lsqfit(db::LsqDB;
    @assert E0 != nothing
    Jbasis = ((Ibasis == Colon()) ? (1:length(db.basis)) : Ibasis)
 
-   verbose && info("assemble lsq system")
+   verbose && @info("assemble lsq system")
    Ψ, Y = get_lsq_system(db; verbose=verbose, E0=E0, Ibasis=Ibasis,
                              configweights = configweights,
                              dataweights = dataweights,
@@ -369,7 +369,7 @@ function lsqfit(db::LsqDB;
    end
 
    # compute errors
-   verbose && info("Assemble errors table")
+   verbose && @info("Assemble errors table")
    errs = Err.lsqerrors(db, c, Jbasis; confignames=keys(configweights), E0=E0)
 
    if E0 != 0
@@ -382,7 +382,7 @@ function lsqfit(db::LsqDB;
    # --------------------------------------------------------------------
    # ASSEMBLE INFO DICT
    # --------------------------------------------------------------------
-   verbose && info("Assemble Information about the fit")
+   verbose && @info("Assemble Information about the fit")
 
    # Julia Version Info
    iob = IOBuffer()
@@ -424,8 +424,8 @@ end
 
 
 function get_git_info()
-   nbipinfo = readstring(`cat $(Pkg.dir("NBodyIPs")*"/.git/refs/heads/master")`)[1:end-1]
-   nbipfitinfo = readstring(`cat $(Pkg.dir("NBodyIPFitting")*"/.git/refs/heads/master")`)[1:end-1]
+   nbipinfo = read(`cat $(Pkg.dir("NBodyIPs")*"/.git/refs/heads/master")`, String)[1:end-1]
+   nbipfitinfo = read(`cat $(Pkg.dir("NBodyIPFitting")*"/.git/refs/heads/master")`, String)[1:end-1]
    # nbipinfo = readstring(`git -C $(Pkg.dir("NBodyIPs")) rev-parse HEAD`)
    # nbipfitinfo = readstring(`git -C $(Pkg.dir("NBodyIPFitting")) rev-parse HEAD`)
    return nbipinfo, nbipfitinfo
