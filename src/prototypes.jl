@@ -124,4 +124,16 @@ mutable struct LsqOptions
    params::Dict{String, Any}
    regularisers::Vector{Any}
    hooks::Vector{Any}
+   verbose::Bool
+   solver::Symbol
+end
+
+function LsqOptions(; solver=:qr,
+                      verbose=true,
+                      E0 = nothing,
+                      Ibasis = :,
+                      configweights=nothing,
+                      dataweights = nothing,
+                      regularisers = [] )
+   return LsqOptions(E0, config_weights, 
 end

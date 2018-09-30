@@ -105,11 +105,12 @@ function _regularise!(Ψ::Matrix{T}, Y::Vector{T}, basis, regularisers) where {T
    for reg in regularisers
       if reg isa Matrix
          P = reg
+         q = zeros(size(P, 1))
       else
-         P = Matrix(reg, basis)
+         P, q = Matrix(reg, basis)
       end
       Ψreg = vcat(Ψreg, P)
-      Yreg = vcat(Yreg, zeros(size(P, 1)))
+      Yreg = vcat(Yreg, q)
    end
    # check they all have the correct size
    return vcat(Ψ, Ψreg), vcat(Y, Yreg)
@@ -192,6 +193,7 @@ function get_lsq_system(db::LsqDB; verbose = true,
    # this should be it ...
    return Ψ, Y
 end
+
 
 
 """
@@ -287,18 +289,18 @@ function lsqfit(db::LsqDB;
    end
 
    infodict = Dict("errors" => Dict(errs),
-               "solver" => String(solver),
-               "E0" => E0,
-               "Ibasis" => Vector{Int}(Jbasis),
-               "dbpath" => dbpath(db),
-               "configweights" => configweights,
-               "confignames" => keys(configweights),
-               "dataweights" => dataweights,
-               "regularisers" => string.(typeof.(regularisers)),
-               "juliaversion" => juliainfo,
-               "NBodyIPs_version" => nbipinfo,
-               "NBodyIPFitting_version" => nbipfitinfo,
-               "numconfigs" => numconfigs
+                   "solver" => String(solver),
+                   "E0" => E0,
+                   "Ibasis" => Vector{Int}(Jbasis),
+                   "dbpath" => dbpath(db),
+                   "configweights" => configweights,
+                   "confignames" => keys(configweights),
+                   "dataweights" => dataweights,
+                   "regularisers" => string.(typeof.(regularisers)),
+                   "juliaversion" => juliainfo,
+                   "NBodyIPs_version" => nbipinfo,
+                   "NBodyIPFitting_version" => nbipfitinfo,
+                   "numconfigs" => numconfigs
          )
    # --------------------------------------------------------------------
 

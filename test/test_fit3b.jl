@@ -2,7 +2,7 @@
 using NBodyIPs, JuLIP, Base.Test, NBodyIPFitting, DataFrames
 using JuLIP.Potentials: evaluate_d
 using NBodyIPFitting: Dat, LsqDB
-using NBodyIPs: BondLengthDesc
+using NBodyIPs: BondLengthDesc, BondAngleDesc
 const Lsq = NBodyIPFitting.Lsq
 const Err = NBodyIPFitting.Errors
 
@@ -25,13 +25,13 @@ data = generate_data(:Si, 2, 0.2*r0, 30, calc)
 
 TRANSFORM = "exp( - 2 * (r/$r0 - 1) )"
 
-rcut2 = 2 * cutoff(calc)
+rcut2 = cutoff(calc)
 CUTOFF2 = "(:cos, $(rcut2-1), $rcut2)"
-D2 = BondLengthDesc(TRANSFORM, CUTOFF2)
+D2 = BondAngleDesc(TRANSFORM, CUTOFF2)
 
-rcut3 = 2 * cutoff(calc)
+rcut3 = cutoff(calc)
 CUTOFF3 = "(:cos, $(rcut3-1), $rcut3)"
-D3 = BondLengthDesc(TRANSFORM, CUTOFF3)
+D3 = BondAngleDesc(TRANSFORM, CUTOFF3)
 
 ##
 err_erms = Float64[]
@@ -59,3 +59,21 @@ display(df)
 
 (@test minimum(err_erms) < 0.0001) |> println
 (@test minimum(err_frms) < 0.01) |> println
+
+
+# BOND LENGTH
+# │ Row │ degrees │ rms_E       │ rms_F      │
+# ├─────┼─────────┼─────────────┼────────────┤
+# │ 1   │ 4       │ 0.00134475  │ 0.118625   │
+# │ 2   │ 6       │ 0.000244722 │ 0.0362398  │
+# │ 3   │ 8       │ 0.000115287 │ 0.0179257  │
+# │ 4   │ 10      │ 5.28124e-5  │ 0.00888845 │
+
+# BOND ANGLE
+# │ Row │ degrees │ relrms_E    │ relrms_F   │
+# ├─────┼─────────┼─────────────┼────────────┤
+# │ 1   │ 4       │ 0.000523011 │ 0.070237   │
+# │ 2   │ 6       │ 0.000445928 │ 0.0477666  │
+# │ 3   │ 8       │ 0.000100544 │ 0.016773   │
+# │ 4   │ 10      │ 3.7269e-5   │ 0.00568809 │
+# │ 5   │ 12      │ 2.00043e-5  │ 0.00419453 │

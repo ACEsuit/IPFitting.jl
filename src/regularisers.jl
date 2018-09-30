@@ -63,9 +63,13 @@ struct BARegulariser{N, T} <: NBodyRegulariser{N}
    @nbregfields
 end
 
+struct EnergyRegulariser{N, T} <: NBodyRegulariser{N}
+   @nbregfields
+end
 
 const BLReg = BLRegulariser
 const BAReg = BARegulariser
+const EReg = BARegulariser
 
 BLRegulariser(N, r0, r1;
              npoints = Nquad(Val(N)),
@@ -80,6 +84,13 @@ BARegulariser(N, r0, r1;
              sequence = :sobol,
              freg = laplace_regulariser) =
    BARegulariser(N, npoints, creg, r0, r1, sequence, freg, Val(N))
+
+EnergyRegulariser(N, r0, r1;
+            npoints = Nquad(Val(N)),
+            creg = 0.1,
+            sequence = :sobol) =
+   EnergyRegulariser(N, npoints, creg, r0, r1, sequence, energy_regulariser, Val(N))
+
 
 # ---------------------------------------------------------------------------
 
@@ -153,10 +164,11 @@ function Matrix(reg::NBodyRegulariser{N}, B::Vector{<: AbstractCalculator}
    end
 
    # loop through sobol points and collect the laplacians at each point.
-   return reg.creg * assemble_reg_matrix(X, [b for b in B[Ib]], length(B), Ib,
+   Ψreg = reg.creg * assemble_reg_matrix(X, [b for b in B[Ib]], length(B), Ib,
                                          inv_tv, reg.freg)
+   Yreg = zeros(size(Ψreg, 1))
+   return Ψreg, Yreg
 end
-
 
 
 function regularise_2b(B::Vector, r0::Number, r1::Number, creg, Nquad)
