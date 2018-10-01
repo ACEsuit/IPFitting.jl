@@ -60,7 +60,7 @@ function observations(db::LsqDB,
          for dat in db.data_groups[ct]
             # TODO: move this `if` after the `for dt` line
             if hasobservation(dat, dt)
-               w = weighthook(dt, dat)
+
                o = observation(dat, dt)
                # TODO: This is a hack => can we replace it with a hook?
                if dt == ENERGY # subtract the 1-body reference energy
@@ -68,13 +68,33 @@ function observations(db::LsqDB,
                   o[1] -= length(dat) * E0
                end
                append!(Y, o)
-               append!(W, ctweight * dtweights[dt] * (w .* ones(length(o))) )
+
+               # compute the weights
+               wh = weighthook(dt, dat)
+               w = _get_weights(ctweight, dtweights[dt], wh, dat, dt, o)
+               append!(W, w)
             end
          end
       end
    end
    return Y, W
 end
+
+
+function _get_weights(ctweight, dtweights_dt, wh, dat, dt, o)
+   if haskey(dat.D, "W"*dt)
+      w = dat.D["W"*dt]
+   else
+      w = ctweight * dtweights_dt * wh
+   end
+   if length(w) == 1
+      return w * ones(length(o))
+   elseif length(w) == length(o)
+      return w
+   end
+   error("_get_weights: length(w) is neither 1 nor length(o)?!?!?")
+end
+
 
 
 # TODO: this function here suggests that the ordering we are usig at the moment
@@ -109,6 +129,7 @@ function _regularise!(Ψ::Matrix{T}, Y::Vector{T}, basis, regularisers) where {T
       else
          P, q = Matrix(reg, basis)
       end
+      @show size(Ψreg), size(P)
       Ψreg = vcat(Ψreg, P)
       Yreg = vcat(Yreg, q)
    end

@@ -111,29 +111,3 @@ function evaluate_lsq end
 
 weighthook(::Val, d::Dat) = 1.0
 weighthook(s::String, d::Dat) = weighthook(Val(Symbol(s)), d)
-
-
-# -----------------------------------------------------------------
-# settings
-
-mutable struct LsqOptions
-   E0::Float64
-   configweights::Dict{String, Float64}
-   dataweights::Dict{String, Float64}
-   Ibasis::Vector{Int}
-   params::Dict{String, Any}
-   regularisers::Vector{Any}
-   hooks::Vector{Any}
-   verbose::Bool
-   solver::Symbol
-end
-
-function LsqOptions(; solver=:qr,
-                      verbose=true,
-                      E0 = nothing,
-                      Ibasis = :,
-                      configweights=nothing,
-                      dataweights = nothing,
-                      regularisers = [] )
-   return LsqOptions(E0, config_weights, 
-end
