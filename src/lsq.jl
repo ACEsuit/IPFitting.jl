@@ -80,11 +80,11 @@ function observations(db::LsqDB,
 end
 
 
-function _get_weights(ctweight, dtweights[dt], wh, dat)
+function _get_weights(ctweight, dtweights_dt, wh, dat)
    if haskey(dat.D, "W")
       w = dat.D["W"]
    else
-      w = ctweight * dtweights[dt] * wh
+      w = ctweight * dtweights_dt * wh
    end
    if length(w) == 1
       return w * ones(length(dat))
@@ -329,7 +329,6 @@ function lsqfit(db::LsqDB;
                    "numconfigs" => numconfigs
          )
    # --------------------------------------------------------------------
-
 
    return NBodyIP(basis, c), infodict
 end
