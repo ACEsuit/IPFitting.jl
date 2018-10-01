@@ -113,27 +113,38 @@ weighthook(::Val, d::Dat) = 1.0
 weighthook(s::String, d::Dat) = weighthook(Val(Symbol(s)), d)
 
 
-# -----------------------------------------------------------------
-# settings
 
-mutable struct LsqOptions
-   E0::Float64
-   configweights::Dict{String, Float64}
-   dataweights::Dict{String, Float64}
-   Ibasis::Vector{Int}
-   params::Dict{String, Any}
-   regularisers::Vector{Any}
-   hooks::Vector{Any}
-   verbose::Bool
-   solver::Symbol
-end
-
-function LsqOptions(; solver=:qr,
-                      verbose=true,
-                      E0 = nothing,
-                      Ibasis = :,
-                      configweights=nothing,
-                      dataweights = nothing,
-                      regularisers = [] )
-   return LsqOptions(E0, config_weights, 
-end
+# # -----------------------------------------------------------------
+# # settings
+#
+# mutable struct LsqOptions
+#    E0::Float64
+#    configweights
+#    dataweights
+#    Ibasis
+#    params::Dict{String, Any}
+#    regularisers::Vector{Any}
+#    hooks
+#    verbose::Bool
+#    solver::Symbol
+#    _configtypes::Dict{String, Float64}
+#    _datatypes::Dict{String, Float64}
+# end
+#
+# function LsqOptions(; solver=:qr,
+#                       verbose=true,
+#                       E0 = 0.0,
+#                       Ibasis = Int[],
+#                       configweights= nothing,
+#                       dataweights = nothing,
+#                       regularisers = [],
+#                       hooks = [],
+#                       params = Dict{String, Any} )
+#    return LsqOptions(E0, configweights, dataweights, Ibasis, params,
+#                      regularisers, hooks, verbose, solver)
+# end
+#
+#
+# function lsq_options(;kwargs...)
+#    LsqOptions(;kwargs...)
+# end

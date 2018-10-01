@@ -33,6 +33,7 @@ const Err = NBodyIPFitting.Errors
 
 export lsqfit
 
+
 _keys(configweights, dataweights) = collect(keys(configweights)),
                                     collect(keys(dataweights))
 
@@ -60,7 +61,7 @@ function observations(db::LsqDB,
          for dat in db.data_groups[ct]
             # TODO: move this `if` after the `for dt` line
             if hasobservation(dat, dt)
-               w = weighthook(dt, dat)
+               wh = weighthook(dt, dat)
                o = observation(dat, dt)
                # TODO: This is a hack => can we replace it with a hook?
                if dt == ENERGY # subtract the 1-body reference energy
@@ -68,12 +69,29 @@ function observations(db::LsqDB,
                   o[1] -= length(dat) * E0
                end
                append!(Y, o)
-               append!(W, ctweight * dtweights[dt] * (w .* ones(length(o))) )
+               # compute the weights
+               w = _get_weights(ctweight, dtweights[dt], wh, dat)
+               append!(W, w)
             end
          end
       end
    end
    return Y, W
+end
+
+
+function _get_weights(ctweight, dtweights[dt], wh, dat)
+   if haskey(dat.D, "W")
+      w = dat.D["W"]
+   else
+      w = ctweight * dtweights[dt] * wh
+   end
+   if length(w) == 1
+      return w * ones(length(dat))
+   elseif length(w) == length(dat)
+      return w
+   end
+   error("_get_weights: length(w) is neither 1 nor length(dat)?!?!?")
 end
 
 
@@ -133,6 +151,9 @@ function _extend_configweights(configweights::Dict, configtypes)
 end
 
 
+_basis_indices(db::LsqDB, Ibasis) =
+      ((Ibasis == Colon()) ? (1:length(db.basis)) : Ibasis)
+
 
 """
 `get_lsq_system(db::LsqDB; kwargs...) -> Ψ, Y`
@@ -149,9 +170,11 @@ function get_lsq_system(db::LsqDB; verbose = true,
                         E0 = nothing,
                         Ibasis = :,
                         regularisers = nothing )
-   # we need to be able to call `length` on `Ibasis`
-   Jbasis = ((Ibasis == Colon()) ? (1:length(db.basis)) : Ibasis)
 
+   # we need to be able to call `length` on `Ibasis`
+   Jbasis = _basis_indices(db, Ibasis)
+
+   # convert the "user" specified weights into database compatible weights
    configweights = _extend_configweights(configweights, keys(db.data_groups))
 
    # # TODO TODO TODO => create some suitable "hooks"
@@ -159,17 +182,20 @@ function get_lsq_system(db::LsqDB; verbose = true,
    # # and while we're at it, subtract E0 from Y
    # Y[idx] -= E0 * len
 
-   # fix some ordering of the configtypes and datatypes
-   # even though this can be inferred from configweights and dataweights we
-   # need to by paranoid that the ordering does not change!
+   # get two vectors of configtypes and datatypes strings
+   #   this fixes some ordering of the configtypes and datatypes. even though
+   #   this can be inferred from configweights and dataweights we need to be
+   #   paranoid that the ordering does not change!!!
    configtypes, datatypes = _keys(configweights, dataweights)
+
    # get the observations vector and the weights vector
    Y, W = observations(db, configtypes, datatypes, configweights, dataweights, E0)
+
    # check for NaNs
    any(isnan, Y) && error("NaN detected in observations vector")
    any(isnan, W) && error("NaN detected in weights vector")
 
-   # allocate and assemble the big fat huge enourmous LSQ matrix
+   # allocate and assemble the big fat LSQ matrix
    Ψ = zeros(length(Y), length(Jbasis))
    lsq_matrix!(Ψ, db, configtypes, datatypes, Jbasis)
    any(isnan, Ψ) && error("discovered NaNs in LSQ system matrix")
@@ -179,7 +205,7 @@ function get_lsq_system(db::LsqDB; verbose = true,
    Y, W, Ψ = Y[Idata], W[Idata], Ψ[Idata, :]
 
    # now rescale Y and Ψ according to W => Y_W, Ψ_W; then the two systems
-   #   \| Y_W - Ψ_W c \| -> min  and (Y - Ψ*c)^T W (Y - Ψ*x) => MIN
+   #   \| Y_W - Ψ_W c \| -> min  and (Y - Ψ*c)^T W^T W (Y - Ψ*x) => MIN
    # are equivalent
    # W .= sqrt.(W)
    Y .*= W
