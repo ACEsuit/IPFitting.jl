@@ -179,7 +179,7 @@ function regularise_2b(B::Vector, r0::Number, r1::Number, creg, Nquad)
    for (ib, b) in zip(I2, B[I2]), (iq, r) in enumerate(rr)
       Φ[iq, ib] = (evaluate_d(b, r+1e-2)-evaluate_d(b, r-1e-2))/(2e-2) * sqrt(creg * h)
    end
-   return creg * Φ
+   return creg * Φ, zeros(size(Φ, 1))
 end
 
 

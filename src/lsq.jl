@@ -59,8 +59,8 @@ function observations(db::LsqDB,
          # loop through the observations (x, f(x)) of the current configuration group
          for dat in db.data_groups[ct]
             # TODO: move this `if` after the `for dt` line
+            #       (probably wait for next rewrite though...)
             if hasobservation(dat, dt)
-
                o = observation(dat, dt)
                # TODO: This is a hack => can we replace it with a hook?
                if dt == ENERGY # subtract the 1-body reference energy
@@ -70,7 +70,10 @@ function observations(db::LsqDB,
                append!(Y, o)
 
                # compute the weights
+               # weighthook rescales energy, forces and virials differently
                wh = weighthook(dt, dat)
+               # then we can still modify the weights from extra information
+               # in the dat structure
                w = _get_weights(ctweight, dtweights[dt], wh, dat, dt, o)
                append!(W, w)
             end
@@ -82,11 +85,22 @@ end
 
 
 function _get_weights(ctweight, dtweights_dt, wh, dat, dt, o)
-   if haskey(dat.D, "W"*dt)
-      w = dat.D["W"*dt]
+   # if there is a "W" entry in dat.D then this means all defaults
+   # are over-written
+   if haskey(dat.D, "W")
+      # now check that this observation type (E, F, V) exists in dat.D["W"]
+      # if yes return the corresponding weight, if not make it zero
+      # which means that we will simply ignore this observation
+      if haskey(dat.D["W"], dt)
+         w = dat.D["W"][dt]
+      else
+         w = 0.0
+      end
    else
+      # if no "W" dict exists use the default weights
       w = ctweight * dtweights_dt * wh
    end
+   # transform the weights into a vector (if necessary) and return
    if length(w) == 1
       return w * ones(length(o))
    elseif length(w) == length(o)
