@@ -21,6 +21,8 @@ Y = [E, E, E, E...., F, F, F, F, ...]
 """
 module Lsq
 
+import JuLIP, NBodyIPFitting
+
 using StaticArrays
 using JuLIP: AbstractCalculator, Atoms
 using NBodyIPs: OneBody, NBodyIP
@@ -28,7 +30,7 @@ using NBodyIPFitting: Dat, LsqDB, data, weighthook
 using NBodyIPFitting.Data: observation, hasobservation, configname, configtype
 using NBodyIPFitting.DataTypes: ENERGY
 using NBodyIPFitting.DB: dbpath
-import NBodyIPFitting
+
 const Err = NBodyIPFitting.Errors
 
 export lsqfit
@@ -56,27 +58,26 @@ function observations(db::LsqDB,
       ctweight = ctweights[ct]
       # loop through the datatypes / observation types to be assembled
       for dt in datatypes
+         if !hasobservation(db.data_groups[ct][1], dt)
+            continue
+         end
          # loop through the observations (x, f(x)) of the current configuration group
          for dat in db.data_groups[ct]
-            # TODO: move this `if` after the `for dt` line
-            #       (probably wait for next rewrite though...)
-            if hasobservation(dat, dt)
-               o = observation(dat, dt)
-               # TODO: This is a hack => can we replace it with a hook?
-               if dt == ENERGY # subtract the 1-body reference energy
-                  o = copy(o)
-                  o[1] -= length(dat) * E0
-               end
-               append!(Y, o)
-
-               # compute the weights
-               # weighthook rescales energy, forces and virials differently
-               wh = weighthook(dt, dat)
-               # then we can still modify the weights from extra information
-               # in the dat structure
-               w = _get_weights(ctweight, dtweights[dt], wh, dat, dt, o)
-               append!(W, w)
+            o = observation(dat, dt)
+            # TODO: This is a hack => can we replace it with a hook?
+            if dt == ENERGY # subtract the 1-body reference energy
+               o = copy(o)
+               o[1] -= length(dat) * E0
             end
+            append!(Y, o)
+
+            # compute the weights
+            # weighthook rescales energy, forces and virials differently
+            wh = weighthook(dt, dat)
+            # then we can still modify the weights from extra information
+            # in the dat structure
+            w = _get_weights(ctweight, dtweights[dt], wh, dat, dt, o)
+            append!(W, w)
          end
       end
    end
@@ -87,12 +88,12 @@ end
 function _get_weights(ctweight, dtweights_dt, wh, dat, dt, o)
    # if there is a "W" entry in dat.D then this means all defaults
    # are over-written
-   if haskey(dat.D, "W")
+   if haskey(dat.info, "W")
       # now check that this observation type (E, F, V) exists in dat.D["W"]
       # if yes return the corresponding weight, if not make it zero
       # which means that we will simply ignore this observation
-      if haskey(dat.D["W"], dt)
-         w = dat.D["W"][dt]
+      if haskey(dat.info["W"], dt)
+         w = dat.info["W"][dt]
       else
          w = 0.0
       end
@@ -122,14 +123,16 @@ function lsq_matrix!(Ψ, db, configtypes, datatypes, Ibasis)
          if haskey(k, dt)
             # block[:, i, j] = <data(i), basis(j)>_{dt}
             block = k[dt]
-            nrows = size(block , 1) * size(block , 2)
-            Ψ[idx+1:idx+nrows, :] .= reshape(block[:, :, Ibasis], nrows, :)
+            nrows = size(block, 1) * size(block, 2)
+            Ψ[(idx+1):(idx+nrows), :] = reshape(block[:, :, Ibasis], nrows, :)
             idx += nrows
          end
       end
    end
    return nothing
 end
+
+
 
 
 function _regularise!(Ψ::Matrix{T}, Y::Vector{T}, basis, regularisers) where {T}
@@ -206,6 +209,7 @@ function get_lsq_system(db::LsqDB; verbose = true,
 
    # allocate and assemble the big fat huge enourmous LSQ matrix
    Ψ = zeros(length(Y), length(Jbasis))
+   # lsq_matrix!(Ψ, db, configtypes, datatypes, Jbasis)
    lsq_matrix!(Ψ, db, configtypes, datatypes, Jbasis)
    any(isnan, Ψ) && error("discovered NaNs in LSQ system matrix")
 
@@ -216,7 +220,7 @@ function get_lsq_system(db::LsqDB; verbose = true,
    # now rescale Y and Ψ according to W => Y_W, Ψ_W; then the two systems
    #   \| Y_W - Ψ_W c \| -> min  and (Y - Ψ*c)^T W (Y - Ψ*x) => MIN
    # are equivalent
-   # W .= sqrt.(W)
+   # >>>>>> W .= sqrt.(W) <<<<<<< TODO: which one is it?
    Y .*= W
    scale!(W, Ψ)
 

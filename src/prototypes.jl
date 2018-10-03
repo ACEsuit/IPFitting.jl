@@ -25,7 +25,17 @@ mutable struct Dat
    at::Atoms
    configtype::String
    D::Dict{String, Vector{Float64}}
+   info::Dict{String, Any}
 end
+
+# function convert(Dat, d::Any)
+#    try
+#       return Dat(d.at, d.configtype, d.D, Dict{String, Any}())
+#    catch
+#       @show d
+#       error("convert of `d` unsuccesful; edit `prototypes.jl:convert()` to fix this")
+#    end
+# end
 
 ==(d1::Dat, d2::Dat) = (
       (d1.configtype == d2.configtype) && (d1.D == d2.D) &&
@@ -33,7 +43,7 @@ end
    )
 
 function Dat(at::Atoms, config_type::AbstractString; kwargs...)
-   dat = Dat(at, config_type, Dict{String, Vector{Float64}}())
+   dat = Dat(at, config_type, Dict{String, Vector{Float64}}(), Dict{String, Any}())
    for (key, val) in kwargs
       str_key = string(key)
       # interpret `nothing` as `missing`
@@ -58,7 +68,7 @@ function Dat(D::Dict)
                Z = D["Z"],
                cell = JMat(D["cell"]),
                pbc = tuple(Bool.(D["pbc"])...) )
-   return Dat(at, D["configtype"], Dict{String, Any}(D["D"]))
+   return Dat(at, D["configtype"], Dict{String, Any}(D["D"]), Dict{String, Any}())
 end
 
 convert(::Val{Symbol("NBodyIPFitting.Dat")}, D::Dict) = Dat(D)

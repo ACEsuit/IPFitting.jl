@@ -118,7 +118,8 @@ function read_xyz(fname; verbose=true, index = ":",
       # get the config type and decide whether to keep or skip this config
       config_type = read_configtype(atpy)
       if config_type == nothing
-         warn("$idx has no config_type")
+         verbose && warn("$(idx+1) has no config_type")
+         config_type = ""
       end
       if exclude != nothing
          if config_type in exclude

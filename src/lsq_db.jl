@@ -229,8 +229,8 @@ function _append_inner!(db::LsqDB, d::Dat, lsqrow::Dict)
    # append d to INFO ...
    push!(D_d, d)
    # and append lsqrow to kron_groups[ct]
-   # here, lsqrow is a dict with the same keys as kron_groups[ct], but
-   # containing 2D arrays
+   # here, lsqrow is a dict with the same keys (=datatypes = observationtypes)
+   # as kron_groups[ct], but containing 2D arrays
    for datatype in keys(d.D)
       db.kron_groups[ct][datatype] = _append(db.kron_groups[ct][datatype],
                                              lsqrow[datatype])
