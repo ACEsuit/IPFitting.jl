@@ -5,7 +5,7 @@ using JuLIP: Atoms, energy, forces
 using NBodyIPFitting: LsqDB, Dat, configtype, weighthook
 using NBodyIPFitting.Data: observation, hasobservation, configname
 
-export lsqerrors, table, table_relative, table_absolute
+export lsqerrors, table, table_relative, table_absolute, relerr_table, abserr_table
 # , scatter_E, scatter_F
 
 
@@ -132,6 +132,9 @@ function table(errs; relative=false)
       table_absolute(errs)
    end
 end
+
+relerr_table(fit_info) = table_relative(fit_info["errors"])
+abserr_table(fit_info) = table_absolute(fit_info["errors"])
 
 table_relative(errs::Dict) = table_relative(LsqErrors(errs))
 table_absolute(errs::Dict) = table_absolute(LsqErrors(errs))
