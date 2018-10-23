@@ -185,21 +185,30 @@ end
 
 
 
-# include("poly_regularise.jl")
+# ---------------------- Regularisation of EnvIPs --------------------------
 
+function regularise(N::Integer, P::Integer, B::Vector, r0, r1; kwargs...)
+   I = find(isa.(B, EnvBL{N, P}))
+   Br = [b.Vr for b in B[I]]
+   Ψr = Polys.regularise(N, Br, r0, r1; kwargs...)
+   Ψ = zeros(size(Ψr, 1), length(B))
+   Ψ[:, I] = Ψr
+   return Ψ
+end
 
-# # ----------------- some simplified access functions ------------------
-#
-# evaluate(V::NBodyFunction{2}, r::Number) = evaluate(V, SVector(r))
-#
-# evaluate_d(V::NBodyFunction{2}, r::Number) = evaluate_d(V, SVector(r))[1]
-#
-# evaluate_dd(V::NBodyFunction{2}, r::Number) =
-#       ((@D V(r+1e-5)) - (@D V(r-1e-5))) / 1e-5
-#
-# evaluate(V::NBodyFunction{3}, r1::Number, r2::Number, r3::Number) =
-#       evaluate(V, SVector(r1, r2, r3))
-
+function regularise(N::Integer, B::Vector, r0, r1; kwargs...)
+   # find all EnvBL basis functions with body-order N
+   I = find(isa.(B, EnvBL{N}))
+   max_P = maximum( b.t for b in B[I] )
+   # each polynomial degree p => separate V_Np, hence
+   # compute multiple regularisations
+   Ψ = zeros(0, length(B))
+   for p = 0:max_P
+      Ψp = regularise(N, p, B, r0, r1; kwargs...)
+      Ψ = [Ψ; Ψp]
+   end
+   return Ψ
+end
 
 
 # # =============== Experimental:

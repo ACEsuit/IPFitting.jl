@@ -292,10 +292,11 @@ function lsqfit(db::LsqDB;
 
    if verbose
       rel_rms = norm(Ψ * c - Y) / norm(Y)
-      verbose && println("Relative RMSE on training set: ", rel_rms)
+      info("Relative RMSE on training set: ", rel_rms)
    end
 
    # compute errors
+   verbose && info("Assemble errors table")
    errs = Err.lsqerrors(db, c, Jbasis; confignames=keys(configweights), E0=E0)
 
    if E0 != 0
@@ -308,6 +309,8 @@ function lsqfit(db::LsqDB;
    # --------------------------------------------------------------------
    # ASSEMBLE INFO DICT
    # --------------------------------------------------------------------
+   verbose && info("Assemble Information about the fit")
+
    # Julia Version Info
    iob = IOBuffer()
    versioninfo(iob)
