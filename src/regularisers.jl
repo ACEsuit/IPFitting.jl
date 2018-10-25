@@ -33,7 +33,9 @@ module Regularisers
 using StaticArrays
 using JuLIP: AbstractCalculator
 using JuLIP.Potentials: evaluate_d
-using NBodyIPs: bodyorder, transform, evaluate_many_ricoords!
+using NBodyIPs: bodyorder, transform, evaluate_many_ricoords!, descriptor
+using NBodyIPs.Polys: NBPoly
+using NBodyIPs.EnvIPs: EnvIP
 using NBodyIPFitting.Tools: @def
 
 import Base: Matrix
@@ -125,10 +127,10 @@ function Matrix(reg::NBodyRegulariser{N}, B::Vector{<: AbstractCalculator}
    # TODO: this assumes that all elements of B have the same descriptor
    # get the indices of the N-body basis functions
    Ib = find(bodyorder.(B) .== N)
-   D = B[Ib[1]].D
+   D = descriptor(B[Ib[1]])
    # assume all have the same dictionary
    # if not, then this regularisation is not valid
-   @assert all(b.D == D  for b in B[Ib])
+   @assert all(descriptor(b) == D  for b in B[Ib])
 
    # scalar inverse transform
    inv_t = x -> inv_transform(x, reg.r0, reg.r1, D)
@@ -171,27 +173,48 @@ function Matrix(reg::NBodyRegulariser{N}, B::Vector{<: AbstractCalculator}
 end
 
 
+_envdeg_(b::NBPoly) = 0
+_envdeg_(b::EnvIP) = b.t
+
+regeval_d(b::NBPoly, args...) = evaluate_d(b, args...)
+regeval_d(b::EnvIP, args...) = evaluate_d(b.Vr, args...)
+
+_Vr(b::NBPoly) = b
+_Vr(b::EnvIP) = b.Vr
+
 function regularise_2b(B::Vector, r0::Number, r1::Number, creg, Nquad)
    I2 = find(bodyorder.(B) .== 2)
+   maxenvdeg = maximum(_envdeg_.(B[I2]))
    rr = linspace(r0, r1, Nquad)
-   Φ = zeros(Nquad, length(B))
+   Φ = [ zeros(Nquad, length(B))  for _=1:(maxenvdeg+1) ]
    h = (r1 - r0) / (Nquad-1)
    for (ib, b) in zip(I2, B[I2]), (iq, r) in enumerate(rr)
-      Φ[iq, ib] = (evaluate_d(b, r+1e-2)-evaluate_d(b, r-1e-2))/(2e-2) * sqrt(creg * h)
+      envdeg = _envdeg_(b)
+      Φ[envdeg+1][iq, ib] = (regeval_d(b, r+1e-2)-regeval_d(b, r-1e-2))/(2e-2) * sqrt(creg * h)
    end
-   return creg * Φ, zeros(size(Φ, 1))
+   Φall = vcat(Φ...)
+   return Φall, zeros(size(Φall, 1))
 end
 
 
-
+# B = basis[Ib]
+# nB = length(basis)
 function assemble_reg_matrix(X, B, nB, Ib, inv_tv, freg)
-   Ψ = zeros(length(X), nB)
-   temp = zeros(length(Ib))
-   for (ix, x) in enumerate(X)
-      Ψ[ix, Ib] = freg(x, B, temp, inv_tv)
+   @assert length(B) == length(Ib)
+   envdegs = unique(_envdeg_.(B))
+   Ψ = [ zeros(length(X), nB)  for _=1:length(envdegs) ]
+   Ib_deg = [ find(_envdeg_.(B) .== p) for p in envdegs ]
+   for (ii, (Ψ_, Ib_, p)) in enumerate(zip(Ψ, Ib_deg, envdegs))
+      temp = zeros(length(Ib_))
+      B_ = [_Vr(b) for b in B[Ib_]]
+      for (ix, x) in enumerate(X)
+         Ψ_[ix, Ib[Ib_]] = freg(x, B_, temp, inv_tv)
+      end
    end
-   return Ψ
+   return vcat(Ψ...)
 end
+
+
 
 
 function laplace_regulariser(x::SVector{DIM,T}, B::Vector{<: AbstractCalculator},
