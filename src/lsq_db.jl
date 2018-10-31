@@ -81,14 +81,15 @@ using StaticArrays:          SVector
 using JuLIP:                 vecs, mat, AbstractCalculator, AbstractAtoms, Atoms
 using NBodyIPFitting:        Dat, LsqDB, KronGroup, DataGroup, data, basis,
                              evaluate_lsq
-using NBodyIPFitting.Data:   configtype
+using NBodyIPFitting.Data:   configtype, configname
 using NBodyIPFitting.Tools:  tfor, decode
+using NBodyIPs:              degree, bodyorder, basisname
 
 import NBodyIPFitting.FIO
 
 import Base: flush, append!
 
-export LsqDB
+export LsqDB, confignames
 
 const KRONFILE = "_kron.h5"
 const INFOFILE = "_info.jld2"
@@ -280,6 +281,7 @@ end
 
 # ------------------- Evaluating LSQ Blocks -----------------
 
+# TODO: use the new splitting technique!!!
 """
 Take a basis and split it into individual basis groups.
 """
@@ -365,5 +367,39 @@ function evallsq_split(d, basis)
                 for key in keys(D_ord[1]) )
 end
 
+
+# ================ Convenience =============
+
+confignames(db::LsqDB) = configname.( collect( keys( db.data_groups ) ) )
+
+function Base.info(db::LsqDB)
+   # config names, how many
+   configs_info = Dict{String, Int}()
+   for (key, dg) in db.data_groups
+      cn = configname(key)
+      if haskey(configs_info, cn)
+         configs_info[cn] += length(dg)
+      else
+         configs_info[cn] = length(dg)
+      end
+   end
+   println("======================================================")
+   println("       LsqDB Summary ")
+   println("------------------------------------------------------")
+   println(" Datagroup: configname  =>  number of configs ")
+   for (i, (key, val)) in enumerate(configs_info)
+      println("        $i : $key  =>  $val ")
+   end
+   # basis groups, how many, max degree
+   B = db.basis
+   Bord, Iord = split_basis(B)
+   println("------------------------------------------------------")
+   println(" Basis Group  |  type   | body-order |  degree ")
+   for (i, B1) in enumerate(Bord)
+      deg = maximum(degree.(B1))
+      println("           $i  |  $(basisname(B1[1])) | $(bodyorder(B1[1])) | $deg ")
+   end
+   println("======================================================")
+end
 
 end

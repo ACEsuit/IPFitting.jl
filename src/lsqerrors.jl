@@ -54,15 +54,18 @@ LsqErrors(configtypes) =
 function lsqerrors(db, c, Ibasis; confignames = Colon(), E0 = nothing)
    if confignames isa Colon
       confignames = configname.(collect(keys(db.data_groups)))
+   else
+      confignames = collect(confignames)
    end
    @assert E0 != nothing
 
    # create the dict for the fit errors
-   errs = LsqErrors(confignames)
+   errs = LsqErrors([confignames; "set"])
    lengths = Dict{String, Dict{String, Int}}()
-   for cn in confignames
+   for cn in [confignames; "set"]
       lengths[cn] = Dict{String, Int}()
    end
+
 
    # scatterE = Dict{String, Tuple{Vector{Float64}, Vector{Float64}}}()
    # scatterF = Dict{String, Tuple{Vector{Float64}, Vector{Float64}}}()
@@ -81,6 +84,11 @@ function lsqerrors(db, c, Ibasis; confignames = Colon(), E0 = nothing)
             errs.mae[cn][ot] = 0.0
             errs.nrm1[cn][ot] = 0.0
             lengths[cn][ot] = 0
+            errs.rmse["set"][ot] = 0.0
+            errs.nrm2["set"][ot] = 0.0
+            errs.mae["set"][ot] = 0.0
+            errs.nrm1["set"][ot] = 0.0
+            lengths["set"][ot] = 0
          end
          # assemble the observation vector
          y = Float64[]
@@ -99,13 +107,18 @@ function lsqerrors(db, c, Ibasis; confignames = Colon(), E0 = nothing)
          w = weighthook(ot, db.data_groups[ct][1])
          errs.rmse[cn][ot] += w^2 * norm(block * c - y)^2
          errs.nrm2[cn][ot] += w^2 * norm(y)^2
-         errs.mae[cn][ot]  += w^2 * norm(block * c - y, 1)
-         errs.nrm1[cn][ot] += w^2 * norm(y, 1)
+         errs.mae[cn][ot]  += w * norm(block * c - y, 1)
+         errs.nrm1[cn][ot] += w * norm(y, 1)
          lengths[cn][ot] += length(y)
+         errs.rmse["set"][ot] += w^2 * norm(block * c - y)^2
+         errs.nrm2["set"][ot] += w^2 * norm(y)^2
+         errs.mae["set"][ot]  += w * norm(block * c - y, 1)
+         errs.nrm1["set"][ot] += w * norm(y, 1)
+         lengths["set"][ot] += length(y)
       end
    end
 
-   for cn in confignames
+   for cn in [confignames; "set"]
       for ot in keys(errs.rmse[cn])
          len = lengths[cn][ot]
          errs.rmse[cn][ot] = sqrt( errs.rmse[cn][ot] / len )
