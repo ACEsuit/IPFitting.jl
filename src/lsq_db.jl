@@ -114,7 +114,6 @@ function load_info(dbpath::String)
          error("I tried to load both a json and a jld2 and neither worked?")
       end
    end
-   @show typeof(dbinfo)
    basis = decode.(dbinfo["basis"])
    data_groups = Dict{String, DataGroup}()
    for (key, val) in dbinfo["data"]
