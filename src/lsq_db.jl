@@ -92,7 +92,7 @@ import Base: flush, append!
 export LsqDB, confignames
 
 const KRONFILE = "_kron.h5"
-const INFOFILE = "_info.jld2"
+const INFOFILE = "_info.json"
 
 """
 `dbpath(db::LsqDB)` : return the absolute path to the database files, not
@@ -105,10 +105,19 @@ infofile(dbpath::AbstractString) = dbpath * INFOFILE
 kronfile(dbpath::AbstractString) = dbpath * KRONFILE
 
 function load_info(dbpath::String)
-   info = FIO.load(infofile(dbpath))
-   basis = decode.(info["basis"])
+   dbinfo = try
+      FIO.load(infofile(dbpath))
+   catch
+      try
+         FIO.load(dbpath * "_info.jld2")
+      catch
+         error("I tried to load both a json and a jld2 and neither worked?")
+      end
+   end
+   @show typeof(dbinfo)
+   basis = decode.(dbinfo["basis"])
    data_groups = Dict{String, DataGroup}()
-   for (key, val) in info["data"]
+   for (key, val) in dbinfo["data"]
       data_groups[key] = [Dat(v) for v in val]
    end
    return basis, data_groups

@@ -45,7 +45,7 @@ end
 println("checking consistency of db")
 println(@test DB.dbpath(db) == dbpath)
 println(@test DB.kronfile(dbpath) == dbpath * "_kron.h5")
-println(@test DB.infofile(dbpath) == dbpath * "_info.jld2")
+println(@test DB.infofile(dbpath) == dbpath * "_info.json")
 println(@test db.basis == basis)
 println(@test db.data_groups["md"] == data1)
 println(@test db.data_groups["cell"] == data2)
@@ -60,8 +60,6 @@ println(@test db1.kron_groups == db.kron_groups)
 ##
 println("Delete the temporary database")
 rm(tmpdir; force=true, recursive=true)
-
-
 
 
 # TODO: Some test like this will be needed when we switch to

@@ -39,9 +39,10 @@ for d in degrees
    B2 = nbpolys(2, D2, d)
    @show length(B2)
    db = LsqDB("", B2, data)
-   IP, errs = Lsq.lsqfit(db, E0 = 0.0,
+   IP, fitinfo = Lsq.lsqfit(db, E0 = 0.0,
                              configweights = Dict("rand" => 1.0),
                              dataweights   = Dict("E" => 100.0, "F" => 1.0) )
+   errs = Err.LsqErrors(fitinfo["errors"])
    Err.table_absolute(errs)
    V2 = IP.components[1]
    ev2 = vecnorm(V2.(rr) - 0.5 * calc.(rr), Inf)

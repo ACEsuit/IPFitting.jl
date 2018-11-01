@@ -15,10 +15,9 @@ println("  * (de-)dictionisation, ==")
 
 at = rattle!(bulk(:Fe) * 3, 0.1)
 lj = LennardJones(r0 = rnn(:Fe)) * C2Shift(2.5*rnn(:Fe))
-dat = Dat(at, "test",
-          Dict( "E" => vec(Val(:E), energy(lj, at)),
-                "F" => vec(Val(:F), forces(lj, at)),
-                "V" => vec(Val(:V), virial(lj, at)) ) )
+dat = Dat(at, "test"; E = energy(lj, at),
+                      F = forces(lj, at),
+                      V = virial(lj, at) )
 
 println(@test(configtype(dat) == "test"))
 println(@test(energy(dat) == energy(lj, at)))

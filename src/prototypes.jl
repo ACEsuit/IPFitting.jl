@@ -1,6 +1,7 @@
 
 import Base: ==, convert, vec
 
+import JuLIP
 using JuLIP: Atoms, JVec, JMat, JVecs, AbstractCalculator, mat, vecs,
              numbers, positions, cell, pbc
 
@@ -63,11 +64,15 @@ Base.Dict(d::Dat) =
          "configtype" => d.configtype,
          "D" => d.D )
 
+
+_read_cell(C::Matrix) = JuLIP.JMatF(C)
+_read_cell(C::Vector{Any}) = JuLIP.JMatF( ([C[1] C[2] C[3]])... )
+
 function Dat(D::Dict)
-   at = Atoms( X = D["X"] |> vecs,
-               Z = D["Z"],
-               cell = JMat(D["cell"]),
-               pbc = tuple(Bool.(D["pbc"])...) )
+   at = Atoms( X = JuLIP._read_X(D["X"]),
+               Z = Vector{Int}(D["Z"]),
+               cell = _read_cell(D["cell"]),
+               pbc = Bool.(D["pbc"]) )  # tuple(Bool.(D["pbc"])...)
    return Dat(at, D["configtype"], Dict{String, Any}(D["D"]), Dict{String, Any}())
 end
 
