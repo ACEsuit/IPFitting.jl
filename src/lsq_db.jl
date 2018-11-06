@@ -83,7 +83,7 @@ using NBodyIPFitting:        Dat, LsqDB, KronGroup, DataGroup, data, basis,
                              evaluate_lsq
 using NBodyIPFitting.Data:   configtype, configname
 using NBodyIPFitting.Tools:  tfor, decode
-using NBodyIPs:              degree, bodyorder, basisname
+using NBodyIPs:              degree, bodyorder, basisname, combiscriptor
 
 import NBodyIPFitting.FIO
 
@@ -289,18 +289,18 @@ end
 
 # ------------------- Evaluating LSQ Blocks -----------------
 
-# TODO: use the new splitting technique!!!
+
 """
 Take a basis and split it into individual basis groups.
 """
 function split_basis(basis)
    # get the types of the individual basis elements
-   tps = typeof.(basis)
+   tps = combiscriptor.(basis)
    Iord = Vector{Int}[]
    Bord = Any[]
    for tp in unique(tps)
       # find which elements of basis have type `tp`
-      I = find( tp .== tps )
+      I = find( [tp == t  for t in tps] )
       push!(Iord, I)
       push!(Bord, [b for b in basis[I]])
    end

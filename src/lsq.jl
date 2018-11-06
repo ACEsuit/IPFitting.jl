@@ -316,8 +316,7 @@ function lsqfit(db::LsqDB;
    juliainfo = String(iob)
 
    # NBodyIPs and NBodyIPFitting Version Info
-   nbipinfo = readstring(`git -C $(Pkg.dir("NBodyIPs")) rev-parse HEAD`)
-   nbipfitinfo = readstring(`git -C $(Pkg.dir("NBodyIPFitting")) rev-parse HEAD`)
+   nbipinfo, nbipfitinfo = get_git_info()
 
    # number of configurations for each configtype
    numconfigs = Dict{String, Int}()
@@ -350,6 +349,12 @@ function lsqfit(db::LsqDB;
 end
 
 
-
+function get_git_info()
+   nbipinfo = readstring(`cat $(Pkg.dir("NBodyIPs")*"/.git/refs/heads/master")`)[1:end-1]
+   nbipfitinfo = readstring(`cat $(Pkg.dir("NBodyIPFitting")*"/.git/refs/heads/master")`)[1:end-1]
+   # nbipinfo = readstring(`git -C $(Pkg.dir("NBodyIPs")) rev-parse HEAD`)
+   # nbipfitinfo = readstring(`git -C $(Pkg.dir("NBodyIPFitting")) rev-parse HEAD`)
+   return nbipinfo, nbipfitinfo
+end
 
 end
