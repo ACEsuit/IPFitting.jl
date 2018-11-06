@@ -146,7 +146,6 @@ function _regularise!(Ψ::Matrix{T}, Y::Vector{T}, basis, regularisers) where {T
       else
          P, q = Matrix(reg, basis)
       end
-      @show size(Ψreg), size(P)
       Ψreg = vcat(Ψreg, P)
       Yreg = vcat(Yreg, q)
    end

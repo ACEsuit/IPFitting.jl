@@ -152,6 +152,19 @@ abserr_table(fit_info) = table_absolute(fit_info["errors"])
 table_relative(errs::Dict) = table_relative(LsqErrors(errs))
 table_absolute(errs::Dict) = table_absolute(LsqErrors(errs))
 
+
+function truncate_string(s, n)
+   if length(s) <= n
+      return s
+   end
+   n1 = n2 = (n-2) ÷ 2
+   if n1 + n2 + 2 < n
+      n1 += 1
+   end
+   return "$(s[1:n1])..$(s[end-n2+1:end])"
+end
+
+
 function table_relative(errs::LsqErrors)
    print("-----------------------------------------------------------------\n")
    print("               ||           RMSE        ||           MAE      \n")
@@ -159,9 +172,8 @@ function table_relative(errs::LsqErrors)
    print("---------------||-------|-------|-------||-------|-------|-------\n")
    s_set = ""
    for ct in keys(errs.rmse)  # ct in configtypes
-      lct = min(length(ct), 13)
       s = @sprintf(" %13s || %5.2f | %5.2f | %5.2f || %5.2f | %5.2f | %5.2f \n",
-         ct[1:lct],
+         truncate_string(ct, 13),
          100*relrmse(errs, ct, "E"),
          100*relrmse(errs, ct, "F"),
          100*relrmse(errs, ct, "V"),
@@ -174,8 +186,10 @@ function table_relative(errs::LsqErrors)
          print(s)
       end
    end
-   # print("---------------||-------|-------|-------||-------|-------|-------\n")
-   # print(s_set)
+   if s_set != ""
+      print("---------------||-------|-------|-------||-------|-------|-------\n")
+      print(s_set)
+   end
    print("-----------------------------------------------------------------\n")
 end
 
@@ -187,10 +201,8 @@ function table_absolute(errs::LsqErrors)
    print("---------------||---------|---------|---------||---------|---------|---------\n")
    s_set = ""
    for ct in keys(errs.rmse)  # ct in configtypes
-
-      lct = min(length(ct), 16)
-      s = @sprintf(" %16s || %7.4f | %7.4f | %7.4f || %7.4f | %7.4f | %7.4f \n",
-                   ct[1:lct],
+      s = @sprintf(" %13s || %7.4f | %7.4f | %7.4f || %7.4f | %7.4f | %7.4f \n",
+                   truncate_string(ct, 13),
                    rmse(errs, ct, "E"), rmse(errs, ct, "F"), rmse(errs, ct, "V"),
                     mae(errs, ct, "E"),  mae(errs, ct, "F"),  mae(errs, ct, "V") )
       if ct == "set"
@@ -199,8 +211,10 @@ function table_absolute(errs::LsqErrors)
          print(s)
       end
    end
-   # print("---------------||---------|---------|---------||---------|---------|---------\n")
-   # print(s_set)
+   if s_set != ""
+   print("---------------||---------|---------|---------||---------|---------|---------\n")
+   print(s_set)
+   end
    print("-----------------------------------------------------------------------------\n")
 end
 
