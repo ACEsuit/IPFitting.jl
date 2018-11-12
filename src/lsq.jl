@@ -21,7 +21,7 @@ Y = [E, E, E, E...., F, F, F, F, ...]
 """
 module Lsq
 
-import JuLIP, NBodyIPFitting
+import JuLIP, NBodyIPFitting, StatsBase
 
 using StaticArrays
 using JuLIP: AbstractCalculator, Atoms
@@ -29,14 +29,28 @@ using NBodyIPs: OneBody, NBodyIP
 using NBodyIPFitting: Dat, LsqDB, data, weighthook
 using NBodyIPFitting.Data: observation, hasobservation, configname, configtype
 using NBodyIPFitting.DataTypes: ENERGY
-using NBodyIPFitting.DB: dbpath
+using NBodyIPFitting.DB: dbpath, _nconfigs, _nbasis
 
 const Err = NBodyIPFitting.Errors
 
 export lsqfit
 
+
+
 _keys(configweights, dataweights) = collect(keys(configweights)),
                                     collect(keys(dataweights))
+
+function _random_subset(db::LsqDB, configtype::AbstractString, p::Real)
+   @assert 0 <= p <= 1
+   # number of configurations in db for this configtype
+   nconfigs = _nconfigs(db, configtype)
+   # number of samples we want
+   nsamples = ceil(Int, p * nconfigs)
+   # draw a random subset
+   return StatsBase.sample(1:nconfigs, nsamples, replace = false, ordered = true)
+end
+
+
 
 """
 `observations(db::LsqDB, configweights::Dict, dataweights::Dict) -> Vector{Float64}`
@@ -50,7 +64,8 @@ function observations(db::LsqDB,
                       configtypes::Vector{String},
                       datatypes::Vector{String},
                       ctweights::Dict,
-                      dtweights::Dict, E0 )
+                      dtweights::Dict, E0,
+                      Iconfigs::Dict )
    Y = Float64[]
    W = Float64[]
    # loop through configuration groups
@@ -62,7 +77,7 @@ function observations(db::LsqDB,
             continue
          end
          # loop through the observations (x, f(x)) of the current configuration group
-         for dat in db.data_groups[ct]
+         for dat in db.data_groups[ct][Iconfigs[ct]]
             o = observation(dat, dt)
             # TODO: This is a hack => can we replace it with a hook?
             if dt == ENERGY # subtract the 1-body reference energy
@@ -76,7 +91,7 @@ function observations(db::LsqDB,
             wh = weighthook(dt, dat)
             # then we can still modify the weights from extra information
             # in the dat structure
-            w = _get_weights(ctweight, dtweights[dt], wh, dat, dt, o)
+            w = _get_weights(ctweight.weight, dtweights[dt], wh, dat, dt, o)
             append!(W, w)
          end
       end
@@ -115,7 +130,7 @@ end
 # TODO: this function here suggests that the ordering we are usig at the moment
 #       is perfectly fine, and is in fact the more performant ordering
 #       and we should not switch it
-function lsq_matrix!(Ψ, db, configtypes, datatypes, Ibasis)
+function lsq_matrix!(Ψ, db, configtypes, datatypes, Ibasis, Iconfigs::Dict)
    idx = 0
    for ct in configtypes
       k = db.kron_groups[ct]
@@ -123,8 +138,9 @@ function lsq_matrix!(Ψ, db, configtypes, datatypes, Ibasis)
          if haskey(k, dt)
             # block[:, i, j] = <data(i), basis(j)>_{dt}
             block = k[dt]
-            nrows = size(block, 1) * size(block, 2)
-            Ψ[(idx+1):(idx+nrows), :] = reshape(block[:, :, Ibasis], nrows, :)
+            Icfg = Iconfigs[ct]  # <--- which i to keep?
+            nrows = size(block, 1) * length(Icfg)
+            Ψ[(idx+1):(idx+nrows), :] = reshape(block[:, Icfg, Ibasis], nrows, :)
             idx += nrows
          end
       end
@@ -153,17 +169,35 @@ function _regularise!(Ψ::Matrix{T}, Y::Vector{T}, basis, regularisers) where {T
    return vcat(Ψ, Ψreg), vcat(Y, Yreg)
 end
 
+
+"""
+`struct ConfigFitInfo` : stores `configtype`-dependent
+weights and also proportion of configurations to fit to
+"""
+struct ConfigFitInfo
+   weight::Float64
+   proportion::Float64
+   order::Symbol
+end
+
+ConfigFitInfo(cfi::ConfigFitInfo) = deepcopy(cfi)
+ConfigFitInfo(cfi::Tuple) = ConfigFitInfo(cfi...)
+ConfigFitInfo(w::Real) = ConfigFitInfo(w, 1.0, :ignore)
+ConfigFitInfo(w::Real, p::Real) = ConfigFitInfo(w, p, :ignore)
+ConfigFitInfo(w::Real, p::Real, o::Any) = ConfigFitInfo(w, p, Symbol(o))
+
+
 """
 generate a new dictionary of configtype weights where configweights is a
 dictionary of configname weights
 """
 function _extend_configweights(configweights::Dict, configtypes)
    names = keys(configweights) |> collect
-   newweights = Dict{String, Float64}()
+   newweights = Dict{String, ConfigFitInfo}()
    for ct in configtypes
       cn = configname(ct)
       if cn in names
-         newweights[ct] = configweights[cn]
+         newweights[ct] = ConfigFitInfo(configweights[cn])
       end
    end
    return newweights
@@ -190,26 +224,28 @@ function get_lsq_system(db::LsqDB; verbose = true,
    Jbasis = ((Ibasis == Colon()) ? (1:length(db.basis)) : Ibasis)
 
    configweights = _extend_configweights(configweights, keys(db.data_groups))
+   Iconfigs = Dict( key => _random_subset(db, key, val.proportion)
+                    for (key, val) in configweights )
 
-   # # TODO TODO TODO => create some suitable "hooks"
+   # # TODO => create some suitable "hooks"
    # E0 = lsq.basis[1]()
    # # and while we're at it, subtract E0 from Y
    # Y[idx] -= E0 * len
 
    # fix some ordering of the configtypes and datatypes
    # even though this can be inferred from configweights and dataweights we
-   # need to by paranoid that the ordering does not change!
+   # need to be paranoid that the ordering does not change!
    configtypes, datatypes = _keys(configweights, dataweights)
    # get the observations vector and the weights vector
-   Y, W = observations(db, configtypes, datatypes, configweights, dataweights, E0)
+   Y, W = observations(db, configtypes, datatypes, configweights, dataweights,
+                       E0, Iconfigs)
    # check for NaNs
    any(isnan, Y) && error("NaN detected in observations vector")
    any(isnan, W) && error("NaN detected in weights vector")
 
    # allocate and assemble the big fat huge enourmous LSQ matrix
    Ψ = zeros(length(Y), length(Jbasis))
-   # lsq_matrix!(Ψ, db, configtypes, datatypes, Jbasis)
-   lsq_matrix!(Ψ, db, configtypes, datatypes, Jbasis)
+   lsq_matrix!(Ψ, db, configtypes, datatypes, Jbasis, Iconfigs)
    any(isnan, Ψ) && error("discovered NaNs in LSQ system matrix")
 
    # remove anything with zero-weight

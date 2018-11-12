@@ -380,6 +380,13 @@ end
 
 confignames(db::LsqDB) = configname.( collect( keys( db.data_groups ) ) )
 
+_nconfigs(db::LsqDB, configtype::AbstractString) =
+      size( first(db.kron_groups[configtype])[2], 2 )
+
+_nbasis(db::LsqDB, configtype::AbstractString) =
+      size( first(db.kron_groups[configtype])[2], 3 )
+
+
 function Base.info(db::LsqDB)
    # config names, how many
    configs_info = Dict{String, Int}()
