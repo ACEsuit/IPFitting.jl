@@ -305,11 +305,10 @@ configtypes and datatypes. Use `table_relative(errs)` and `table_absolute(errs)`
 to display these as tables and `rmse, mae` to access individual errors.
 """
 function lsqfit(db::LsqDB;
-                solver=:qr, verbose=true, E0 = nothing,
+                solver=(:qr, ), verbose=true, E0 = nothing,
                 Ibasis = :, configweights=nothing, dataweights = nothing,
                 regularisers = [],
                 kwargs...)
-   @assert solver == :qr
    @assert E0 != nothing
    Jbasis = ((Ibasis == Colon()) ? (1:length(db.basis)) : Ibasis)
 
@@ -320,10 +319,19 @@ function lsqfit(db::LsqDB;
                              regularisers = regularisers,
                              kwargs...)
 
-   verbose && info("solve $(size(Ψ)) LSQ system using QR factorisation")
-   qrΨ = qrfact(Ψ)
-   verbose && @show cond(qrΨ[:R])
-   c = qrΨ \ Y
+   if solver[1] == :qr
+      verbose && info("solve $(size(Ψ)) LSQ system using QR factorisation")
+      qrΨ = qrfact(Ψ)
+      verbose && @show cond(qrΨ[:R])
+      c = qrΨ \ Y
+
+   elseif solver[1] == :svd
+      ndiscard = solver[2]
+      # ...
+
+   else
+      error("unknown `solver` in `lsqfit`")
+   end
 
    if verbose
       rel_rms = norm(Ψ * c - Y) / norm(Y)
