@@ -326,9 +326,10 @@ function lsqfit(db::LsqDB;
       c = qrΨ \ Y
 
    elseif solver[1] == :svd
+      verbose && info("solve $(size(Ψ)) LSQ system using SVD factorisation")
       ndiscard = solver[2]
-      # ...
-
+      F = svdfact(Ψ)
+      c = F[:V][:,1:(end-ndiscard)] * (Diagonal(F[:S][1:(end-ndiscard)]) \ (F[:U]' * Y)[1:(end-ndiscard)])
    else
       error("unknown `solver` in `lsqfit`")
    end
@@ -373,7 +374,7 @@ function lsqfit(db::LsqDB;
    end
 
    infodict = Dict("errors" => Dict(errs),
-                   "solver" => String(solver),
+                   "solver" => String(solver[1]),
                    "E0" => E0,
                    "Ibasis" => Vector{Int}(Jbasis),
                    "dbpath" => dbpath(db),
