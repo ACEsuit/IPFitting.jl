@@ -319,7 +319,7 @@ function lsqfit(db::LsqDB;
                              regularisers = regularisers,
                              kwargs...)
 
-   if solver[1] == :qr
+   if (solver[1] == :qr) || (solver == :qr)
       verbose && info("solve $(size(Ψ)) LSQ system using QR factorisation")
       qrΨ = qrfact(Ψ)
       verbose && @show cond(qrΨ[:R])
@@ -330,6 +330,7 @@ function lsqfit(db::LsqDB;
       ndiscard = solver[2]
       F = svdfact(Ψ)
       c = F[:V][:,1:(end-ndiscard)] * (Diagonal(F[:S][1:(end-ndiscard)]) \ (F[:U]' * Y)[1:(end-ndiscard)])
+      
    else
       error("unknown `solver` in `lsqfit`")
    end
