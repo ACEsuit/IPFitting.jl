@@ -127,6 +127,13 @@ function Matrix(reg::NBodyRegulariser{N}, B::Vector{<: AbstractCalculator}
    # TODO: this assumes that all elements of B have the same descriptor
    # get the indices of the N-body basis functions
    Ib = find(bodyorder.(B) .== N)
+   if isempty(Ib)
+      warn("""Trying to construct a $N-body regulariser, but no basis function
+              with bodyorder $N exists.""")
+      Ψreg = zeros(0, length(B))
+      Yreg = zeros(0, 1)
+      return Ψreg, Yreg
+   end
    D = descriptor(B[Ib[1]])
    # assume all have the same dictionary
    # if not, then this regularisation is not valid
