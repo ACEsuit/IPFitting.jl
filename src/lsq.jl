@@ -33,7 +33,7 @@ using NBodyIPFitting.DB: dbpath, _nconfigs, _nbasis
 
 const Err = NBodyIPFitting.Errors
 
-export lsqfit
+export lsqfit, onb
 
 
 
@@ -269,6 +269,33 @@ function get_lsq_system(db::LsqDB; verbose = true,
 end
 
 
+function onb(db::LsqDB;
+             solver=(:qr, ), verbose=true, E0 = nothing,
+             Ibasis = :, configweights=nothing, dataweights = nothing,
+             regularisers = [],
+             kwargs...)
+   @assert E0 != nothing
+   Jbasis = ((Ibasis == Colon()) ? (1:length(db.basis)) : Ibasis)
+
+   verbose && info("assemble lsq system")
+   Ψ, _ = get_lsq_system(db; verbose=verbose, E0=E0, Ibasis=Ibasis,
+                             configweights = configweights,
+                             dataweights = dataweights,
+                             regularisers = regularisers,
+                             kwargs...)
+   @assert solver[1] == :qr
+   verbose && info("QR-factorize Ψ, size=$(size(Ψ))")
+   qrΨ = qrfact(Ψ)
+   verbose && @show cond(qrΨ[:R])
+   Rinv = pinv(qrΨ[:R])
+   basis = db.basis[Ibasis]
+   onb = []
+   for n = 1:size(Rinv, 2)
+      push!(onb, NBodyIP(basis, Rinv[:,n]))
+   end
+   return [b for b in onb]
+end
+
 
 """
 `lsqfit(db; kwargs...) -> IP, errs`
@@ -330,7 +357,7 @@ function lsqfit(db::LsqDB;
       ndiscard = solver[2]
       F = svdfact(Ψ)
       c = F[:V][:,1:(end-ndiscard)] * (Diagonal(F[:S][1:(end-ndiscard)]) \ (F[:U]' * Y)[1:(end-ndiscard)])
-      
+
    else
       error("unknown `solver` in `lsqfit`")
    end

@@ -21,44 +21,45 @@ end
 
 r0 = rnn(:Si)
 calc = StillingerWeber()
-data = generate_data(:Si, 2, 0.2*r0, 30, calc)
+data = generate_data(:Si, 2, 0.33*r0, 100, calc)
 
-TRANSFORM = "exp( - 2 * (r/$r0 - 1) )"
+TRANSFORM = "exp( - 2 * (r/$r0 - 1.5) )"
 
-rcut2 = cutoff(calc)
+rcut2 = cutoff(calc)*1.6
 CUTOFF2 = "(:cos, $(rcut2-1), $rcut2)"
-D2 = BondAngleDesc(TRANSFORM, CUTOFF2)
+D2 = BondLengthDesc(TRANSFORM, CUTOFF2)
 
-rcut3 = cutoff(calc)
+rcut3 = cutoff(calc)*1.6
 CUTOFF3 = "(:cos, $(rcut3-1), $rcut3)"
-D3 = BondAngleDesc(TRANSFORM, CUTOFF3)
+D3 = BondLengthDesc(TRANSFORM, CUTOFF3)
 
 ##
 err_erms = Float64[]
 err_frms = Float64[]
-degrees = [4, 6, 8, 10, 12]
+degrees = [4, 6, 8, 10] # [4, 6, 8, 10, 12]
 rr = linspace(0.9*r0, cutoff(calc), 200)
 for deg3 in degrees
    # B = [B1; gen_basis(2, D2, deg2); gen_basis(3, D3, deg3)]
-   B = [nbpolys(2, D2, 8); nbpolys(3, D3, deg3)]
+   # B = [nbpolys(2, D2, 8); nbpolys(3, D3, deg3)]
+   B = nbpolys(3, D3, deg3)
    @show length(B)
    db = LsqDB("", B, data)
    IP, errs = Lsq.lsqfit( db,
                          E0 = 0.0,
                          configweights = Dict("rand" => 1.0),
                          dataweights   = Dict("E" => 100.0, "F" => 1.0) )
-   push!(err_erms, Err.relrmse(errs, "rand", "E"))
-   push!(err_frms, Err.relrmse(errs, "rand", "F"))
+   # push!(err_erms, Err.relrmse(errs, "rand", "E"))
+   # push!(err_frms, Err.relrmse(errs, "rand", "F"))
 end
 
-##
-df = DataFrame( :degrees => degrees,
-                :relrms_E => err_erms,
-                :relrms_F => err_frms )
-display(df)
-
-(@test minimum(err_erms) < 0.0001) |> println
-(@test minimum(err_frms) < 0.01) |> println
+# ##
+# df = DataFrame( :degrees => degrees,
+#                 :relrms_E => err_erms,
+#                 :relrms_F => err_frms )
+# display(df)
+#
+# (@test minimum(err_erms) < 0.0001) |> println
+# (@test minimum(err_frms) < 0.01) |> println
 
 
 # BOND LENGTH
