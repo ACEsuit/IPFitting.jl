@@ -26,10 +26,10 @@ end
 
 save(fname, args...) = save(fname, Dict(args...))
 save(fname, D::Dict) = _save(_format(fname), fname, D)
-load(fname, args...) = _load(_format(fname), fname, args...)
+load(fname, args...; kwargs...) = _load(_format(fname), fname, args...; kwargs...)
 
-function _load(format, fname, args...)
-   D = _load(format, fname)
+function _load(format, fname, args...; kwargs...)
+   D = _load(format, fname; kwargs...)
    if length(args) == 1
       return D[args[1]]
    end
@@ -78,13 +78,19 @@ end
 _cleanup!(val::Any) = val
 _cleanup!(val::UInt8) = (val === NOTHING_H5 ? nothing : val)
 
-function _load(::FHDF5, fname, args...)
+
+
+_readall(fid, mmap) =
+      Dict( n => _readfrom(fid, mmap, n) for n in names(fid) )
+
+
+function _load(::FHDF5, fname, args...; mmap=false)
    fid = h5open(fname, "r")
    ret = try
       if length(args) == 0
-         ret = read(fid)
+         ret = _readall(fid, mmap)
       else
-         ret = [_readfrom(fid, a) for a in args]
+         ret = [_readfrom(fid, mmap, a) for a in args]
       end
       close(fid)
       ret
@@ -102,10 +108,13 @@ function _load(::FHDF5, fname, args...)
    end
 end
 
-_readfrom(g, a::Tuple) = _readfrom(g, a...)
-_readfrom(g, a::String, I::Tuple) = g[a][I...]
-_readfrom(g, a::String) = read(g, a)
+_readfrom(g, mmap, a::Tuple) = _readfrom(g, mmap, a...)
+_readfrom(g, mmap, a::String, I::Tuple) = g[a][I...]
+_readfrom(g, mmap, a::String) = mmap ? _readmmap(g[a]) : read(g, a)
 
+_readmmap(g::HDF5Group) =
+   Dict( n => _readmmap(g[n]) for n in names(g) )
+_readmmap(g::HDF5Dataset) = readmmap(g)
 
 
 function _save(::FHDF5, fname, D::Dict)

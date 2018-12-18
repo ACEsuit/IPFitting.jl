@@ -19,11 +19,12 @@ function generate_data(species, L, rmax, N, calc)
    return data
 end
 
+srand(1)
 r0 = rnn(:Cu)
 calc = let r0=r0
    LennardJones(r0=r0) * C2Shift(2.5*r0)
 end
-data = generate_data(:Cu, 3, 0.25*r0, 30, calc)
+data = generate_data(:Cu, 3, 0.25*r0, 50, calc)
 rcut2 = cutoff(calc)
 # D2 = BondLengthDesc("exp( - 2 * (r/$r0 - 1) )", (:cos, rcut2-1, rcut2))
 D2 = BondLengthDesc("($r0)/r", (:cos, rcut2-1, rcut2))
@@ -65,5 +66,5 @@ display(df)
 
 (@test minimum(err_erms) < 1e-4) |> println
 (@test minimum(err_frms) < 1e-3) |> println
-(@test minimum(err_eunif) < 2e-4) |> println
+(@test minimum(err_eunif) < 3e-4) |> println
 (@test minimum(err_funif) < 4e-4) |> println

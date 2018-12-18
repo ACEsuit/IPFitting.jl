@@ -145,17 +145,17 @@ end
 
 save_kron(db) = save_kron(dbpath(db), db)
 
-function load_kron(dbpath::String)
-   kron_groups = FIO.load(kronfile(dbpath))
+function load_kron(dbpath::String; mmap=false)
+   kron_groups = FIO.load(kronfile(dbpath); mmap=mmap)
    return kron_groups
 end
 
-load_kron(db::LsqDB) = load_kron(dbpath(db))
+load_kron(db::LsqDB; mmap=false) = load_kron(dbpath(db); mmap=mmap)
 
-function LsqDB(dbpath::AbstractString)
+function LsqDB(dbpath::AbstractString; mmap=false)
    basis, data_groups = load_info(dbpath)
    @assert isfile(kronfile(dbpath))
-   kron_groups = load_kron(dbpath)
+   kron_groups = load_kron(dbpath; mmap=mmap)
    return LsqDB(basis, data_groups, kron_groups, dbpath)
 end
 
