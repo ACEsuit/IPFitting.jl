@@ -116,7 +116,8 @@ _bainvt(inv_t, x::StaticVector{6}) =
 # this converts the Regulariser type information to a matrix that can be
 # attached to the LSQ problem .
 #
-function Matrix(reg::NBodyRegulariser{N}, B::Vector{<: AbstractCalculator}
+function Matrix(reg::NBodyRegulariser{N}, B::Vector{<: AbstractCalculator};
+                verbose=false
                 ) where {N}
 
    # 2B is a bit simpler than the rest, treat it separately
@@ -128,8 +129,8 @@ function Matrix(reg::NBodyRegulariser{N}, B::Vector{<: AbstractCalculator}
    # get the indices of the N-body basis functions
    Ib = find(bodyorder.(B) .== N)
    if isempty(Ib)
-      warn("""Trying to construct a $N-body regulariser, but no basis function
-              with bodyorder $N exists.""")
+      verbose && warn("""Trying to construct a $N-body regulariser, but no basis
+                         function with bodyorder $N exists.""")
       Ψreg = zeros(0, length(B))
       Yreg = zeros(0, 1)
       return Ψreg, Yreg
