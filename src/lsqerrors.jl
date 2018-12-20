@@ -8,7 +8,6 @@ using NBodyIPFitting.Data: observation, hasobservation, configname
 export lsqerrors, table, table_relative, table_absolute, relerr_table, abserr_table
 # , scatter_E, scatter_F
 
-
 struct LsqErrors
    rmse::Dict{String, Dict{String,Float64}}
     mae::Dict{String, Dict{String,Float64}}
@@ -21,11 +20,12 @@ struct LsqErrors
 end
 
 Base.Dict(errs::LsqErrors) =
-   Dict("rmse" => errs.rmse, "mae" => errs.mae,
-        "nrm2" => errs.nrm2, "nrm1" => errs.nrm1)
+   Dict("rmse" => errs.rmse, "mae" => errs.mae, "maxe" => errs.maxe,
+        "nrm2" => errs.nrm2, "nrm1" => errs.nrm1, "nrminf" => errs.nrminf)
 
 LsqErrors(errs::Dict) =
-   LsqErrors(errs["rmse"], errs["mae"], errs["nrm2"], errs["nrm1"])
+   LsqErrors( errs["rmse"], errs["mae"], errs["maxe"],
+              errs["nrm2"], errs["nrm1"], errs["nrminf"] )
 
 rmse(errs::LsqErrors, ct, ot) =
       haskey(errs.rmse[ct], ot) ? errs.rmse[ct][ot] : NaN
@@ -37,7 +37,7 @@ relmae(errs::LsqErrors, ct, ot) =
       haskey(errs.mae[ct], ot) ? errs.mae[ct][ot]/errs.nrm1[ct][ot] : NaN
 maxe(errs::LsqErrors, ct, ot) =
       haskey(errs.maxe[ct], ot) ? errs.maxe[ct][ot] : NaN
-maxe(errs::LsqErrors, ct, ot) =
+relmaxe(errs::LsqErrors, ct, ot) =
       haskey(errs.maxe[ct], ot) ? errs.maxe[ct][ot]/errs.nrminf[ct][ot] : NaN
 
 rmse(errs::Dict, ct, ot) = rmse(LsqErrors(errs))
@@ -56,8 +56,9 @@ function errdict(configtypes)
 end
 
 LsqErrors(configtypes) =
-         LsqErrors(errdict(configtypes), errdict(configtypes),
-                   errdict(configtypes), errdict(configtypes) )
+         LsqErrors( errdict(configtypes), errdict(configtypes),
+                    errdict(configtypes), errdict(configtypes),
+                    errdict(configtypes), errdict(configtypes) )
 
 function lsqerrors(db, c, Ibasis; confignames = Colon(), E0 = nothing)
    if confignames isa Colon
