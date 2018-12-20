@@ -12,8 +12,10 @@ export lsqerrors, table, table_relative, table_absolute, relerr_table, abserr_ta
 struct LsqErrors
    rmse::Dict{String, Dict{String,Float64}}
     mae::Dict{String, Dict{String,Float64}}
+   maxe::Dict{String, Dict{String,Float64}}
    nrm2::Dict{String, Dict{String,Float64}}
    nrm1::Dict{String, Dict{String,Float64}}
+   nrminf::Dict{String, Dict{String,Float64}}
    # scatterE::Dict{String, Tuple{Vector{Float64}, Vector{Float64}}}
    # scatterF::Dict{String, Tuple{Vector{Float64}, Vector{Float64}}}
 end
@@ -33,11 +35,17 @@ mae(errs::LsqErrors, ct, ot) =
       haskey(errs.mae[ct], ot) ? errs.mae[ct][ot] : NaN
 relmae(errs::LsqErrors, ct, ot) =
       haskey(errs.mae[ct], ot) ? errs.mae[ct][ot]/errs.nrm1[ct][ot] : NaN
+maxe(errs::LsqErrors, ct, ot) =
+      haskey(errs.maxe[ct], ot) ? errs.maxe[ct][ot] : NaN
+maxe(errs::LsqErrors, ct, ot) =
+      haskey(errs.maxe[ct], ot) ? errs.maxe[ct][ot]/errs.nrminf[ct][ot] : NaN
 
 rmse(errs::Dict, ct, ot) = rmse(LsqErrors(errs))
 relrmse(errs::Dict, ct, ot) = relrmse(LsqErrors(errs))
 mae(errs::Dict, ct, ot) = mae(LsqErrors(errs))
 relmae(errs::Dict, ct, ot) = relmae(LsqErrors(errs))
+maxe(errs::Dict, ct, ot) = maxe(LsqErrors(errs))
+relmaxe(errs::Dict, ct, ot) = relmaxe(LsqErrors(errs))
 
 function errdict(configtypes)
    D = Dict{String, Dict{String, Float64}}()
@@ -83,11 +91,15 @@ function lsqerrors(db, c, Ibasis; confignames = Colon(), E0 = nothing)
             errs.nrm2[cn][ot] = 0.0
             errs.mae[cn][ot] = 0.0
             errs.nrm1[cn][ot] = 0.0
+            errs.maxe[cn][ot] = 0.0
+            errs.nrminf[cn][ot] = 0.0
             lengths[cn][ot] = 0
             errs.rmse["set"][ot] = 0.0
             errs.nrm2["set"][ot] = 0.0
             errs.mae["set"][ot] = 0.0
             errs.nrm1["set"][ot] = 0.0
+            errs.maxe["set"][ot] = 0.0
+            errs.nrminf["set"][ot] = 0.0
             lengths["set"][ot] = 0
          end
          # assemble the observation vector
@@ -103,17 +115,23 @@ function lsqerrors(db, c, Ibasis; confignames = Colon(), E0 = nothing)
          end
          # get the lsq block
          block = reshape(db.kron_groups[ct][ot][:,:,Ibasis], :, length(Ibasis))
+         # the error on this particular data-point
+         e = block * c - y
          # compute the various errors for this ct/ot combination
          w = weighthook(ot, db.data_groups[ct][1])
-         errs.rmse[cn][ot] += w^2 * norm(block * c - y)^2
+         errs.rmse[cn][ot] += w^2 * norm(e)^2
          errs.nrm2[cn][ot] += w^2 * norm(y)^2
-         errs.mae[cn][ot]  += w * norm(block * c - y, 1)
+         errs.mae[cn][ot]  += w * norm(e, 1)
          errs.nrm1[cn][ot] += w * norm(y, 1)
+         errs.maxe[cn][ot] = max(errs.maxe[cn][ot], norm(e, Inf))
+         errs.nrminf[cn][ot] = max(errs.nrminf[cn][ot], norm(y, Inf))
          lengths[cn][ot] += length(y)
-         errs.rmse["set"][ot] += w^2 * norm(block * c - y)^2
+         errs.rmse["set"][ot] += w^2 * norm(e)^2
          errs.nrm2["set"][ot] += w^2 * norm(y)^2
-         errs.mae["set"][ot]  += w * norm(block * c - y, 1)
+         errs.mae["set"][ot]  += w * norm(e, 1)
          errs.nrm1["set"][ot] += w * norm(y, 1)
+         errs.maxe["set"][ot] = max(errs.maxe["set"][ot], norm(e, Inf))
+         errs.nrminf["set"][ot] = max(errs.nrminf["set"][ot], norm(y, Inf))
          lengths["set"][ot] += length(y)
       end
    end
