@@ -63,7 +63,7 @@ LsqErrors(configtypes) =
          LsqErrors(errdict(configtypes), errdict(configtypes),
                    errdict(configtypes), errdict(configtypes), allerrdict(configtypes) )
 
-function lsqerrors(db, c, Ibasis; confignames = Colon(), E0 = nothing)
+function lsqerrors(db, c, Ibasis; confignames = Colon(), E0 = nothing, nb_points_cdf = 40)
    if confignames isa Colon
       confignames = configname.(collect(keys(db.data_groups)))
    else
@@ -154,6 +154,7 @@ function lsqerrors(db, c, Ibasis; confignames = Colon(), E0 = nothing)
          errs.nrm2[cn][ot] = sqrt( errs.nrm2[cn][ot] / len )
          errs.mae[cn][ot] = errs.mae[cn][ot] / len
          errs.nrm1[cn][ot] = errs.nrm1[cn][ot] / len
+         errs.allerr[cn][ot] = quantile(errs.allerr[cn][ot] ,linspace(0.,1.,nb_points_cdf))
       end
    end
 
