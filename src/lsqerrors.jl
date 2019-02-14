@@ -88,6 +88,18 @@ function lsqerrors(db, c, Ibasis; confignames = Colon(), E0 = nothing)
       if !(cn in confignames)
          continue
       end
+      for ot in keys(db.kron_groups[ct])
+         if !haskey(errs.rmse[cn], ot)
+            errs.allerr["set"][ot] = Float64[]
+         end
+      end
+   end
+
+   for ct in keys(db.data_groups)
+      cn = configname(ct)
+      if !(cn in confignames)
+         continue
+      end
       # loop through observation types in the current config type
       for ot in keys(db.kron_groups[ct])
          if !haskey(errs.rmse[cn], ot)
@@ -122,13 +134,16 @@ function lsqerrors(db, c, Ibasis; confignames = Colon(), E0 = nothing)
          errs.nrm2[cn][ot] += w^2 * norm(y)^2
          errs.mae[cn][ot]  += w * norm(block * c - y, 1)
          errs.nrm1[cn][ot] += w * norm(y, 1)
-         push!(errs.allerr[cn][ot], w * norm(block * c - y) )
+         append!(errs.allerr[cn][ot], w * abs.(block * c - y) )
          lengths[cn][ot] += length(y)
          errs.rmse["set"][ot] += w^2 * norm(block * c - y)^2
          errs.nrm2["set"][ot] += w^2 * norm(y)^2
          errs.mae["set"][ot]  += w * norm(block * c - y, 1)
          errs.nrm1["set"][ot] += w * norm(y, 1)
          lengths["set"][ot] += length(y)
+         append!(errs.allerr["set"][ot], w * abs.(block * c - y) )
+         # @show length(errs.allerr["set"][ot])
+         # @show lengths["set"][ot]
       end
    end
 
