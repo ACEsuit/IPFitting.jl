@@ -14,16 +14,17 @@ struct LsqErrors
     mae::Dict{String, Dict{String,Float64}}
    nrm2::Dict{String, Dict{String,Float64}}
    nrm1::Dict{String, Dict{String,Float64}}
+   allerr::Dict{String, Dict{String,Vector{Float64}}}
    # scatterE::Dict{String, Tuple{Vector{Float64}, Vector{Float64}}}
    # scatterF::Dict{String, Tuple{Vector{Float64}, Vector{Float64}}}
 end
 
 Base.Dict(errs::LsqErrors) =
    Dict("rmse" => errs.rmse, "mae" => errs.mae,
-        "nrm2" => errs.nrm2, "nrm1" => errs.nrm1)
+        "nrm2" => errs.nrm2, "nrm1" => errs.nrm1, "allerr" => errs.allerr)
 
 LsqErrors(errs::Dict) =
-   LsqErrors(errs["rmse"], errs["mae"], errs["nrm2"], errs["nrm1"])
+   LsqErrors(errs["rmse"], errs["mae"], errs["nrm2"], errs["nrm1"], errs["allerr"])
 
 rmse(errs::LsqErrors, ct, ot) =
       haskey(errs.rmse[ct], ot) ? errs.rmse[ct][ot] : NaN
@@ -33,11 +34,14 @@ mae(errs::LsqErrors, ct, ot) =
       haskey(errs.mae[ct], ot) ? errs.mae[ct][ot] : NaN
 relmae(errs::LsqErrors, ct, ot) =
       haskey(errs.mae[ct], ot) ? errs.mae[ct][ot]/errs.nrm1[ct][ot] : NaN
+allerr(errs::LsqErrors, ct, ot) =
+      haskey(errs.allerr[ct], ot) ? errs.allerr[ct][ot] : NaN
 
 rmse(errs::Dict, ct, ot) = rmse(LsqErrors(errs))
 relrmse(errs::Dict, ct, ot) = relrmse(LsqErrors(errs))
 mae(errs::Dict, ct, ot) = mae(LsqErrors(errs))
 relmae(errs::Dict, ct, ot) = relmae(LsqErrors(errs))
+allerr(errs::Dict, ct, ot) = allerr(LsqErrors(errs))
 
 function errdict(configtypes)
    D = Dict{String, Dict{String, Float64}}()
@@ -47,9 +51,17 @@ function errdict(configtypes)
    return D
 end
 
+function allerrdict(configtypes)
+   D = Dict{String, Dict{String, Vector{Float64}}}()
+   for ct in configtypes
+      D[ct] = Dict{String,  Vector{Float64}}()
+   end
+   return D
+end
+
 LsqErrors(configtypes) =
          LsqErrors(errdict(configtypes), errdict(configtypes),
-                   errdict(configtypes), errdict(configtypes) )
+                   errdict(configtypes), errdict(configtypes), allerrdict(configtypes) )
 
 function lsqerrors(db, c, Ibasis; confignames = Colon(), E0 = nothing)
    if confignames isa Colon
@@ -83,6 +95,7 @@ function lsqerrors(db, c, Ibasis; confignames = Colon(), E0 = nothing)
             errs.nrm2[cn][ot] = 0.0
             errs.mae[cn][ot] = 0.0
             errs.nrm1[cn][ot] = 0.0
+            errs.allerr[cn][ot] = Float64[]
             lengths[cn][ot] = 0
             errs.rmse["set"][ot] = 0.0
             errs.nrm2["set"][ot] = 0.0
@@ -109,6 +122,7 @@ function lsqerrors(db, c, Ibasis; confignames = Colon(), E0 = nothing)
          errs.nrm2[cn][ot] += w^2 * norm(y)^2
          errs.mae[cn][ot]  += w * norm(block * c - y, 1)
          errs.nrm1[cn][ot] += w * norm(y, 1)
+         push!(errs.allerr[cn][ot], w * norm(block * c - y) )
          lengths[cn][ot] += length(y)
          errs.rmse["set"][ot] += w^2 * norm(block * c - y)^2
          errs.nrm2["set"][ot] += w^2 * norm(y)^2
