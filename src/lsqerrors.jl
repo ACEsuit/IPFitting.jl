@@ -83,17 +83,6 @@ function lsqerrors(db, c, Ibasis; confignames = Colon(), E0 = nothing, nb_points
    # scatterF = Dict{String, Tuple{Vector{Float64}, Vector{Float64}}}()
 
    idx = 0
-   for ct in keys(db.data_groups)
-      cn = configname(ct)
-      if !(cn in confignames)
-         continue
-      end
-      for ot in keys(db.kron_groups[ct])
-         if !haskey(errs.rmse[cn], ot)
-            errs.allerr["set"][ot] = Float64[]
-         end
-      end
-   end
 
    for ct in keys(db.data_groups)
       cn = configname(ct)
@@ -109,10 +98,13 @@ function lsqerrors(db, c, Ibasis; confignames = Colon(), E0 = nothing, nb_points
             errs.nrm1[cn][ot] = 0.0
             errs.allerr[cn][ot] = Float64[]
             lengths[cn][ot] = 0
+         end
+         if !haskey(errs.rmse["set"], ot)
             errs.rmse["set"][ot] = 0.0
             errs.nrm2["set"][ot] = 0.0
             errs.mae["set"][ot] = 0.0
             errs.nrm1["set"][ot] = 0.0
+            errs.allerr["set"][ot] = Float64[]
             lengths["set"][ot] = 0
          end
          # assemble the observation vector
