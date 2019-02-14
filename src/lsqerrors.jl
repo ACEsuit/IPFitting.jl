@@ -75,7 +75,6 @@ function lsqerrors(db, c, Ibasis; confignames = Colon(), E0 = nothing)
       lengths[cn] = Dict{String, Int}()
    end
 
-
    # scatterE = Dict{String, Tuple{Vector{Float64}, Vector{Float64}}}()
    # scatterF = Dict{String, Tuple{Vector{Float64}, Vector{Float64}}}()
 
@@ -95,7 +94,7 @@ function lsqerrors(db, c, Ibasis; confignames = Colon(), E0 = nothing)
             errs.maxe[cn][ot] = 0.0
             errs.nrminf[cn][ot] = 0.0
             lengths[cn][ot] = 0
-         end 
+         end
          if !haskey(errs.rmse["set"], ot)
             errs.rmse["set"][ot] = 0.0
             errs.nrm2["set"][ot] = 0.0
