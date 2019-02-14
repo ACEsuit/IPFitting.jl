@@ -16,7 +16,7 @@ this stores a list of "basis" functions and a list of "data", i.e. configuration
 
             DB
            /  \
-       INFO    KRON_________________ ...
+       INFO    KRON_________________ ..
      /     \           |    |    |
   BASIS    DATA       CT1  CT2  CT3
        _____|_____ ...
@@ -29,7 +29,7 @@ this stores a list of "basis" functions and a list of "data", i.e. configuration
  * CTj < KRON: a dictionary with the following structure
 
        CT1
-    ___|___ __...
+    ___|___ __
    |   |   |
    E   F   V
 
@@ -87,7 +87,7 @@ using NBodyIPs:              degree, bodyorder, basisname, combiscriptor
 
 import NBodyIPFitting.FIO
 
-import Base: flush, append!
+import Base: flush, append!, union
 
 export LsqDB, confignames
 
@@ -96,7 +96,7 @@ const INFOFILE = "_info.json"
 
 """
 `dbpath(db::LsqDB)` : return the absolute path to the database files, not
-including the '_kron.h5' and '_info.json' endings.
+including the 'kron.h5' and 'info.json' endings.
 """
 dbpath(db::LsqDB) = db.dbpath
 
@@ -263,6 +263,30 @@ function flush(db::LsqDB)
    return nothing
 end
 
+
+# function union(db1::LsqDB,db2::LsqDB, dbpath = (db1.dbpath * "_u"))
+#    confignames = collect(keys(db1.data_groups))
+#    basis = [basis(db1), basis(db2)]
+#    data_groups = db1.data_groups
+#    kron_groups = db1.kron_groups
+#    for k in confignames
+#       kron_groups[k] =
+#    dbpath = dbpath
+#
+# end
+
+# function union(db1::LsqDB,db2::LsqDB, dbpath = (db1.dbpath * "_u"))
+#    basis = [basis(db1), basis(db2)]
+#    data_groups::Dict{String, DataGroup}
+#       kron_groups::Dict{String, KronGroup}
+#       dbpath::String
+#    end
+#
+#    basis(db::LsqDB) = db.basis
+#    basis(db::LsqDB, i::Integer) = db.basis[i]
+#    data(db::LsqDB) = db.data
+# end
+
 # TODO: the following function suggests that the ordering of
 #       <values, data, basis> was poorly chosen and it should instead be
 #       <values, basis, data> => reconsider this!!!!
@@ -409,10 +433,10 @@ function Base.info(db::LsqDB)
    B = db.basis
    Bord, Iord = split_basis(B)
    println("------------------------------------------------------")
-   println(" Basis Group  |  type   | body-order |  degree ")
+   println(" Basis Group  |  type   | body-order |  degree | descriptor")
    for (i, B1) in enumerate(Bord)
       deg = maximum(degree.(B1))
-      println("           $i  |  $(basisname(B1[1])) | $(bodyorder(B1[1])) | $deg ")
+      println("           $i  |  $(basisname(B1[1])) | $(bodyorder(B1[1])) | $deg | $(split(repr(typeof(B1[1].D)), "{")[1]) " )
    end
    println("======================================================")
 end
