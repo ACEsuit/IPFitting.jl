@@ -264,16 +264,29 @@ function flush(db::LsqDB)
 end
 
 
-# function union(db1::LsqDB,db2::LsqDB, dbpath = (db1.dbpath * "_u"))
-#    confignames = collect(keys(db1.data_groups))
-#    basis = [basis(db1), basis(db2)]
-#    data_groups = db1.data_groups
-#    kron_groups = db1.kron_groups
-#    for k in confignames
-#       kron_groups[k] =
-#    dbpath = dbpath
-#
-# end
+function union(db1::LsqDB,db2::LsqDB; dbpath = (db1.dbpath * "_u"))
+   info("Warning: the union implies that the data in the two databases are the same")
+   configtypes = collect(keys(db1.data_groups))
+   basis = cat(1, db1.basis, db2.basis)
+   data_groups = db1.data_groups
+
+   kron_groups1 = db1.kron_groups
+   kron_groups2 = db2.kron_groups
+
+   kron_groups = Dict{String, KronGroup}()
+   for k in configtypes
+      kron_groups[k] = KronGroup()
+      @assert haskey(db2.data_groups, k)
+      for ot in ["E", "F", "V"]
+         if !haskey(data_groups[k][1].D, ot)
+            continue
+         end
+         kron_groups[k][ot] = cat(3,kron_groups1[k][ot],kron_groups2[k][ot])
+      end
+   end
+   db = LsqDB(basis, data_groups, kron_groups, dbpath)
+   flush(db)
+end
 
 # function union(db1::LsqDB,db2::LsqDB, dbpath = (db1.dbpath * "_u"))
 #    basis = [basis(db1), basis(db2)]
