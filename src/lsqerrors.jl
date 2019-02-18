@@ -1,9 +1,10 @@
 
 module Errors
 
-using JuLIP: Atoms, energy, forces
+using JuLIP: Atoms, energy, forces, virial
 using NBodyIPFitting: LsqDB, Dat, configtype, weighthook
 using NBodyIPFitting.Data: observation, hasobservation, configname
+using ASE: ASEAtoms
 
 export lsqerrors, table, table_relative, table_absolute, relerr_table, abserr_table, results_dict, cdf_energy_forces
 # , scatter_E, scatter_F
