@@ -5,7 +5,7 @@ using JuLIP: Atoms, energy, forces
 using NBodyIPFitting: LsqDB, Dat, configtype, weighthook
 using NBodyIPFitting.Data: observation, hasobservation, configname
 
-export lsqerrors, table, table_relative, table_absolute, relerr_table, abserr_table
+export lsqerrors, table, table_relative, table_absolute, relerr_table, abserr_table, results_dict, cdf_energy_forces
 # , scatter_E, scatter_F
 
 
