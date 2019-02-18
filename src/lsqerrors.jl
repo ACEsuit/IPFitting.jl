@@ -259,4 +259,92 @@ end
 #    return D
 # end
 
+
+# Computation of the energy-force-virials for a given atomic position and IP
+function ipcomp(at,ot,IP)
+   if ot == "E"
+      return [energy(IP,at)]
+   elseif ot == "F"
+      F = forces(IP,at)
+      Fout = Float64[]
+      for Fi in F
+         append!(Fout,Fi)
+      end
+      return Fout
+   elseif ot == "V"
+      V = virial(IP,at)
+      Vout = Float64[]
+      for Vi in V
+         append!(Vout,Vi)
+      end
+      return Vout
+   else
+      error("observation type not implemented")
+   end
+end
+
+
+function results_dict(data, IP; confignames = Colon(), pathname = "")
+   allconfignames = unique(configname.(data))
+   allconfigtypes = unique(configtype.(data))
+   if confignames isa Colon
+      confignames = allconfignames
+   else
+      confignames = collect(confignames)
+   end
+   confignames = allconfignames
+
+   # create the dict for the results
+   results = Dict{String, Dict{String,Vector{Tuple{Vector{Float64},Vector{Float64}}}}}()
+   for cn in confignames
+      results[cn] = Dict{String,Vector{Tuple{Vector{Float64},Vector{Float64}}}}()
+   end
+
+   for dat in data
+      print(".")
+      ct = configtype.(dat)
+      cn = configname.(dat)
+      if !(cn in confignames)
+         continue
+      end
+      for ot in ["E", "F", "V"]
+         #
+         if !hasobservation(dat, ot)
+            continue
+         end
+         if !haskey(results[cn], ot)
+            results[cn][ot] = Vector{Tuple{Vector{Float64},Vector{Float64}}}[]
+         end
+         # Store exact data + approximation
+            push!(results[cn][ot], (observation(dat,ot) , (ipcomp(ASEAtoms(dat.at),ot,IP))) )
+      end
+   end
+   if pathname != ""
+      save(pathname, results)
+   end
+   return results
+end
+
+function cdf_energy_forces(res_dict; nb_points_cdf = 40)
+   absEerr = Float64[]
+   absFerr = Float64[]
+   absVerr = Float64[]
+   for cn in collect(keys(res_dict))
+      if haskey(res_dict[cn],"E")
+         for i in 1:length(res_dict[cn]["E"])
+            append!(absEerr, abs.(res_dict[cn]["E"][i][1] - res_dict[cn]["E"][i][2]) )
+         end
+      end
+      if haskey(res_dict[cn],"F")
+         for i in 1:length(res_dict[cn]["F"])
+            append!(absFerr, abs.(res_dict[cn]["F"][i][1] - res_dict[cn]["F"][i][2]) )
+         end
+      end
+   end
+   return quantile(absEerr, collect(linspace(0.,1.,nb_points_cdf))), quantile(absFerr, collect(linspace(0.,1.,nb_points_cdf)))
+end
+
+
+
+
 end

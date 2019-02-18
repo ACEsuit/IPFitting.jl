@@ -286,6 +286,7 @@ function union(db1::LsqDB,db2::LsqDB; dbpath = (db1.dbpath * "_u"))
    end
    db = LsqDB(basis, data_groups, kron_groups, dbpath)
    flush(db)
+   return db
 end
 
 # function union(db1::LsqDB,db2::LsqDB, dbpath = (db1.dbpath * "_u"))
