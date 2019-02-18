@@ -302,7 +302,7 @@ function results_dict(data, IP; confignames = Colon(), pathname = "")
    end
 
    for dat in data
-      print(".")
+      #  print(".")
       ct = configtype.(dat)
       cn = configname.(dat)
       if !(cn in confignames)
