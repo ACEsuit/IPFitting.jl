@@ -38,7 +38,7 @@ using NBodyIPs.Polys: NBPoly
 using NBodyIPs.EnvIPs: EnvIP
 using NBodyIPFitting.Tools: @def
 
-import Base: Matrix
+import Base: Matrix, Dict
 
 export BLRegulariser, BLReg, BARegulariser, BAReg
 
@@ -68,6 +68,16 @@ end
 struct EnergyRegulariser{N, T} <: NBodyRegulariser{N}
    @nbregfields
 end
+
+Dict(reg::NBodyRegulariser) = Dict(
+   "type" => string(typeof(reg)), 
+   "N" => reg.N,
+   "npoints" => reg.npoints,
+   "creg" => reg.creg,
+   "r0" => reg.r0,
+   "r1" => reg.r1,
+   "sequence" => string(reg.sequence))
+
 
 const BLReg = BLRegulariser
 const BAReg = BARegulariser

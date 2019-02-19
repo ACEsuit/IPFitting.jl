@@ -410,7 +410,7 @@ function lsqfit(db::LsqDB;
                    "configweights" => configweights,
                    "confignames" => keys(configweights),
                    "dataweights" => dataweights,
-                   "regularisers" => string.(typeof.(regularisers)),
+                   "regularisers" => Dict.(regularisers),
                    "juliaversion" => juliainfo,
                    "NBodyIPs_version" => nbipinfo,
                    "NBodyIPFitting_version" => nbipfitinfo,
