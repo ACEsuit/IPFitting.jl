@@ -6,6 +6,7 @@ using NBodyIPFitting: LsqDB, Dat, configtype, weighthook
 using NBodyIPFitting.Data: observation, hasobservation, configname
 using ASE: ASEAtoms
 using FileIO, JLD2
+using NBodyIPs: fast
 
 export lsqerrors, table, table_relative, table_absolute, relerr_table, abserr_table, results_dict, cdf_energy_forces
 # , scatter_E, scatter_F
@@ -265,21 +266,11 @@ end
 # Computation of the energy-force-virials for a given atomic position and IP
 function ipcomp(at,ot,IP)
    if ot == "E"
-      return [energy(IP,at)]
+      return vec(ot,energy(IP,at))
    elseif ot == "F"
-      F = forces(IP,at)
-      Fout = Float64[]
-      for Fi in F
-         append!(Fout,Fi)
-      end
-      return Fout
+      return vec(ot,forces(IP,at))
    elseif ot == "V"
-      V = virial(IP,at)
-      Vout = Float64[]
-      for Vi in V
-         append!(Vout,Vi)
-      end
-      return Vout
+      return vec(ot,virial(IP,at))
    else
       error("observation type not implemented")
    end
@@ -287,6 +278,7 @@ end
 
 
 function results_dict(data, IP; confignames = Colon(), pathname = "")
+   IPf = fast(IP)
    allconfignames = unique(configname.(data))
    allconfigtypes = unique(configtype.(data))
    if confignames isa Colon
@@ -318,7 +310,7 @@ function results_dict(data, IP; confignames = Colon(), pathname = "")
             results[cn][ot] = Vector{Tuple{Vector{Float64},Vector{Float64}}}[]
          end
          # Store exact data + approximation
-            push!(results[cn][ot], (observation(dat,ot) , (ipcomp(ASEAtoms(dat.at),ot,IP))) )
+            push!(results[cn][ot], (observation(dat,ot) , (ipcomp(ASEAtoms(dat.at),ot,IPf))) )
       end
    end
    if pathname != ""

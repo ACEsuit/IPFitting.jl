@@ -110,8 +110,9 @@ in a `Dat` or Lsq system. E.g.,
 F = forces(...)::Vector{JVecF}
 vec(::Val{:F}, F) = mat(F)[:]
 ```
+or equivalently, `vec("F", F)`
 """
-vec
+vec(s::AbstractString, args...) = vec(Val(Symbol(s)), args...)
 
 """
 convert a Vector{T} to some real (atomistic) data, e.g.,
