@@ -68,7 +68,7 @@ LsqErrors(configtypes) =
 
 function lsqerrors(db, c, Ibasis; confignames = Colon(), E0 = nothing, nb_points_cdf = 40)
    if confignames isa Colon
-      confignames = configname.(collect(keys(db.data_groups)))
+      confignames = unique(configname.(collect(keys(db.data_groups))))
    else
       confignames = collect(confignames)
    end
