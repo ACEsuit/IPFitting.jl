@@ -96,7 +96,7 @@ function lsqerrors(db, c, Ibasis; confignames = Colon(), E0 = nothing, nb_points
    # scatterE = Dict{String, Tuple{Vector{Float64}, Vector{Float64}}}()
    # scatterF = Dict{String, Tuple{Vector{Float64}, Vector{Float64}}}()
 
-   idx = 0
+   # idx = 0
 
    for ct in keys(db.data_groups)
       cn = configname(ct)
@@ -146,7 +146,7 @@ function lsqerrors(db, c, Ibasis; confignames = Colon(), E0 = nothing, nb_points
          errs.nrm2[cn][ot] += w^2 * norm(y)^2
          errs.mae[cn][ot]  += w * norm(e, 1)
          errs.nrm1[cn][ot] += w * norm(y, 1)
-         append!(errs.allerr[cn][ot], w * abs.(block * c - y) )
+         append!(errs.allerr[cn][ot], w * abs.(e) )
          errs.maxe[cn][ot] = max(errs.maxe[cn][ot], norm(e, Inf))
          errs.nrminf[cn][ot] = max(errs.nrminf[cn][ot], norm(y, Inf))
          lengths[cn][ot] += length(y)
@@ -371,6 +371,8 @@ function lsqerrors(res_dict, data; confignames = Colon(), nb_points_cdf = 40, E0
             errs.mae[cn][ot] = 0.0
             errs.nrm1[cn][ot] = 0.0
             errs.allerr[cn][ot] = Float64[]
+            errs.maxe[cn][ot] = 0.0
+            errs.nrminf[cn][ot] = 0.0
             lengths[cn][ot] = 0
          end
          if !haskey(errs.rmse["set"], ot)
@@ -379,6 +381,8 @@ function lsqerrors(res_dict, data; confignames = Colon(), nb_points_cdf = 40, E0
             errs.mae["set"][ot] = 0.0
             errs.nrm1["set"][ot] = 0.0
             errs.allerr["set"][ot] = Float64[]
+            errs.maxe["set"][ot] = 0.0
+            errs.nrminf["set"][ot] = 0.0
             lengths["set"][ot] = 0
          end
          # loop over configurations
@@ -393,18 +397,23 @@ function lsqerrors(res_dict, data; confignames = Colon(), nb_points_cdf = 40, E0
             # get the approximate computation
             # compute the various errors for this data/ot combination
             w = weighthook(ot, data[i])
-            errs.rmse[cn][ot] += w^2 * norm(yapprox - y)^2
+            e = yapprox - y
+            errs.rmse[cn][ot] += w^2 * norm(e)^2
             errs.nrm2[cn][ot] += w^2 * norm(y)^2
-            errs.mae[cn][ot]  += w * norm(yapprox - y, 1)
+            errs.mae[cn][ot]  += w * norm(e, 1)
             errs.nrm1[cn][ot] += w * norm(y, 1)
-            append!(errs.allerr[cn][ot], w * abs.(yapprox - y) )
+            append!(errs.allerr[cn][ot], w * abs.(e) )
+            errs.maxe[cn][ot] = max(errs.maxe[cn][ot], norm(e, Inf))
+            errs.nrminf[cn][ot] = max(errs.nrminf[cn][ot], norm(y, Inf))
             lengths[cn][ot] += length(y)
-            errs.rmse["set"][ot] += w^2 * norm(yapprox - y)^2
+            errs.rmse["set"][ot] += w^2 * norm(e)^2
             errs.nrm2["set"][ot] += w^2 * norm(y)^2
-            errs.mae["set"][ot]  += w * norm(yapprox - y, 1)
+            errs.mae["set"][ot]  += w * norm(e, 1)
             errs.nrm1["set"][ot] += w * norm(y, 1)
+            errs.maxe["set"][ot] = max(errs.maxe["set"][ot], norm(e, Inf))
+            errs.nrminf["set"][ot] = max(errs.nrminf["set"][ot], norm(y, Inf))
             lengths["set"][ot] += length(y)
-            append!(errs.allerr["set"][ot], w * abs.(yapprox - y) )
+            append!(errs.allerr["set"][ot], w * abs.(e) )
             # @show length(errs.allerr["set"][ot])
             # @show lengths["set"][ot]
          end
