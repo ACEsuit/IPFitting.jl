@@ -1,5 +1,5 @@
 
-using NBodyIPs, JuLIP, Base.Test, NBodyIPFitting
+using NBodyIPs, JuLIP, Test, NBodyIPFitting
 using JuLIP.Potentials: evaluate_d
 using NBodyIPFitting: Dat, LsqDB
 using NBodyIPFitting.Data: observation

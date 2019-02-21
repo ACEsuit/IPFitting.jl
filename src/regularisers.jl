@@ -137,7 +137,7 @@ function Matrix(reg::NBodyRegulariser{N}, B::Vector{<: AbstractCalculator};
 
    # TODO: this assumes that all elements of B have the same descriptor
    # get the indices of the N-body basis functions
-   Ib = find(bodyorder.(B) .== N)
+   Ib = findall(bodyorder.(B) .== N)
    if isempty(Ib)
       verbose && warn("""Trying to construct a $N-body regulariser, but no basis
                          function with bodyorder $N exists.""")
@@ -201,9 +201,9 @@ _Vr(b::NBPoly) = b
 _Vr(b::EnvIP) = b.Vr
 
 function regularise_2b(B::Vector, r0::Number, r1::Number, creg, Nquad)
-   I2 = find(bodyorder.(B) .== 2)
+   I2 = findall(bodyorder.(B) .== 2)
    maxenvdeg = maximum(_envdeg_.(B[I2]))
-   rr = linspace(r0, r1, Nquad)
+   rr = range(r0, stop=r1, length=Nquad)
    Φ = [ zeros(Nquad, length(B))  for _=1:(maxenvdeg+1) ]
    h = (r1 - r0) / (Nquad-1)
    for (ib, b) in zip(I2, B[I2]), (iq, r) in enumerate(rr)
@@ -221,7 +221,7 @@ function assemble_reg_matrix(X, B, nB, Ib, inv_tv, freg)
    @assert length(B) == length(Ib)
    envdegs = unique(_envdeg_.(B))
    Ψ = [ zeros(length(X), nB)  for _=1:length(envdegs) ]
-   Ib_deg = [ find(_envdeg_.(B) .== p) for p in envdegs ]
+   Ib_deg = [ findall(_envdeg_.(B) .== p) for p in envdegs ]
    for (ii, (Ψ_, Ib_, p)) in enumerate(zip(Ψ, Ib_deg, envdegs))
       temp = zeros(length(Ib_))
       B_ = [_Vr(b) for b in B[Ib_]]
@@ -237,8 +237,8 @@ end
 
 function laplace_regulariser(x::SVector{DIM,T}, B::Vector{<: AbstractCalculator},
                              temp::Vector{T}, inv_tv) where {DIM, T}
-   if !isleaftype(eltype(B))
-      warn("laplace_regulariser: `TB` is not a leaf type")
+   if !isconcretetype(eltype(B))
+      @warn("laplace_regulariser: `TB` is not a leaf type")
    end
    h = 1e-2
    r = inv_tv(x)

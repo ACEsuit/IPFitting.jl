@@ -17,7 +17,7 @@ function hess_weights!(cn::String, db::LsqDB; h = :auto, wE = 0.0, rscal = 3, ve
          # then loop through the dats
          for d in dg
             if forces(d) == nothing
-               verbose && warn("""hess_weights!: a training configuration does
+               verbose && @warn("""hess_weights!: a training configuration does
                                   not contain energy and forces => ignore""")
                d.info["W"] = Dict( "F" => zeros(3*length(d)),
                                    "E" => 0.0,

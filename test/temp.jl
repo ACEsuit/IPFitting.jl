@@ -19,7 +19,7 @@ configweights = Dict("surface"                => (1.0, p),
 
 r0 = rnn(:W)
 rcuts = unique(cutoff.(db.basis))
-rcut4, rcut3, rcut2 = (sort(rcuts)...)
+rcut4, rcut3, rcut2 = (sort(rcuts)...,)
 
 reg = [ BLReg(2, 0.5*r0, 0.85*r0, creg = 0.1),
         BLReg(3, 0.7*r0, 0.85*r0, creg = 0.1),

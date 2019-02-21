@@ -17,7 +17,7 @@ configweights = Dict("dia" => (1.0),
 
 r0 = rnn(:Si)
 rcuts = unique(cutoff.(db.basis))
-rcut4, rcut3, rcut2 = (sort(rcuts)...)
+rcut4, rcut3, rcut2 = (sort(rcuts)...,)
 
 reg = [ BAReg(2, 0.5*r0, 0.85*r0, creg = 1.0),
         BAReg(3, 0.7*r0, 0.85*r0, creg = 0.1),
@@ -31,7 +31,7 @@ IPreg, inforeg = lsqfit( db; E0 = E0, dataweights = dataweights,
 
 V20 = IPreg.components[2]
 V21 = IPreg.components[3]
-r = linspace(0.8*r0, rcut2, 200)
+r = range(0.8*r0, stop=rcut2, length=200)
 P = plot(r, V20.Vr.(r) );
 plot!(P, r, V21.Vr.(r)  );
 display(P)

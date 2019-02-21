@@ -48,6 +48,7 @@ function read_energy(atpy)
    end
    try
       return atpy[:get_potential_energy]()
+   catch
    end
    return nothing
 end
@@ -60,6 +61,7 @@ function read_forces(atpy)
    end
    try
       return atpy[:get_array]("force")' |> vecs
+   catch
    end
    return nothing
 end
