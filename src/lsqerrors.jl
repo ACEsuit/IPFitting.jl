@@ -299,6 +299,7 @@ end
 
 
 function results_dict(data, IP; confignames = Colon(), pathname = "")
+   info("Assemble dictionary with exact and approximate values")
    IPf = fast(IP)
    allconfignames = unique(configname.(data))
    allconfigtypes = unique(configtype.(data))
