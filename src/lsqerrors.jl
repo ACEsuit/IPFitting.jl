@@ -300,7 +300,6 @@ end
 
 function results_dict(data, IP; confignames = Colon(), pathname = "")
    info("Assemble dictionary with exact and approximate values")
-   IPf = fast(IP)
    allconfignames = unique(configname.(data))
    allconfigtypes = unique(configtype.(data))
    if confignames isa Colon
@@ -332,7 +331,7 @@ function results_dict(data, IP; confignames = Colon(), pathname = "")
             results[cn][ot] = Vector{Tuple{Vector{Float64},Vector{Float64},Int64}}[]
          end
          # Store exact data + approximation + indice in the data
-            push!(results[cn][ot], (observation(dat,ot) , (ipcomp(ASEAtoms(dat.at),ot,IPf)),i) )
+            push!(results[cn][ot], (observation(dat,ot) , (ipcomp(ASEAtoms(dat.at),ot,IP)),i) )
       end
    end
    if pathname != ""
