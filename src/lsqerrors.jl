@@ -17,8 +17,8 @@ struct LsqErrors
    maxe::Dict{String, Dict{String,Float64}}
    nrm2::Dict{String, Dict{String,Float64}}
    nrm1::Dict{String, Dict{String,Float64}}
-   allerr::Dict{String, Dict{String,Vector{Float64}}}
    nrminf::Dict{String, Dict{String,Float64}}
+   allerr::Dict{String, Dict{String,Vector{Float64}}}
    # scatterE::Dict{String, Tuple{Vector{Float64}, Vector{Float64}}}
    # scatterF::Dict{String, Tuple{Vector{Float64}, Vector{Float64}}}
 end
