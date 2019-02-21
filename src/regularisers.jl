@@ -38,7 +38,7 @@ using NBodyIPs.Polys: NBPoly
 using NBodyIPs.EnvIPs: EnvIP
 using NBodyIPFitting.Tools: @def
 
-import Base: Matrix
+import Base: Matrix, Dict
 
 export BLRegulariser, BLReg, BARegulariser, BAReg
 
@@ -68,6 +68,16 @@ end
 struct EnergyRegulariser{N, T} <: NBodyRegulariser{N}
    @nbregfields
 end
+
+Dict(reg::NBodyRegulariser) = Dict(
+   "type" => string(typeof(reg)), 
+   "N" => reg.N,
+   "npoints" => reg.npoints,
+   "creg" => reg.creg,
+   "r0" => reg.r0,
+   "r1" => reg.r1,
+   "sequence" => string(reg.sequence))
+
 
 const BLReg = BLRegulariser
 const BAReg = BARegulariser
@@ -116,7 +126,8 @@ _bainvt(inv_t, x::StaticVector{6}) =
 # this converts the Regulariser type information to a matrix that can be
 # attached to the LSQ problem .
 #
-function Matrix(reg::NBodyRegulariser{N}, B::Vector{<: AbstractCalculator}
+function Matrix(reg::NBodyRegulariser{N}, B::Vector{<: AbstractCalculator};
+                verbose=false
                 ) where {N}
 
    # 2B is a bit simpler than the rest, treat it separately
@@ -127,6 +138,13 @@ function Matrix(reg::NBodyRegulariser{N}, B::Vector{<: AbstractCalculator}
    # TODO: this assumes that all elements of B have the same descriptor
    # get the indices of the N-body basis functions
    Ib = find(bodyorder.(B) .== N)
+   if isempty(Ib)
+      verbose && warn("""Trying to construct a $N-body regulariser, but no basis
+                         function with bodyorder $N exists.""")
+      Ψreg = zeros(0, length(B))
+      Yreg = zeros(0, 1)
+      return Ψreg, Yreg
+   end
    D = descriptor(B[Ib[1]])
    # assume all have the same dictionary
    # if not, then this regularisation is not valid

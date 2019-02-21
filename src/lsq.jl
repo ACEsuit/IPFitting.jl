@@ -151,7 +151,8 @@ end
 
 
 
-function _regularise!(Ψ::Matrix{T}, Y::Vector{T}, basis, regularisers) where {T}
+function _regularise!(Ψ::Matrix{T}, Y::Vector{T}, basis, regularisers;
+                      verbose=false) where {T}
    # assemble the regularisers
    Ψreg = Matrix{Float64}(0, size(Ψ, 2))
    Yreg = Float64[]
@@ -160,7 +161,7 @@ function _regularise!(Ψ::Matrix{T}, Y::Vector{T}, basis, regularisers) where {T
          P = reg
          q = zeros(size(P, 1))
       else
-         P, q = Matrix(reg, basis)
+         P, q = Matrix(reg, basis; verbose=verbose)
       end
       Ψreg = vcat(Ψreg, P)
       Yreg = vcat(Yreg, q)
@@ -261,7 +262,7 @@ function get_lsq_system(db::LsqDB; verbose = true,
 
    # regularise
    if regularisers != nothing
-      Ψ, Y = _regularise!(Ψ, Y, db.basis[Jbasis], regularisers)
+      Ψ, Y = _regularise!(Ψ, Y, db.basis[Jbasis], regularisers; verbose=verbose)
    end
 
    # this should be it ...
@@ -409,7 +410,7 @@ function lsqfit(db::LsqDB;
                    "configweights" => configweights,
                    "confignames" => keys(configweights),
                    "dataweights" => dataweights,
-                   "regularisers" => string.(typeof.(regularisers)),
+                   "regularisers" => Dict.(regularisers),
                    "juliaversion" => juliainfo,
                    "NBodyIPs_version" => nbipinfo,
                    "NBodyIPFitting_version" => nbipfitinfo,

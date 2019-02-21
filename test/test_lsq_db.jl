@@ -58,8 +58,17 @@ println(@test db1.data_groups == db.data_groups)
 println(@test db1.kron_groups == db.kron_groups)
 
 ##
+println("re-load the database with mmap=true")
+db2 = DB.LsqDB(dbpath, mmap=true)
+println(@test DB.dbpath(db2) == dbpath)
+println(@test db2.basis == db.basis)
+println(@test db2.data_groups == db.data_groups)
+println(@test db2.kron_groups == db.kron_groups)
+
+##
 println("Delete the temporary database")
 rm(tmpdir; force=true, recursive=true)
+
 
 
 # TODO: Some test like this will be needed when we switch to
