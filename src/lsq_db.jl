@@ -450,7 +450,8 @@ function Base.info(db::LsqDB)
    println(" Basis Group  |  type   | body-order |  degree | descriptor")
    for (i, B1) in enumerate(Bord)
       deg = maximum(degree.(B1))
-      println("           $i  |  $(basisname(B1[1])) | $(bodyorder(B1[1])) | $deg | $(split(repr(typeof(B1[1].D)), "{")[1]) " )
+      println("           $i  |  $(basisname(B1[1])) | $(bodyorder(B1[1])) | $deg |  " )
+      # 
    end
    println("======================================================")
 end

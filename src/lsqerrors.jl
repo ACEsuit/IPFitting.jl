@@ -309,7 +309,7 @@ function results_dict(data, IP; confignames = Colon(), pathname = "")
          if !haskey(results[cn], ot)
             results[cn][ot] = Vector{Tuple{Vector{Float64},Vector{Float64},Int64}}[]
          end
-         # Store exact data + approximation
+         # Store exact data + approximation + indice in the data
             push!(results[cn][ot], (observation(dat,ot) , (ipcomp(ASEAtoms(dat.at),ot,IPf)),i) )
       end
    end
@@ -320,7 +320,8 @@ function results_dict(data, IP; confignames = Colon(), pathname = "")
 end
 
 
-function lsqerrors(res_dict, data; confignames = Colon(), nb_points_cdf = 40)
+function lsqerrors(res_dict, data; confignames = Colon(), nb_points_cdf = 40, E0 = nothing)
+   @assert E0 != nothing
    if confignames isa Colon
       confignames = collect(keys(res_dict))
    else
@@ -362,8 +363,12 @@ function lsqerrors(res_dict, data; confignames = Colon(), nb_points_cdf = 40)
          # loop over configurations
          for d in res_dict[cn][ot]
             i = d[3]
-            y = d[2]
-            yapprox = d[1]
+            y = d[1]
+            yapprox = d[2]
+            if ot == "E"
+               y -= length(data[i].at) * E0
+               yapprox -= length(data[i].at) * E0
+            end
             # get the approximate computation
             # compute the various errors for this data/ot combination
             w = weighthook(ot, data[i])
