@@ -24,7 +24,7 @@ function tfor(f, rg; verbose=true, msg="tfor", costs = ones(Int, length(rg)))
          @info("$msg with $(nthreads()) threads")
          p_lock = SpinLock()
       end
-      tic()
+      # tic()
       @threads for i = 1:length(rg)
          f(rg[i])
          if verbose
@@ -34,7 +34,7 @@ function tfor(f, rg; verbose=true, msg="tfor", costs = ones(Int, length(rg)))
             unlock(p_lock)
          end
       end
-      verbose && toc()
+      # verbose && toc()
    end
    return nothing
 end

@@ -24,7 +24,7 @@ import JuLIP: Atoms, energy, forces, virial
 import Base: length, Dict
 
 import ASE     # use ASE since this will have already figured out how to
-               # load `ase` without problems 
+               # load `ase` without problems
 ase_io = ASE.ase_io
 
 export configtype, configname, weight, load_data
@@ -109,11 +109,11 @@ function read_xyz(fname; verbose=true, index = ":",
       println("Reading in $fname ...")
    end
    at_list = ase_io.read(fname, index=index)
-   data = Vector{Dat}(length(at_list))
+   data = Vector{Dat}(undef, length(at_list))
    idx = 0
    if verbose
       println("Processing data ...")
-      tic()
+      # tic()
    end
    dt = verbose ? 1.0 : 0.0
    @showprogress dt for atpy in at_list
@@ -149,7 +149,7 @@ function read_xyz(fname; verbose=true, index = ":",
                        config_type * ":$(length(at))$(EFV)";
                        E = E, F = F, V = V )
    end
-   verbose && toc()
+   # verbose && toc()
    return data[1:idx]
 end
 
