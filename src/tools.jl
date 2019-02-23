@@ -9,7 +9,7 @@ function tfor(f, rg; verbose=true, msg="tfor", costs = ones(Int, length(rg)))
    if nthreads() == 1
       verbose && println("$msg in serial")
       dt = verbose ? 1.0 : Inf
-      tic()
+      t0 = time_ns()
       for (n, c) in zip(rg, costs)
          f(n)
          if verbose
@@ -17,10 +17,11 @@ function tfor(f, rg; verbose=true, msg="tfor", costs = ones(Int, length(rg)))
             ProgressMeter.update!(p, p_ctr)
          end
       end
-      verbose && toc()
+      t1 = time_ns()
+      verbose && @info("Elapsed: $(round((t1-t0)*1e-9, digits=1))s")
    else
       if verbose
-         println("$msg with $(nthreads()) threads")
+         @info("$msg with $(nthreads()) threads")
          p_lock = SpinLock()
       end
       tic()

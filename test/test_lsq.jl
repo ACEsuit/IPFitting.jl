@@ -37,13 +37,14 @@ Y = zeros(length(data) * len)
 rowidx = 0
 for (okey, evalb, w) in zip(["E", "F"], (energy, forces), (1/atlen, 1.0))
    for d in data
+      global rowidx
       o = observation(d, okey)
       leno = length(o)
       Y[(rowidx+1):(rowidx+leno)] = w * o
       for colidx = 1:length(B2)
          Ψ[(rowidx+1):(rowidx+leno), colidx] = w * vec(Val(Symbol(okey)), evalb(B2[colidx], d.at))
       end
-      rowidx += leno
+      global rowidx += leno
    end
 end
 ## test that Ψ_man, F_man are equivalent to a system generated from a db

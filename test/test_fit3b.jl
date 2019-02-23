@@ -5,6 +5,7 @@ using NBodyIPFitting: Dat, LsqDB
 using NBodyIPs: BondLengthDesc, BondAngleDesc
 const Lsq = NBodyIPFitting.Lsq
 const Err = NBodyIPFitting.Errors
+using LinearAlgebra: norm
 
 # generate random data
 function generate_data(species, L, rmax, N, calc)
@@ -51,6 +52,8 @@ for deg3 in degrees
    # push!(err_erms, Err.relrmse(errs, "rand", "E"))
    # push!(err_frms, Err.relrmse(errs, "rand", "F"))
 end
+
+# TODO: put this back in!!!!
 
 # ##
 # df = DataFrame( :degrees => degrees,

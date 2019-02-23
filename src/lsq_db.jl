@@ -14,10 +14,10 @@ A db called (e.g.) 'lsqdb' consists of two files:
 this stores a list of "basis" functions and a list of "data", i.e. configurations
  * `lsqdb_kron.h5` : this stores all the inner products <basis, data>
 
-            DB
-           /  \
-       INFO    KRON_________________ ..
-     /     \           |    |    |
+          __DB__
+         |      |
+     __INFO_   KRON_________________ ..
+    |       |          |    |    |
   BASIS    DATA       CT1  CT2  CT3
        _____|_____ ...
       |    |    |
@@ -29,7 +29,7 @@ this stores a list of "basis" functions and a list of "data", i.e. configuration
  * CTj < KRON: a dictionary with the following structure
 
        CT1
-    ___|___ __
+    ___|___ __ ...
    |   |   |
    E   F   V
 
@@ -89,7 +89,7 @@ import NBodyIPFitting.FIO
 
 import Base: flush, append!, union
 
-export LsqDB, confignames
+export LsqDB, confignames, info 
 
 const KRONFILE = "_kron.h5"
 const INFOFILE = "_info.json"
@@ -229,7 +229,7 @@ function _append_inner!(db::LsqDB, d::Dat, lsqrow::Dict)
       D_d = db.data_groups[ct] = DataGroup()
       # add empty sub-groups for the datatypes (observationtypes) present in d
       for key in keys(d.D)
-         D_ct[key] = Array{Float64}(length(d.D[key]), 0, length(db.basis))
+         D_ct[key] = Array{Float64}(undef, length(d.D[key]), 0, length(db.basis))
       end
    else
       D_ct = db.kron_groups[ct]
@@ -318,7 +318,7 @@ function _append(A::Array{T, 3}, B::Array{T, 2}) where {T}
       @show size(A), size(B)
       @assert (szA[1] == size(B,1) && szA[3] == size(B, 2))
    end
-   Anew = Array{T}(szA[1], szA[2]+1, szA[3])
+   Anew = Array{T}(undef, szA[1], szA[2]+1, szA[3])
    Anew[:, 1:szA[2], :] .= A
    Anew[:, end, :] .= B
    return Anew
@@ -375,7 +375,7 @@ function _evallsq(vDT::Val,
    # vectorise the first so we know the length of the data
    vec1 = vec(vDT, vals[1])
    # create a multi-D array to reshape these into
-   A = Array{Float64}(length(vec1), length(B))
+   A = Array{Float64}(undef, length(vec1), length(B))
    A[:, 1] = vec1
    for n = 2:length(B)
       A[:, n] = vec(vDT, vals[n])
@@ -389,7 +389,8 @@ an array ∑ni x m.
 """
 function _cat_(As, Iord)
    TA = eltype(As[1])
-   A = Array{TA}(size(As[1],1), sum(size(AA, 2) for AA in As))
+   A = Array{TA}(undef, size(As[1],1),
+                        sum(size(AA, 2) for AA in As))
    for i = 1:length(As)
       A[:, Iord[i]] = As[i]
    end
@@ -425,7 +426,7 @@ _nbasis(db::LsqDB, configtype::AbstractString) =
       size( first(db.kron_groups[configtype])[2], 3 )
 
 
-function Base.info(db::LsqDB)
+function info(db::LsqDB)
    # config names, how many
    configs_info = Dict{String, Int}()
    for (key, dg) in db.data_groups
@@ -451,7 +452,7 @@ function Base.info(db::LsqDB)
    for (i, B1) in enumerate(Bord)
       deg = maximum(degree.(B1))
       println("           $i  |  $(basisname(B1[1])) | $(bodyorder(B1[1])) | $deg |  " )
-      # 
+      #
    end
    println("======================================================")
 end

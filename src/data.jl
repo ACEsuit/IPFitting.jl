@@ -23,8 +23,9 @@ using NBodyIPFitting.DataTypes
 import JuLIP: Atoms, energy, forces, virial
 import Base: length, Dict
 
-using PyCall
-@pyimport ase.io as ase_io
+import ASE     # use ASE since this will have already figured out how to
+               # load `ase` without problems 
+ase_io = ASE.ase_io
 
 export configtype, configname, weight, load_data
 

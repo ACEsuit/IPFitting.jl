@@ -69,6 +69,7 @@ _read_cell(C::Matrix) = JuLIP.JMatF(C)
 _read_cell(C::Vector{Any}) = JuLIP.JMatF( ([C[1] C[2] C[3]])... )
 
 function Dat(D::Dict)
+   X = JuLIP._read_X(D["X"])
    at = Atoms( X = JuLIP._read_X(D["X"]),
                Z = Vector{Int}(D["Z"]),
                cell = _read_cell(D["cell"]),
@@ -112,7 +113,7 @@ vec(::Val{:F}, F) = mat(F)[:]
 ```
 or equivalently, `vec("F", F)`
 """
-vec(s::AbstractString, args...) = vec(Val(Symbol(s)), args...)
+function vec end
 
 """
 convert a Vector{T} to some real (atomistic) data, e.g.,

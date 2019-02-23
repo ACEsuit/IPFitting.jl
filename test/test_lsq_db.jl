@@ -35,7 +35,7 @@ basis = [basis1; basis2]
 data = [data1; data2]
 db = nothing
 try
-   db = DB.LsqDB(dbpath, basis, data)
+   global db = DB.LsqDB(dbpath, basis, data)
    println(@test true)
 catch
    println("...something went wrong...")

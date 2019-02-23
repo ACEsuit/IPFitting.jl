@@ -31,6 +31,9 @@ using NBodyIPFitting.Data: observation, hasobservation, configname, configtype
 using NBodyIPFitting.DataTypes: ENERGY
 using NBodyIPFitting.DB: dbpath, _nconfigs, _nbasis
 
+using LinearAlgebra: lmul!, Diagonal, qr, cond, norm
+using InteractiveUtils: versioninfo
+
 const Err = NBodyIPFitting.Errors
 
 export lsqfit, onb
@@ -154,7 +157,7 @@ end
 function _regularise!(Ψ::Matrix{T}, Y::Vector{T}, basis, regularisers;
                       verbose=false) where {T}
    # assemble the regularisers
-   Ψreg = Matrix{Float64}(0, size(Ψ, 2))
+   Ψreg = Matrix{Float64}(undef, 0, size(Ψ, 2))
    Yreg = Float64[]
    for reg in regularisers
       if reg isa Matrix
@@ -215,7 +218,7 @@ weights by config_type and observation type. See `lsqfit` for a list
 of keyword arguments. Allowed kwargs are `verbose, configweights, dataweights,
 E0, Ibasis`.
 """
-function get_lsq_system(db::LsqDB; verbose = true,
+@noinline function get_lsq_system(db::LsqDB; verbose = true,
                         configweights = nothing,
                         dataweights = nothing,
                         E0 = nothing,
@@ -258,7 +261,7 @@ function get_lsq_system(db::LsqDB; verbose = true,
    # are equivalent
    # >>>>>> W .= sqrt.(W) <<<<<<< TODO: which one is it?
    Y .*= W
-   scale!(W, Ψ)
+   lmul!(Diagonal(W), Ψ)
 
    # regularise
    if regularisers != nothing
@@ -270,7 +273,7 @@ function get_lsq_system(db::LsqDB; verbose = true,
 end
 
 
-function onb(db::LsqDB;
+@noinline function onb(db::LsqDB;
              solver=(:qr, ), verbose=true, E0 = nothing,
              Ibasis = :, configweights=nothing, dataweights = nothing,
              regularisers = [],
@@ -285,10 +288,10 @@ function onb(db::LsqDB;
                              regularisers = regularisers,
                              kwargs...)
    @assert solver[1] == :qr
-   verbose && info("QR-factorize Ψ, size=$(size(Ψ))")
-   qrΨ = qrfact(Ψ)
-   verbose && @show cond(qrΨ[:R])
-   Rinv = pinv(qrΨ[:R])
+   verbose && @info("QR-factorize Ψ, size=$(size(Ψ))")
+   qrΨ = qr(Ψ)
+   verbose && @info("cond(R) = $(cond(qrΨ.R))")
+   Rinv = pinv(qrΨ.R)
    basis = db.basis[Ibasis]
    onb = []
    for n = 1:size(Rinv, 2)
@@ -332,7 +335,7 @@ is `:qr`. On request we can try others.
 configtypes and datatypes. Use `table_relative(errs)` and `table_absolute(errs)`
 to display these as tables and `rmse, mae` to access individual errors.
 """
-function lsqfit(db::LsqDB;
+@noinline function lsqfit(db::LsqDB;
                 solver=(:qr, ), verbose=true, E0 = nothing,
                 Ibasis = :, configweights=nothing, dataweights = nothing,
                 regularisers = [],
@@ -348,13 +351,13 @@ function lsqfit(db::LsqDB;
                              kwargs...)
 
    if (solver[1] == :qr) || (solver == :qr)
-      verbose && info("solve $(size(Ψ)) LSQ system using QR factorisation")
-      qrΨ = qrfact(Ψ)
-      verbose && @show cond(qrΨ[:R])
+      verbose && @info("solve $(size(Ψ)) LSQ system using QR factorisation")
+      qrΨ = qr(Ψ)
+      verbose && @info("cond(R) = $(cond(qrΨ.R))")
       c = qrΨ \ Y
 
    elseif solver[1] == :svd
-      verbose && info("solve $(size(Ψ)) LSQ system using SVD factorisation")
+      verbose && @info("solve $(size(Ψ)) LSQ system using SVD factorisation")
       ndiscard = solver[2]
       F = svdfact(Ψ)
       c = F[:V][:,1:(end-ndiscard)] * (Diagonal(F[:S][1:(end-ndiscard)]) \ (F[:U]' * Y)[1:(end-ndiscard)])
@@ -365,7 +368,7 @@ function lsqfit(db::LsqDB;
 
    if verbose
       rel_rms = norm(Ψ * c - Y) / norm(Y)
-      info("Relative RMSE on training set: ", rel_rms)
+      @info("Relative RMSE on training set: $rel_rms")
    end
 
    # compute errors
@@ -387,7 +390,7 @@ function lsqfit(db::LsqDB;
    # Julia Version Info
    iob = IOBuffer()
    versioninfo(iob)
-   juliainfo = String(iob)
+   juliainfo = String(take!(iob))
 
    # NBodyIPs and NBodyIPFitting Version Info
    nbipinfo, nbipfitinfo = get_git_info()
@@ -423,12 +426,14 @@ function lsqfit(db::LsqDB;
 end
 
 
+## TODO: THIS NEEDS A REWRITE !!!!
 function get_git_info()
-   nbipinfo = read(`cat $(Pkg.dir("NBodyIPs")*"/.git/refs/heads/master")`, String)[1:end-1]
-   nbipfitinfo = read(`cat $(Pkg.dir("NBodyIPFitting")*"/.git/refs/heads/master")`, String)[1:end-1]
+   @warn("Storing Package git version info is no longer supported; this needs a rewrite.")
+   # nbipinfo = read(`cat $(Pkg.dir("NBodyIPs")*"/.git/refs/heads/master")`, String)[1:end-1]
+   # nbipfitinfo = read(`cat $(Pkg.dir("NBodyIPFitting")*"/.git/refs/heads/master")`, String)[1:end-1]
    # nbipinfo = readstring(`git -C $(Pkg.dir("NBodyIPs")) rev-parse HEAD`)
    # nbipfitinfo = readstring(`git -C $(Pkg.dir("NBodyIPFitting")) rev-parse HEAD`)
-   return nbipinfo, nbipfitinfo
+   return "", "" # nbipinfo, nbipfitinfo
 end
 
 end

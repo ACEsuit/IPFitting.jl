@@ -9,7 +9,7 @@ println("===================================")
 println("Testing NBodyIPFitting.FIO")
 println("===================================")
 
-for filetype in [".h5", ".jld2", ".json"]
+for filetype in [".h5", ".json"]
 
 println("-----------------------------")
 println("Testing FIO with $filetype.")

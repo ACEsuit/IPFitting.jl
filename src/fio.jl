@@ -52,11 +52,11 @@ end
 # ------------- JLD2 LOAD AND SAVE -------------
 
 function _load(::FJLD2, fname, args...)
-   return FileIO.load(fname, args...)
+   @error "Usage of .jld2 is no longer permitted"
 end
 
 function _save(::FJLD2, fname, args...)
-   return FileIO.save(fname, args...)
+   @error "Usage of .jld2 is no longer permitted"
 end
 
 # ----------- HDF5 LOAD AND SAVE

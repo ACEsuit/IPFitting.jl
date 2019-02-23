@@ -4,9 +4,12 @@ module Errors
 using JuLIP: Atoms, energy, forces, virial
 using NBodyIPFitting: LsqDB, Dat, configtype, weighthook
 using NBodyIPFitting.Data: observation, hasobservation, configname
-using ASE: ASEAtoms
-using FileIO, JLD2
+using ASE: ASEAtoms   # TODO: WE SHOULD AVOID THIS!!!!
+using FileIO, Printf
 using NBodyIPs: fast
+
+using Statistics: quantile
+using LinearAlgebra: norm
 
 export lsqerrors, table, table_relative, table_absolute, relerr_table, abserr_table, results_dict, cdf_energy_forces
 # , scatter_E, scatter_F
@@ -17,8 +20,8 @@ struct LsqErrors
    maxe::Dict{String, Dict{String,Float64}}
    nrm2::Dict{String, Dict{String,Float64}}
    nrm1::Dict{String, Dict{String,Float64}}
-   allerr::Dict{String, Dict{String,Vector{Float64}}}
    nrminf::Dict{String, Dict{String,Float64}}
+   allerr::Dict{String, Dict{String,Vector{Float64}}}
    # scatterE::Dict{String, Tuple{Vector{Float64}, Vector{Float64}}}
    # scatterF::Dict{String, Tuple{Vector{Float64}, Vector{Float64}}}
 end
@@ -31,7 +34,7 @@ Base.Dict(errs::LsqErrors) =
 LsqErrors(errs::Dict) =
    LsqErrors( errs["rmse"], errs["mae"], errs["maxe"],
               errs["nrm2"], errs["nrm1"], errs["nrminf"],
-               errs["allerr"])
+              errs["allerr"] )
 
 rmse(errs::LsqErrors, ct, ot) =
       haskey(errs.rmse[ct], ot) ? errs.rmse[ct][ot] : NaN
@@ -78,7 +81,8 @@ LsqErrors(configtypes) =
                     errdict(configtypes), errdict(configtypes),
                     allerrdict(configtypes) )
 
-function lsqerrors(db, c, Ibasis; confignames = Colon(), E0 = nothing, nb_points_cdf = 40)
+@noinline function lsqerrors(db, c, Ibasis;
+                       confignames = Colon(), E0 = nothing, nb_points_cdf = 40)
    if confignames isa Colon
       confignames = unique(configname.(collect(keys(db.data_groups))))
    else
@@ -331,7 +335,7 @@ function results_dict(data, IP; confignames = Colon(), pathname = "")
             results[cn][ot] = Vector{Tuple{Vector{Float64},Vector{Float64},Int64}}[]
          end
          # Store exact data + approximation + indice in the data
-            push!(results[cn][ot], (observation(dat,ot) , (ipcomp(ASEAtoms(dat.at),ot,IPf)),i) )
+         push!(results[cn][ot], (observation(dat,ot) , (ipcomp(ASEAtoms(dat.at),ot,IPf)),i) )
       end
    end
    if pathname != ""

@@ -1,3 +1,4 @@
+
 @info("Loading libraries...")
 using JuLIP, ASE
 using NBodyIPs
@@ -8,6 +9,8 @@ using NBodyIPFitting.Data: observation, hasobservation, configname
 using FileIO, Plots, DataFrames
 using Distributions
 using Test
+
+using LinearAlgebra: norm
 
 @info("Loading data...")
 include(homedir() * "/Dropbox/PIBmat/W_Data/W.jl")
