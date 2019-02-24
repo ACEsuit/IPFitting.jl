@@ -2,7 +2,7 @@
 module Errors
 
 using JuLIP: Atoms, energy, forces, virial
-using NBodyIPFitting: LsqDB, Dat, configtype, weighthook
+using NBodyIPFitting: LsqDB, Dat, configtype, weighthook, evaluate_lsq
 using NBodyIPFitting.Data: observation, hasobservation, configname
 using ASE: ASEAtoms   # TODO: WE SHOULD AVOID THIS!!!!
 using FileIO, Printf
@@ -10,197 +10,179 @@ using NBodyIPs: fast
 
 using Statistics: quantile
 using LinearAlgebra: norm
+using ProgressMeter
 
-export lsqerrors, table, table_relative, table_absolute, relerr_table, abserr_table, results_dict, cdf_energy_forces
-# , scatter_E, scatter_F
+export add_fits!, rmse, mae, rmse_table, mae_table
 
-struct LsqErrors
-   rmse::Dict{String, Dict{String,Float64}}
-    mae::Dict{String, Dict{String,Float64}}
-   maxe::Dict{String, Dict{String,Float64}}
-   nrm2::Dict{String, Dict{String,Float64}}
-   nrm1::Dict{String, Dict{String,Float64}}
-   nrminf::Dict{String, Dict{String,Float64}}
-   allerr::Dict{String, Dict{String,Vector{Float64}}}
-   # scatterE::Dict{String, Tuple{Vector{Float64}, Vector{Float64}}}
-   # scatterF::Dict{String, Tuple{Vector{Float64}, Vector{Float64}}}
+# ------------------------- USER INTERFACE FUNCTIONS -------------------------
+
+rmse(data::Vector{Dat}; fitkey="fit") = _fiterrs(data; fitkey=fitkey, p=2)
+# mae(data::Vector{Dat}; fitkey="fit") = _fiterrs(data; fitkey=fitkey, p=1)
+# maxe(data::Vector{Dat}; fitkey="fit") = _fiterrs(data; fitkey=fitkey, p=Inf)
+
+rmse_table(data::AbstractVector{Dat}) = rmse_table(rmse(data)...)
+rmse_table(errs::Dict, errs_rel::Dict) = _err_table(errs, errs_rel, "RMSE")
+
+
+
+"""
+`add_fits(IP, data::Vector{Dat}) -> nothing`
+
+for each `d in data`, compute the observations with the IP (fitted to this
+data) and store in `d.info["fit"][...]`
+
+The key `"fit"` can be replaced with any string, through the kwarg
+`fitkey`, e.g.,
+```julia
+data = ...
+add_fits(PIP4Benv, data; fitkey = "PIP4Benv")
+add_fits(GAP, data; fitkey = "GAP2010")
+```
+"""
+function add_fits!(IP, data::Vector{Dat}; fitkey = "fit")
+   @showprogress for d in data   # TODO: multi-threaded
+      d.info[fitkey] = Dict{String, Vector{Float64}}()
+      for okey in keys(d.D)   # d.D are the observations
+         d.info[fitkey][okey] = vec(okey, evaluate_lsq(okey, IP, d.at))
+      end
+   end
+   return nothing
 end
 
-Base.Dict(errs::LsqErrors) =
-   Dict("rmse" => errs.rmse, "mae" => errs.mae, "maxe" => errs.maxe,
-        "nrm2" => errs.nrm2, "nrm1" => errs.nrm1, "nrminf" => errs.nrminf,
-        "allerr" => errs.allerr)
 
-LsqErrors(errs::Dict) =
-   LsqErrors( errs["rmse"], errs["mae"], errs["maxe"],
-              errs["nrm2"], errs["nrm1"], errs["nrminf"],
-              errs["allerr"] )
 
-rmse(errs::LsqErrors, ct, ot) =
-      haskey(errs.rmse[ct], ot) ? errs.rmse[ct][ot] : NaN
-relrmse(errs::LsqErrors, ct, ot) =
-      haskey(errs.rmse[ct], ot) ? errs.rmse[ct][ot]/errs.nrm2[ct][ot] : NaN
-mae(errs::LsqErrors, ct, ot) =
-      haskey(errs.mae[ct], ot) ? errs.mae[ct][ot] : NaN
-relmae(errs::LsqErrors, ct, ot) =
-      haskey(errs.mae[ct], ot) ? errs.mae[ct][ot]/errs.nrm1[ct][ot] : NaN
-allerr(errs::LsqErrors, ct, ot) =
-      haskey(errs.allerr[ct], ot) ? errs.allerr[ct][ot] : NaN
-maxe(errs::LsqErrors, ct, ot) =
-      haskey(errs.maxe[ct], ot) ? errs.maxe[ct][ot] : NaN
-relmaxe(errs::LsqErrors, ct, ot) =
-      haskey(errs.maxe[ct], ot) ? errs.maxe[ct][ot]/errs.nrminf[ct][ot] : NaN
+# ---------------------------------------------------------------------
+# ------------------------- PRIVATE FUNCTIONS -------------------------
+# ---------------------------------------------------------------------
 
-rmse(errs::Dict, ct, ot) = rmse(LsqErrors(errs))
-relrmse(errs::Dict, ct, ot) = relrmse(LsqErrors(errs))
-mae(errs::Dict, ct, ot) = mae(LsqErrors(errs))
-relmae(errs::Dict, ct, ot) = relmae(LsqErrors(errs))
-allerr(errs::Dict, ct, ot) = allerr(LsqErrors(errs))
-maxe(errs::Dict, ct, ot) = maxe(LsqErrors(errs))
-relmaxe(errs::Dict, ct, ot) = relmaxe(LsqErrors(errs))
-
-function errdict(configtypes)
+"""
+initialize an error dictionary
+"""
+function errdict(confignames)
    D = Dict{String, Dict{String, Float64}}()
-   for ct in configtypes
+   for ct in confignames
       D[ct] = Dict{String, Float64}()
    end
+   D["set"] = Dict{String, Float64}()
    return D
 end
 
-function allerrdict(configtypes)
-   D = Dict{String, Dict{String, Vector{Float64}}}()
-   for ct in configtypes
-      D[ct] = Dict{String,  Vector{Float64}}()
-   end
-   return D
-end
 
-LsqErrors(configtypes) =
-         LsqErrors( errdict(configtypes), errdict(configtypes),
-                    errdict(configtypes), errdict(configtypes),
-                    errdict(configtypes), errdict(configtypes),
-                    allerrdict(configtypes) )
 
-@noinline function lsqerrors(db, c, Ibasis;
-                       confignames = Colon(), E0 = nothing, nb_points_cdf = 40)
-   if confignames isa Colon
-      confignames = unique(configname.(collect(keys(db.data_groups))))
-   else
-      confignames = collect(confignames)
-   end
-   @assert E0 != nothing
+function _fiterrs(data::Vector{Dat}; fitkey="fit", p=2)
+   confignames = unique(configname.(data))
+   err = errdict(confignames)
+   relerr = errdict(confignames)
+   nrm = errdict(confignames)
+   len = errdict(confignames)
 
-   # create the dict for the fit errors
-   errs = LsqErrors([confignames; "set"])
-   lengths = Dict{String, Dict{String, Int}}()
-   for cn in [confignames; "set"]
-      lengths[cn] = Dict{String, Int}()
-   end
-
-   # scatterE = Dict{String, Tuple{Vector{Float64}, Vector{Float64}}}()
-   # scatterF = Dict{String, Tuple{Vector{Float64}, Vector{Float64}}}()
-
-   # idx = 0
-
-   for ct in keys(db.data_groups)
-      cn = configname(ct)
-      if !(cn in confignames)
-         continue
-      end
-      # loop through observation types in the current config type
-      for ot in keys(db.kron_groups[ct])
-         if !haskey(errs.rmse[cn], ot)
-            errs.rmse[cn][ot] = 0.0
-            errs.nrm2[cn][ot] = 0.0
-            errs.mae[cn][ot] = 0.0
-            errs.nrm1[cn][ot] = 0.0
-            errs.allerr[cn][ot] = Float64[]
-            errs.maxe[cn][ot] = 0.0
-            errs.nrminf[cn][ot] = 0.0
-            lengths[cn][ot] = 0
+   # assemble the errors
+   for d in data
+      cn = configname(d)
+      for ot in keys(d.D) # the observation types (E, F, ...)
+         if !haskey(err[cn], ot)
+            len[cn][ot] = 0.0
+            nrm[cn][ot] = 0.0
+            err[cn][ot] = 0.0
          end
-         if !haskey(errs.rmse["set"], ot)
-            errs.rmse["set"][ot] = 0.0
-            errs.nrm2["set"][ot] = 0.0
-            errs.mae["set"][ot] = 0.0
-            errs.nrm1["set"][ot] = 0.0
-            errs.allerr["set"][ot] = Float64[]
-            errs.maxe["set"][ot] = 0.0
-            errs.nrminf["set"][ot] = 0.0
-            lengths["set"][ot] = 0
+         if !haskey(err["set"], ot)
+            len["set"][ot] = 0.0
+            nrm["set"][ot] = 0.0
+            err["set"][ot] = 0.0
          end
-         # assemble the observation vector
-         y = Float64[]
-         for d in db.data_groups[ct]
-            o = observation(d, ot)
-            # TODO: hack again!!!
-            if ot == "E"
-               o = copy(o)
-               o[1] -= length(d) * E0
-            end
-            append!(y, o)
-         end
-         # get the lsq block
-         block = reshape(db.kron_groups[ct][ot][:,:,Ibasis], :, length(Ibasis))
-         # the error on this particular data-point
-         e = block * c - y
-         # compute the various errors for this ct/ot combination
-         w = weighthook(ot, db.data_groups[ct][1])
-         errs.rmse[cn][ot] += w^2 * norm(e)^2
-         errs.nrm2[cn][ot] += w^2 * norm(y)^2
-         errs.mae[cn][ot]  += w * norm(e, 1)
-         errs.nrm1[cn][ot] += w * norm(y, 1)
-         append!(errs.allerr[cn][ot], w * abs.(e) )
-         errs.maxe[cn][ot] = max(errs.maxe[cn][ot], norm(e, Inf))
-         errs.nrminf[cn][ot] = max(errs.nrminf[cn][ot], norm(y, Inf))
-         lengths[cn][ot] += length(y)
-         errs.rmse["set"][ot] += w^2 * norm(e)^2
-         errs.nrm2["set"][ot] += w^2 * norm(y)^2
-         errs.mae["set"][ot]  += w * norm(e, 1)
-         errs.nrm1["set"][ot] += w * norm(y, 1)
-         errs.maxe["set"][ot] = max(errs.maxe["set"][ot], norm(e, Inf))
-         errs.nrminf["set"][ot] = max(errs.nrminf["set"][ot], norm(y, Inf))
-         lengths["set"][ot] += length(y)
-         append!(errs.allerr["set"][ot], w * abs.(block * c - y) )
-         # @show length(errs.allerr["set"][ot])
-         # @show lengths["set"][ot]
+         w = weighthook(ot, d)  # the default weight for this observation
+         exval = d.D[ot] * w
+         fitval = d.info[fitkey][ot] * w
+         len[cn][ot] += length(exval)
+         len["set"][ot] += length(exval)
+         nrm[cn][ot] += norm(exval, p)^p
+         nrm["set"][ot] += norm(exval, p)^p
+         err[cn][ot] += norm(exval-fitval, p)^p
+         err["set"][ot] += norm(exval-fitval, p)^p
       end
    end
 
-   for cn in [confignames; "set"]
-      for ot in keys(errs.rmse[cn])
-         len = lengths[cn][ot]
-         errs.rmse[cn][ot] = sqrt( errs.rmse[cn][ot] / len )
-         errs.nrm2[cn][ot] = sqrt( errs.nrm2[cn][ot] / len )
-         errs.mae[cn][ot] = errs.mae[cn][ot] / len
-         errs.nrm1[cn][ot] = errs.nrm1[cn][ot] / len
-         errs.allerr[cn][ot] = quantile(errs.allerr[cn][ot] ,range(0., stop=1., length=nb_points_cdf))
+   # normalise correctly
+   for cn in keys(err)
+      for ot in keys(err[cn])
+         err[cn][ot] = (err[cn][ot]/len[cn][ot])^(1/p)
+         nrm[cn][ot] = (nrm[cn][ot]/len[cn][ot])^(1/p)
+         relerr[cn][ot] = err[cn][ot] / nrm[cn][ot]
       end
    end
 
-   # # ------- - scatter E -------
-   # push!(scatterE[ct][1], E_data/len)
-   # push!(scatterE[ct][2], E_fit/len)
-   # append!(scatterF[ct][1], f_data)
-   # append!(scatterF[ct][2], f_fit)
-
-   return errs
+   return err, relerr
 end
 
 
-function table(errs; relative=false)
-   if relative
-      table_relative(errs)
-   else
-      table_absolute(errs)
-   end
-end
+# https://github.com/cortner/NBodyIPFitting.jl/blob/master/src/lsqerrors.jl
+         # # assemble the observation vector
+         # y = Float64[]
+         # for d in db.data_groups[ct]
+         #    o = observation(d, ot)
+         #    # TODO: hack again!!!
+         #    if ot == "E"
+         #       o = copy(o)
+         #       o[1] -= length(d) * E0
+         #    end
+         #    append!(y, o)
+         # end
+         # # get the lsq block
+         # block = reshape(db.kron_groups[ct][ot][:,:,Ibasis], :, length(Ibasis))
+         # # the error on this particular data-point
+         # e = block * c - y
+         #
 
-relerr_table(fit_info) = table_relative(fit_info["errors"])
-abserr_table(fit_info) = table_absolute(fit_info["errors"])
+# function _fiterrs(db::LsqDB, c, Ibasis; fitkey="fit", p=2, E0=nothing)
+#    @assert E0 != nothing
+#    confignames = unique(configname.(db.data_groups))
+#    err = errdict(confignames)
+#    relerr = errdict(confignames)
+#    nrm = errdict(confignames)
+#    len = errdict(confignames)
+#
+#    # assemble the errors
+#    for ct in keys(db.data_groups)
+#       cn = configname(ct)
+#       for ot in keys(db.kron_groups[ct])  # the observation types
+#          if !haskey(err[cn], ot)
+#             len[cn][ot] = 0.0
+#             nrm[cn][ot] = 0.0
+#             err[cn][ot] = 0.0
+#          end
+#          if !haskey(err["set"], ot)
+#             len["set"][ot] = 0.0
+#             nrm["set"][ot] = 0.0
+#             err["set"][ot] = 0.0
+#          end
+#          # get the lsq block
+#          block = reshape(db.kron_groups[ct][ot][:,:,Ibasis], :, length(Ibasis))
+#          # the error on this particular data-point
+#          e = block * c - y
+#          w = weighthook(ot, db.data_groups[ct][1])  # the default weight for this observation
+#          exval = d.D[ot] * w
+#          fitval = d.info[fitkey][ot] * w
+#          len[cn][ot] += length(exval)
+#          len["set"][ot] += length(exval)
+#          nrm[cn][ot] += norm(exval, p)^p
+#          nrm["set"][ot] += norm(exval, p)^p
+#          err[cn][ot] += norm(exval-fitval, p)^p
+#          err["set"][ot] += norm(exval-fitval, p)^p
+#       end
+#    end
+#
+#    # normalise correctly
+#    for cn in keys(err)
+#       for ot in keys(err[cn])
+#          err[cn][ot] = (err[cn][ot]/len[cn][ot])^(1/p)
+#          nrm[cn][ot] = (nrm[cn][ot]/len[cn][ot])^(1/p)
+#          relerr[cn][ot] = err[cn][ot] / nrm[cn][ot]
+#       end
+#    end
+#
+#    return err, relerr
+# end
 
-table_relative(errs::Dict) = table_relative(LsqErrors(errs))
-table_absolute(errs::Dict) = table_absolute(LsqErrors(errs))
 
 
 function truncate_string(s, n)
@@ -214,22 +196,22 @@ function truncate_string(s, n)
    return "$(s[1:n1])..$(s[end-n2+1:end])"
 end
 
+_relerr(relerrs, ct, ot) = haskey(relerrs[ct], ot) ? 100*relerrs[ct][ot] : NaN
+_err(errs, ct, ot) = haskey(errs[ct], ot) ? errs[ct][ot] : NaN
 
-function table_relative(errs::LsqErrors)
-   print("-----------------------------------------------------------------\n")
-   print("               ||           RMSE        ||           MAE      \n")
-   print("  config type  || E [%] | F [%] | V [%] || E [%] | F [%] | V [%] \n")
-   print("---------------||-------|-------|-------||-------|-------|-------\n")
+function _err_table(errs, relerrs, title)
+   print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
+   print("                       $title    \n")
+   print("───────────────┰─────────────────┬─────────────────┬─────────────────\n")
+   print("  config type  ┃      E [eV]     │     F [eV/A]    │     V [eV/A]   \n")
+   print("───────────────╂─────────────────┼─────────────────┼─────────────────\n")
    s_set = ""
-   for ct in keys(errs.rmse)  # ct in configtypes
-      s = @sprintf(" %13s || %5.2f | %5.2f | %5.2f || %5.2f | %5.2f | %5.2f \n",
+   for ct in keys(errs)  # ct in configtypes
+      s = @sprintf(" %13s ┃ %6.4f ┊ %5.2f%% │ %6.3f ┊ %5.2f%% │ %6.3f ┊ %5.2f%%\n",
          truncate_string(ct, 13),
-         100*relrmse(errs, ct, "E"),
-         100*relrmse(errs, ct, "F"),
-         100*relrmse(errs, ct, "V"),
-         100* relmae(errs, ct, "E"),
-         100* relmae(errs, ct, "F"),
-         100* relmae(errs, ct, "V") )
+         _err(errs, ct, "E"), _relerr(errs, ct, "E"),
+         _err(errs, ct, "F"), _relerr(errs, ct, "F"),
+         _err(errs, ct, "V"), _relerr(errs, ct, "V") )
       if ct == "set"
          s_set = s
       else
@@ -237,234 +219,11 @@ function table_relative(errs::LsqErrors)
       end
    end
    if s_set != ""
-      print("---------------||-------|-------|-------||-------|-------|-------\n")
+      print("───────────────╂─────────────────┼─────────────────┼─────────────────\n")
       print(s_set)
    end
-   print("-----------------------------------------------------------------\n")
+      print("━━━━━━━━━━━━━━━┷━━━━━━━━━━━━━━━━━┷━━━━━━━━━━━━━━━━━┷━━━━━━━━━━━━━━━━━\n")
 end
-
-
-function table_absolute(errs::LsqErrors)
-   print("-----------------------------------------------------------------------------\n")
-   print("               ||            RMSE             ||             MAE        \n")
-   print("  config type  ||  E [eV] | F[eV/A] | V[eV/A] ||  E [eV] | F[eV/A] | V[eV/A] \n")
-   print("---------------||---------|---------|---------||---------|---------|---------\n")
-   s_set = ""
-   for ct in keys(errs.rmse)  # ct in configtypes
-      s = @sprintf(" %13s || %7.4f | %7.4f | %7.4f || %7.4f | %7.4f | %7.4f \n",
-                   truncate_string(ct, 13),
-                   rmse(errs, ct, "E"), rmse(errs, ct, "F"), rmse(errs, ct, "V"),
-                    mae(errs, ct, "E"),  mae(errs, ct, "F"),  mae(errs, ct, "V") )
-      if ct == "set"
-         s_set = s
-      else
-         print(s)
-      end
-   end
-   if s_set != ""
-   print("---------------||---------|---------|---------||---------|---------|---------\n")
-   print(s_set)
-   end
-   print("-----------------------------------------------------------------------------\n")
-end
-
-
-# function scatter_E(errs::LsqErrors; s=1)
-#    D = deepcopy(errs.scatterE)
-#    for (key, val) in D
-#       E_data, E_fit = val
-#       D[key] = (E_data[1:s:end], E_fit[1:s:end])
-#    end
-#    return D
-# end
-#
-# function scatter_F(errs::LsqErrors; s=20)
-#    D = deepcopy(errs.scatterF)
-#    for (key, val) in D
-#       F_data, F_fit = val
-#       D[key] = (F_data[1:s:end], F_fit[1:s:end])
-#    end
-#    return D
-# end
-
-
-# Computation of the energy-force-virials for a given atomic position and IP
-function ipcomp(at,ot,IP)
-   if ot == "E"
-      return vec(ot,energy(IP,at))
-   elseif ot == "F"
-      return vec(ot,forces(IP,at))
-   elseif ot == "V"
-      return vec(ot,virial(IP,at))
-   else
-      error("observation type not implemented")
-   end
-end
-
-
-function results_dict(data, IP; confignames = Colon(), pathname = "")
-   IPf = fast(IP)
-   allconfignames = unique(configname.(data))
-   allconfigtypes = unique(configtype.(data))
-   if confignames isa Colon
-      confignames = allconfignames
-   else
-      confignames = collect(confignames)
-   end
-   confignames = allconfignames
-
-   # create the dict for the results
-   results = Dict{String, Dict{String,Vector{Tuple{Vector{Float64},Vector{Float64},Int64}}}}()
-   for cn in confignames
-      results[cn] = Dict{String,Vector{Tuple{Vector{Float64},Vector{Float64},Int64}}}()
-   end
-
-   for (i,dat) in enumerate(data)
-       # print(".")
-      ct = configtype.(dat)
-      cn = configname.(dat)
-      if !(cn in confignames)
-         continue
-      end
-      for ot in ["E", "F", "V"]
-         #
-         if !hasobservation(dat, ot)
-            continue
-         end
-         if !haskey(results[cn], ot)
-            results[cn][ot] = Vector{Tuple{Vector{Float64},Vector{Float64},Int64}}[]
-         end
-         # Store exact data + approximation + indice in the data
-         push!(results[cn][ot], (observation(dat,ot) , (ipcomp(ASEAtoms(dat.at),ot,IPf)),i) )
-      end
-   end
-   if pathname != ""
-      save(pathname, results)
-   end
-   return results
-end
-
-
-function lsqerrors(res_dict, data; confignames = Colon(), nb_points_cdf = 40, E0 = nothing)
-   @assert E0 != nothing
-   if confignames isa Colon
-      confignames = collect(keys(res_dict))
-   else
-      confignames = collect(confignames)
-   end
-
-   # create the dict for the fit errors
-   errs = LsqErrors([confignames; "set"])
-   lengths = Dict{String, Dict{String, Int}}()
-   for cn in [confignames; "set"]
-      lengths[cn] = Dict{String, Int}()
-   end
-
-   for cn in keys(res_dict)
-      if !(cn in confignames)
-         continue
-      end
-      # loop through observation types in the current config type
-      for ot in ["E", "F", "V"]
-         if !haskey(res_dict[cn], ot)
-            continue
-         end
-         if !haskey(errs.rmse[cn], ot)
-            errs.rmse[cn][ot] = 0.0
-            errs.nrm2[cn][ot] = 0.0
-            errs.mae[cn][ot] = 0.0
-            errs.nrm1[cn][ot] = 0.0
-            errs.allerr[cn][ot] = Float64[]
-            errs.maxe[cn][ot] = 0.0
-            errs.nrminf[cn][ot] = 0.0
-            lengths[cn][ot] = 0
-         end
-         if !haskey(errs.rmse["set"], ot)
-            errs.rmse["set"][ot] = 0.0
-            errs.nrm2["set"][ot] = 0.0
-            errs.mae["set"][ot] = 0.0
-            errs.nrm1["set"][ot] = 0.0
-            errs.allerr["set"][ot] = Float64[]
-            errs.maxe["set"][ot] = 0.0
-            errs.nrminf["set"][ot] = 0.0
-            lengths["set"][ot] = 0
-         end
-         # loop over configurations
-         for d in res_dict[cn][ot]
-            i = d[3]
-            y = d[1]
-            yapprox = d[2]
-            if ot == "E"
-               y -= length(data[i].at) * E0
-               yapprox -= length(data[i].at) * E0
-            end
-            # get the approximate computation
-            # compute the various errors for this data/ot combination
-            w = weighthook(ot, data[i])
-            e = yapprox - y
-            errs.rmse[cn][ot] += w^2 * norm(e)^2
-            errs.nrm2[cn][ot] += w^2 * norm(y)^2
-            errs.mae[cn][ot]  += w * norm(e, 1)
-            errs.nrm1[cn][ot] += w * norm(y, 1)
-            append!(errs.allerr[cn][ot], w * abs.(e) )
-            errs.maxe[cn][ot] = max(errs.maxe[cn][ot], norm(e, Inf))
-            errs.nrminf[cn][ot] = max(errs.nrminf[cn][ot], norm(y, Inf))
-            lengths[cn][ot] += length(y)
-            errs.rmse["set"][ot] += w^2 * norm(e)^2
-            errs.nrm2["set"][ot] += w^2 * norm(y)^2
-            errs.mae["set"][ot]  += w * norm(e, 1)
-            errs.nrm1["set"][ot] += w * norm(y, 1)
-            errs.maxe["set"][ot] = max(errs.maxe["set"][ot], norm(e, Inf))
-            errs.nrminf["set"][ot] = max(errs.nrminf["set"][ot], norm(y, Inf))
-            lengths["set"][ot] += length(y)
-            append!(errs.allerr["set"][ot], w * abs.(e) )
-            # @show length(errs.allerr["set"][ot])
-            # @show lengths["set"][ot]
-         end
-
-      end
-   end
-
-   for cn in [confignames; "set"]
-      for ot in keys(errs.rmse[cn])
-         len = lengths[cn][ot]
-         errs.rmse[cn][ot] = sqrt( errs.rmse[cn][ot] / len )
-         errs.nrm2[cn][ot] = sqrt( errs.nrm2[cn][ot] / len )
-         errs.mae[cn][ot] = errs.mae[cn][ot] / len
-         errs.nrm1[cn][ot] = errs.nrm1[cn][ot] / len
-         errs.allerr[cn][ot] = quantile(errs.allerr[cn][ot] ,range(0., stop=1., length=nb_points_cdf))
-      end
-   end
-
-   # # ------- - scatter E -------
-   # push!(scatterE[ct][1], E_data/len)
-   # push!(scatterE[ct][2], E_fit/len)
-   # append!(scatterF[ct][1], f_data)
-   # append!(scatterF[ct][2], f_fit)
-
-   return errs
-
-
-end
-
-# function cdf_energy_forces(res_dict; nb_points_cdf = 40)
-#    absEerr = Float64[]
-#    absFerr = Float64[]
-#    absVerr = Float64[]
-#    for cn in collect(keys(res_dict))
-#       if haskey(res_dict[cn],"E")
-#          for i in 1:length(res_dict[cn]["E"])
-#             append!(absEerr, abs.(res_dict[cn]["E"][i][1] - res_dict[cn]["E"][i][2]) )
-#          end
-#       end
-#       if haskey(res_dict[cn],"F")
-#          for i in 1:length(res_dict[cn]["F"])
-#             append!(absFerr, abs.(res_dict[cn]["F"][i][1] - res_dict[cn]["F"][i][2]) )
-#          end
-#       end
-#    end
-#    return quantile(absEerr, collect(linspace(0.,1.,nb_points_cdf))), quantile(absFerr, collect(linspace(0.,1.,nb_points_cdf)))
-# end
 
 
 

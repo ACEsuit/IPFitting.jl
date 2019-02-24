@@ -1,94 +1,50 @@
 
-@info("Loading libraries...")
-using JuLIP, ASE
-using NBodyIPs
+using JuLIP, NBodyIPs, NBodyIPFitting
+using NBodyIPFitting: Dat, LsqDB
 using NBodyIPs: bodyorder, degree
-using NBodyIPFitting
-using NBodyIPFitting.Lsq
-using NBodyIPFitting.Data: observation, hasobservation, configname
-using FileIO, Plots, DataFrames
-using Distributions
 using Test
-
 using LinearAlgebra: norm
 
-@info("Loading data...")
-include(homedir() * "/Dropbox/PIBmat/W_Data/W.jl")
-data = W.loaddb()
-@show length(data)
-
-@info("Loading db file...")
-dbname = homedir() * "/Research/01_En_cours/Post-doc/nbodyips/W_2BBL_r2_2"
-@show dbname
-@time db = LsqDB(dbname)
-info(db)
 
 
-num_config = Dict(
-   "gamma_surface_vacancy"  =>  750,
-   "vacancy"  =>  420,
-   "slice_sample"  =>  2000,
-   "gamma_surface"  =>  6183,
-   "surface"  =>  180,
-   "md_bulk"  =>  60,
-   "dislocation_quadrupole"  =>  100 )
-
-p_config = Dict(
-   "gamma_surface_vacancy"  =>  1.0,
-   "vacancy"  =>  1.0,
-   "slice_sample"  =>  1.0,
-   "gamma_surface"  =>  1.0,
-   "surface"  =>  1.0,
-   "md_bulk"  =>  1.0,
-   "dislocation_quadrupole"  =>  1.0 )
-
-
-function get_weights(db)
-   cfgkeys = confignames(db)
-   vals = ones(length(cfgkeys))
-   configweights = Dict( k => (v, p_config[k]) for (k, v) in zip(cfgkeys, vals))
-   dataweights = Dict( "E" => 1.0, "F" => 1.0, "V" => 0.0 )
-   return configweights, dataweights
-end
-
-function get_Ibasis(db, degrees)
-   Ibasis = Int[]
-   for (i, (bo, deg)) in enumerate( zip( bodyorder.(db.basis), degree.(db.basis) ) )
-      if degrees[bo] >= deg
-         push!(Ibasis, i)
-      end
+# generate random data
+function generate_data(species, L, rmax, N, calc; cn="rand")
+   data = Dat[]
+   for n = 1:N
+      at = bulk(species; cubic=true, pbc=true) * L
+      rattle!(at, rand() * rmax)
+      E = energy(calc, at)
+      F = forces(calc, at)
+      V = virial(calc, at)
+      push!(data, Dat(at, cn; E = E, F = F, V = V))
    end
-   return Ibasis
+   return data
 end
 
+r0 = rnn(:Si)
+calc = StillingerWeber()
+data1 = generate_data(:Si, 2, 0.33*r0, 20, calc; cn="rand1")
+data2 = generate_data(:Si, 2, 0.1*r0, 20, calc; cn="rand2")
+data = [data1; data2]
 
-degrees = Dict(2 => 3, 3=>0, 4=>0,  5=>0)
-configweights, dataweights = get_weights(db)
-Ibasis = get_Ibasis(db, degrees)
+@info("generate a 3B fit to SW")
 
-IP, lsqinfo = lsqfit( db; E0 = W.get_E0(),
-                      dataweights = dataweights,
-                      configweights = configweights,
-                      Ibasis = Ibasis,
-                      verbose = false )
+TRANSFORM = "exp( - 2 * (r/$r0 - 1.5) )"
+rcut2 = cutoff(calc)*1.4
+rcut3 = cutoff(calc)*1.9
+CUTOFF2 = "(:cos, $(rcut2-1), $rcut2)"
+CUTOFF3 = "(:cos, $(rcut3-1), $rcut3)"
+D2 = BondLengthDesc(TRANSFORM, CUTOFF2)
+D3 = BondLengthDesc(TRANSFORM, CUTOFF3)
+B = [nbpolys(2, D3, 8); nbpolys(3, D3, 6)]
+@show length(B)
+db = LsqDB("", B, data)
+IP, errs = lsqfit( db,
+                   E0 = 0.0,
+                   configweights = Dict("rand1" => 1.0, "rand2" => 0.5),
+                   dataweights   = Dict("E" => 100.0, "F" => 1.0) )
+IPf = fast(IP)
+add_fits!(IPf, data)
+errs, errsrel = rmse(data)
 
-@time res_dict = results_dict(data, IP; confignames = Colon(), pathname = homedir() * "/Research/01_En_cours/Post-doc/nbodyips/res_dict_W.jld2")
-
-errs1 = lsqerrors(db, [IP.components[2].c ; IP.components[3].c] , Ibasis; E0 = W.get_E0())
-table(errs1)
-
-errs2 = lsqerrors(res_dict, data; E0 = W.get_E0())
-table(errs2)
-
-for f in fieldnames(errs1)
-   D1 = getfield(errs1, f)
-   D2 = getfield(errs2, f)
-   for cn in keys(configweights)
-      for ot in ["E","F","V"]
-         if !haskey(D1[cn],ot)
-            continue
-         end
-         @test maximum(abs.(D1[cn][ot] - D2[cn][ot])) < 1e-6
-      end
-   end
-end
+rmse_table(errs, errsrel)
