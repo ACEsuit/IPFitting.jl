@@ -29,7 +29,7 @@ using NBodyIPs: OneBody, NBodyIP
 using NBodyIPFitting: Dat, LsqDB, data, weighthook
 using NBodyIPFitting.Data: observation, hasobservation, configname, configtype
 using NBodyIPFitting.DataTypes: ENERGY
-using NBodyIPFitting.DB: dbpath, _nconfigs, _nbasis
+using NBodyIPFitting.DB: dbpath, _nconfigs
 
 using LinearAlgebra: lmul!, Diagonal, qr, cond, norm
 using InteractiveUtils: versioninfo

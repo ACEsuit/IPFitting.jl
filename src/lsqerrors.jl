@@ -2,7 +2,7 @@
 module Errors
 
 using JuLIP: Atoms, energy, forces, virial
-using NBodyIPFitting: LsqDB, Dat, configtype, weighthook, evaluate_lsq
+using NBodyIPFitting: LsqDB, Dat, configtype, weighthook, eval_obs
 using NBodyIPFitting.Data: observation, hasobservation, configname
 using ASE: ASEAtoms   # TODO: WE SHOULD AVOID THIS!!!!
 using FileIO, Printf
@@ -44,7 +44,7 @@ function add_fits!(IP, data::Vector{Dat}; fitkey = "fit")
    @showprogress for d in data   # TODO: multi-threaded
       d.info[fitkey] = Dict{String, Vector{Float64}}()
       for okey in keys(d.D)   # d.D are the observations
-         d.info[fitkey][okey] = vec(okey, evaluate_lsq(okey, IP, d.at))
+         d.info[fitkey][okey] = vec(okey, eval_obs(okey, IP, d.at))
       end
    end
    return nothing
@@ -66,15 +66,17 @@ _relerr(relerrs, ct, ot) = haskey(relerrs[ct], ot) ? 100*relerrs[ct][ot] : NaN
 _err(errs, ct, ot) = haskey(errs[ct], ot) ? errs[ct][ot] : NaN
 
 function _err_table(errs, relerrs, title)
-   print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n")
-   print("                       $title    \n")
-   print("───────────────┰─────────────────┬─────────────────┬─────────────────\n")
-   print("  config type  ┃      E [eV]     │     F [eV/A]    │     V [eV/A]   \n")
-   print("───────────────╂────────┬────────┼────────┬────────┼────────┬────────\n")
+   lentitle = length(title)
+   print("┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n")
+   print("┃ "); printstyled(title; bold=true);
+   print(repeat(' ', 70-3-lentitle)); print("┃\n")
+   print("┣━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━┯━━━━━━━━━━━━━━━━━┯━━━━━━━━━━━━━━━━━┫\n")
+   print("┃ config type  ┃      E [eV]     │     F [eV/A]    │     V [eV/A]    ┃\n")
+   print("┠──────────────╂────────┬────────┼────────┬────────┼────────┬────────┨\n")
    s_set = ""
    for ct in keys(errs)  # ct in configtypes
-      s = @sprintf(" %13s ┃ %6.4f ┊ %5.2f%% │ %6.3f ┊ %5.2f%% │ %6.3f ┊ %5.2f%%\n",
-         truncate_string(ct, 13),
+      s = @sprintf("┃ %12s ┃ %6.4f ┊ %5.2f%% │ %6.3f ┊ %5.2f%% │ %6.3f ┊ %5.2f%% ┃\n",
+         truncate_string(ct, 12),
          _err(errs, ct, "E"), _relerr(errs, ct, "E"),
          _err(errs, ct, "F"), _relerr(errs, ct, "F"),
          _err(errs, ct, "V"), _relerr(errs, ct, "V") )
@@ -85,10 +87,10 @@ function _err_table(errs, relerrs, title)
       end
    end
    if s_set != ""
-      print("───────────────╂────────┼────────┼────────┼────────┼────────┼────────\n")
+      print("┠──────────────╂────────┼────────┼────────┼────────┼────────┼────────┨\n")
       print(s_set)
    end
-      print("━━━━━━━━━━━━━━━┷━━━━━━━━┷━━━━━━━━┷━━━━━━━━┷━━━━━━━━┷━━━━━━━━┷━━━━━━━━\n")
+      print("┗━━━━━━━━━━━━━━┻━━━━━━━━┷━━━━━━━━┷━━━━━━━━┷━━━━━━━━┷━━━━━━━━┷━━━━━━━━┛\n")
 end
 
 

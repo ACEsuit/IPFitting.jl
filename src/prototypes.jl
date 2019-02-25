@@ -5,39 +5,21 @@ import JuLIP
 using JuLIP: Atoms, JVec, JMat, JVecs, AbstractCalculator, mat, vecs,
              numbers, positions, cell, pbc
 
-export LsqDB, Dat
+export LsqDB, Dat, basis, configs, config
 
 
 """
-`Dat`: store one simulation data point. If `d::Dat`, to obtain the data, use
-```
-Atoms(d)
-energy(d)
-forces(d)
-virial(d)
-# weight(d)
-configtype(d)
-length(d)    # number of atoms
-```
-If information is missing, the relevant function will return `nothing` instead
-(TODO for J v1.0: change `nothing` to `missing`)
+`Dat`: store one atomistic configuration and the associated
+observations (e.g. E, F, V, ...)
 """
 mutable struct Dat
-   at::Atoms
-   configtype::String
-   D::Dict{String, Vector{Float64}}
-   info::Dict{String, Any}
+   at::Atoms                         # configuration
+   configtype::String                # group identifier
+   D::Dict{String, Vector{Float64}}  # list of observations
+   info::Dict{String, Any}           # anything else...
 end
 
-# function convert(Dat, d::Any)
-#    try
-#       return Dat(d.at, d.configtype, d.D, Dict{String, Any}())
-#    catch
-#       @show d
-#       error("convert of `d` unsuccesful; edit `prototypes.jl:convert()` to fix this")
-#    end
-# end
-
+# TODO: should D.info also be compared?
 ==(d1::Dat, d2::Dat) = (
       (d1.configtype == d2.configtype) && (d1.D == d2.D) &&
       all( f(d1.at) == f(d2.at) for f in (positions, numbers, cell, pbc) )
@@ -47,13 +29,17 @@ function Dat(at::Atoms, config_type::AbstractString; kwargs...)
    dat = Dat(at, config_type, Dict{String, Vector{Float64}}(), Dict{String, Any}())
    for (key, val) in kwargs
       str_key = string(key)
-      # interpret `nothing` as `missing`
-      if val != nothing
-         dat.D[str_key] = vec(Val(Symbol(str_key)), val)
+      if !(ismissing(val) || (val == nothing))
+         # convert the observation to a basic vector and store it
+         dat.D[str_key] = vec(str_key, val)
       end
    end
    return dat
 end
+
+# TODO: using `JuLIP.Dict(::Atoms...)` and
+# enable storage of the complete Atoms object,
+# which may contain additional information
 
 Base.Dict(d::Dat) =
    Dict("__id__" => "NBodyIPFitting.Dat",
@@ -65,15 +51,12 @@ Base.Dict(d::Dat) =
          "D" => d.D )
 
 
-_read_cell(C::Matrix) = JuLIP.JMatF(C)
-_read_cell(C::Vector{Any}) = JuLIP.JMatF( ([C[1] C[2] C[3]])... )
-
 function Dat(D::Dict)
-   X = JuLIP._read_X(D["X"])
-   at = Atoms( X = JuLIP._read_X(D["X"]),
+   X = JuLIP._auto_X(D["X"])
+   at = Atoms( X = JuLIP._auto_X(D["X"]),
                Z = Vector{Int}(D["Z"]),
-               cell = _read_cell(D["cell"]),
-               pbc = Bool.(D["pbc"]) )  # tuple(Bool.(D["pbc"])...)
+               cell = JuLIP._auto_cell(D["cell"]),
+               pbc = JuLIP._auto_pbc(D["pbc"]) )
    return Dat(at, D["configtype"], Dict{String, Any}(D["D"]), Dict{String, Any}())
 end
 
@@ -81,8 +64,6 @@ convert(::Val{Symbol("NBodyIPFitting.Dat")}, D::Dict) = Dat(D)
 
 # -----------------------------------------------------------------
 
-const KronGroup = Dict{String, Array{Float64, 3}}
-const DataGroup = Vector{Dat}
 
 """
 `mutable struct LsqDB{TD, TB}`
@@ -92,14 +73,15 @@ be extended by adding data, or basis functions
 """
 mutable struct LsqDB
    basis::Vector{AbstractCalculator}
-   data_groups::Dict{String, DataGroup}
-   kron_groups::Dict{String, KronGroup}
+   configs::Vector{Dat}
+   Ψ::Matrix{Float64}
    dbpath::String
 end
 
 basis(db::LsqDB) = db.basis
 basis(db::LsqDB, i::Integer) = db.basis[i]
-data(db::LsqDB) = db.data
+configs(db::LsqDB) = db.configs
+config(db::LsqDB, i::Integer) = db.configs[i]
 
 
 # prototypes
@@ -113,7 +95,7 @@ vec(::Val{:F}, F) = mat(F)[:]
 ```
 or equivalently, `vec("F", F)`
 """
-function vec end
+function vec_obs end
 
 """
 convert a Vector{T} to some real (atomistic) data, e.g.,
@@ -122,9 +104,15 @@ x::Vector{Float64}
 devec(::Val{:F}, x) = vecs( resize(x, 3, length(x) ÷ 3) )
 ```
 """
-function devec end
+function devec_obs end
 
-function evaluate_lsq end
+"""
+evaluate a specific observation type
+"""
+function eval_obs end
 
+"""
+create special weights for different observations
+"""
 weighthook(::Val, d::Dat) = 1.0
 weighthook(s::String, d::Dat) = weighthook(Val(Symbol(s)), d)
