@@ -21,14 +21,15 @@ function generate_data(species, L, rmax, N, calc; cn="rand")
    return data
 end
 
+##
 r0 = rnn(:Si)
 calc = StillingerWeber()
 data1 = generate_data(:Si, 2, 0.33*r0, 20, calc; cn="rand1")
 data2 = generate_data(:Si, 2, 0.1*r0, 20, calc; cn="rand2")
 data = [data1; data2]
 
+##
 @info("generate a 3B fit to SW")
-
 TRANSFORM = "exp( - 2 * (r/$r0 - 1.5) )"
 rcut2 = cutoff(calc)*1.4
 rcut3 = cutoff(calc)*1.9
@@ -39,12 +40,26 @@ D3 = BondLengthDesc(TRANSFORM, CUTOFF3)
 B = [nbpolys(2, D3, 8); nbpolys(3, D3, 6)]
 @show length(B)
 db = LsqDB("", B, data)
-IP, errs = lsqfit( db,
+IP, fitinfo = lsqfit( db,
                    E0 = 0.0,
                    configweights = Dict("rand1" => 1.0, "rand2" => 0.5),
-                   dataweights   = Dict("E" => 100.0, "F" => 1.0) )
+                   dataweights   = Dict("E" => 100.0, "F" => 1.0)
+                   )
 IPf = fast(IP)
+
+##
+@info("Checking that the two rmse computations agree")
+
 add_fits!(IPf, data)
 errs, errsrel = rmse(data)
-
 rmse_table(errs, errsrel)
+
+olderrs = fitinfo["errors"]
+rmse_table(rmse(olderrs)...)
+
+for cn in keys(errs)
+   for ot in keys(errs[cn])
+      println(@test errs[cn][ot] ≈ olderrs["rmse"][cn][ot])
+      println(@test errsrel[cn][ot] ≈ olderrs["relrmse"][cn][ot])
+   end
+end

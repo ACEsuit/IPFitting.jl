@@ -374,7 +374,7 @@ to display these as tables and `rmse, mae` to access individual errors.
    # compute errors
    verbose && @info("Assemble errors table")
    @warn("new error implementation... redo this part please ")
-   # errs = Err.lsqerrors(db, c, Jbasis; confignames=keys(configweights), E0=E0)
+   errs = Err.lsqerrors(db, c, Jbasis; confignames=keys(configweights), E0=E0)
 
    if E0 != 0
       basis = [ OneBody(E0); db.basis[Ibasis] ]
@@ -406,7 +406,7 @@ to display these as tables and `rmse, mae` to access individual errors.
       numconfigs[cn] +=  length(db.data_groups[ct])
    end
 
-   infodict = Dict("errors" => Dict(),
+   infodict = Dict("errors" => errs,
                    "solver" => String(solver[1]),
                    "E0" => E0,
                    "Ibasis" => Vector{Int}(Jbasis),
