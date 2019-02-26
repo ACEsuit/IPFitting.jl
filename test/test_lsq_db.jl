@@ -47,23 +47,22 @@ println(@test DB.dbpath(db) == dbpath)
 println(@test DB.kronfile(dbpath) == dbpath * "_kron.h5")
 println(@test DB.infofile(dbpath) == dbpath * "_info.json")
 println(@test db.basis == basis)
-println(@test db.data_groups["md"] == data1)
-println(@test db.data_groups["cell"] == data2)
+println(@test db.configs == data)
 
 println("re-load the database")
 db1 = DB.LsqDB(dbpath)
 println(@test DB.dbpath(db1) == dbpath)
 println(@test db1.basis == db.basis)
-println(@test db1.data_groups == db.data_groups)
-println(@test db1.kron_groups == db.kron_groups)
+println(@test db1.configs == db.configs)
+println(@test db1.Ψ == db.Ψ)
 
 ##
 println("re-load the database with mmap=true")
 db2 = DB.LsqDB(dbpath, mmap=true)
 println(@test DB.dbpath(db2) == dbpath)
 println(@test db2.basis == db.basis)
-println(@test db2.data_groups == db.data_groups)
-println(@test db2.kron_groups == db.kron_groups)
+println(@test db2.configs == db.configs)
+println(@test db2.Ψ == db.Ψ)
 
 ##
 println("Delete the temporary database")

@@ -38,36 +38,36 @@ err_erms = Float64[]
 err_frms = Float64[]
 degrees = [4, 6, 8, 10, 12, 14, 16]
 
-let D2=D2, data=data
+
+for d in degrees
+   rr = range(0.9*r0, stop=cutoff(calc), length=200)
    global err_eunif
    global err_funif
    global err_erms
    global err_frms
-   global degrees 
-   rr = range(0.9*r0, stop=cutoff(calc), length=200)
-   for d in degrees
-      local B2
-      local db
-      B2 = nbpolys(2, D2, d)
-      @show length(B2)
-      db = LsqDB("", B2, data)
-      IP, fitinfo = Lsq.lsqfit(db, E0 = 0.0,
-                               configweights = Dict("rand" => 1.0),
-                               dataweights   = Dict("E" => 100.0, "F" => 1.0) )
-      @info("done fitting...")
-      errs = Err.LsqErrors(fitinfo["errors"])
-      @info("done assembling errors")
-      Err.table_absolute(errs)
-      V2 = IP.components[1]
-      ev2 = norm(V2.(rr) - 0.5 * calc.(rr), Inf)
-      dev2 = norm(evaluate_d.(Ref(V2), rr) - 0.5 * evaluate_d.(Ref(calc), rr), Inf)
-      println("   V2 - uniform error = ", ev2, " | ", dev2)
-      push!(err_eunif, ev2)
-      push!(err_funif, dev2)
-      push!(err_erms, Err.rmse(errs, "rand", "E"))
-      push!(err_frms, Err.rmse(errs, "rand", "F"))
-   end
+   global degrees
+   local B2
+   local db
+   B2 = nbpolys(2, D2, d)
+   @show length(B2)
+   db = LsqDB("", B2, data)
+   IP, fitinfo = Lsq.lsqfit(db, E0 = 0.0,
+                            configweights = Dict("rand" => 1.0),
+                            obsweights   = Dict("E" => 100.0, "F" => 1.0) )
+   @info("done fitting...")
+   errs = fitinfo["errors"]
+   @info("done assembling errors")
+   Err.rmse_table(rmse(errs)...)
+   V2 = IP.components[1]
+   ev2 = norm(V2.(rr) - 0.5 * calc.(rr), Inf)
+   dev2 = norm(evaluate_d.(Ref(V2), rr) - 0.5 * evaluate_d.(Ref(calc), rr), Inf)
+   println("   V2 - uniform error = ", ev2, " | ", dev2)
+   push!(err_eunif, ev2)
+   push!(err_funif, dev2)
+   push!(err_erms, errs["rmse"]["rand"]["E"])
+   push!(err_frms, errs["rmse"]["rand"]["F"])
 end
+
 
 df = DataFrame( :degrees => degrees,
                        :unif_E => err_eunif,

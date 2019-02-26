@@ -24,9 +24,9 @@ using Reexport
 
 include("tools.jl")
 
-include("fio.jl")
-
 include("prototypes.jl")
+
+include("obsiter.jl")
 
 include("datatypes.jl")
 

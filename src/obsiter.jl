@@ -1,4 +1,5 @@
 
+import Base.iterate
 
 struct ObservationsIterator
    configs::Vector{Dat}
@@ -14,7 +15,7 @@ function iterate(iter::ObservationsIterator, i::Integer)
       return nothing
    end
    # the observation keys for the current config
-   okeys = collect(keys(iter.configs.D))
+   okeys = collect(keys(iter.configs[i].D))
    # get the next observation
    return iterate(iter, (i=i, okeys=okeys, ikey=1))
 end
@@ -26,7 +27,7 @@ function iterate(iter::ObservationsIterator, state::NamedTuple)
    end
    # if there is another observation left...
    obskey = state.okeys[state.ikey]
-   d = iter.configs[state.i]iter.configs[state.i]
+   d = iter.configs[state.i]
    return (obskey, d, state.i),  # returned to user
           (i=state.i, okeys=state.okeys, ikey=state.ikey+1)   # next state
 end
@@ -47,7 +48,7 @@ function tfor_observations(configs::Vector{Dat}, callback;
       push!(okeys, okey)
    end
 
-   # start a threaded for loop 
+   # start a threaded for loop
    db_lock = SpinLock()
    tfor( n -> callback(okeys[n], configs[idats[n]], db, db_lock),
          1:length(idats),

@@ -18,7 +18,7 @@ loaded information.
 module Data
 
 using JuLIP, ProgressMeter, FileIO
-using NBodyIPFitting: Dat, vec, devec
+using NBodyIPFitting: Dat, vec_obs, devec_obs, observation, hasobservation
 using NBodyIPFitting.DataTypes
 import JuLIP: Atoms, energy, forces, virial
 import Base: length, Dict
@@ -34,12 +34,9 @@ length(d::Dat) = length(d.at)
 configtype(d::Dat) = d.configtype
 configname(d::Dat) = configname(configtype(d))
 configname(s::String) = match(r"[a-z,A-Z,0-9,_,%]*", s).match
-energy(d::Dat) = haskey(d.D, ENERGY) ? devec(Val(:E), d.D[ENERGY]) : nothing
-forces(d::Dat) = haskey(d.D, FORCES) ? devec(Val(:F), d.D[FORCES]) : nothing
-virial(d::Dat) = haskey(d.D, VIRIAL) ? devec(Val(:V), d.D[VIRIAL]) : nothing
-observation(d::Dat, key::String) = d.D[key]
-hasobservation(d::Dat, key::String) = haskey(d.D, key)
-observation(key::String, d::Dat) = d.D[key]
+energy(d::Dat) = haskey(d.D, ENERGY) ? devec_obs(Val(:E), d.D[ENERGY]) : nothing
+forces(d::Dat) = haskey(d.D, FORCES) ? devec_obs(Val(:F), d.D[FORCES]) : nothing
+virial(d::Dat) = haskey(d.D, VIRIAL) ? devec_obs(Val(:V), d.D[VIRIAL]) : nothing
 
 
 function read_energy(atpy)

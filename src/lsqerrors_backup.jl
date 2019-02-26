@@ -1,11 +1,11 @@
 # # Computation of the energy-force-virials for a given atomic position and IP
 # function ipcomp(at,ot,IP)
 #    if ot == "E"
-#       return vec(ot,energy(IP,at))
+#       return vec_obs(ot,energy(IP,at))
 #    elseif ot == "F"
-#       return vec(ot,forces(IP,at))
+#       return vec_obs(ot,forces(IP,at))
 #    elseif ot == "V"
-#       return vec(ot,virial(IP,at))
+#       return vec_obs(ot,virial(IP,at))
 #    else
 #       error("observation type not implemented")
 #    end

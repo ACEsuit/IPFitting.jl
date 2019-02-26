@@ -31,7 +31,7 @@ function Dat(at::Atoms, config_type::AbstractString; kwargs...)
       str_key = string(key)
       if !(ismissing(val) || (val == nothing))
          # convert the observation to a basic vector and store it
-         dat.D[str_key] = vec(str_key, val)
+         dat.D[str_key] = vec_obs(str_key, val)
       end
    end
    return dat
@@ -43,24 +43,33 @@ end
 
 Base.Dict(d::Dat) =
    Dict("__id__" => "NBodyIPFitting.Dat",
-         "X" => positions(d.at) |> mat,
-         "Z" => numbers(d.at),
-         "cell" => cell(d.at) |> Matrix,
-         "pbc" => Int.([pbc(d.at)...]),
+         "at" => Dict(d.at),
          "configtype" => d.configtype,
-         "D" => d.D )
+         "D" => d.D,
+         "info" => d.info)
+         # positions(d.at) |> mat,
+         # "Z" => numbers(d.at),
+         # "cell" => cell(d.at) |> Matrix,
+         # "pbc" => Int.([pbc(d.at)...]),
+         # "configtype" => d.configtype,
+         # "D" => d.D )
 
 
 function Dat(D::Dict)
-   X = JuLIP._auto_X(D["X"])
-   at = Atoms( X = JuLIP._auto_X(D["X"]),
-               Z = Vector{Int}(D["Z"]),
-               cell = JuLIP._auto_cell(D["cell"]),
-               pbc = JuLIP._auto_pbc(D["pbc"]) )
+   at = Atoms(D["at"])
+               # X = D["X"],
+               # Z = D["Z"],
+               # cell = D["cell"],
+               # pbc = D["pbc"] )
    return Dat(at, D["configtype"], Dict{String, Any}(D["D"]), Dict{String, Any}())
 end
 
 convert(::Val{Symbol("NBodyIPFitting.Dat")}, D::Dict) = Dat(D)
+
+observation(d::Dat, key::String) = d.D[key]
+hasobservation(d::Dat, key::String) = haskey(d.D, key)
+observation(key::String, d::Dat) = d.D[key]
+
 
 # -----------------------------------------------------------------
 
@@ -91,9 +100,9 @@ convert some real data, in some generic format, into a vector to be stored
 in a `Dat` or Lsq system. E.g.,
 ```
 F = forces(...)::Vector{JVecF}
-vec(::Val{:F}, F) = mat(F)[:]
+vec_obs(::Val{:F}, F) = mat(F)[:]
 ```
-or equivalently, `vec("F", F)`
+or equivalently, `vec_obs("F", F)`
 """
 function vec_obs end
 
@@ -101,7 +110,7 @@ function vec_obs end
 convert a Vector{T} to some real (atomistic) data, e.g.,
 ```
 x::Vector{Float64}
-devec(::Val{:F}, x) = vecs( resize(x, 3, length(x) ÷ 3) )
+devec_obs(::Val{:F}, x) = vecs( resize(x, 3, length(x) ÷ 3) )
 ```
 """
 function devec_obs end

@@ -35,11 +35,11 @@ same memory layout as a 3 x N matrix (`JuLIP.mat`), which can can then be
 vectorised (`[:]`), and this vectoriation is readily undone again.
 Analogously, any data must be stored in such a vectorised format. This is
 achieved (e.g. for forces) via
-* `Base.vec(::Val{:F}, F) -> Vector`
-* `NBodyIPFitting.devec(::Val{:F}, Fvec) -> Vector{SVector{...}}`
+* `vec_obs(::Val{:F}, F) -> Vector`
+* `devec_obs(::Val{:F}, Fvec) -> Vector{SVector{...}}`
 or equivalently
-* `Base.vec("F", F) -> Vector`
-* `NBodyIPFitting.devec("F", Fvec) -> Vector{SVector{...}}`
+* `vec_obs("F", F) -> Vector`
+* `devec_obs("F", Fvec) -> Vector{SVector{...}}`
 (the `Val` versions are used for performance optimisation)
 """
 module DB
@@ -48,13 +48,12 @@ using Base.Threads:          SpinLock
 using StaticArrays:          SVector
 using JuLIP:                 AbstractCalculator, AbstractAtoms, Atoms,
                              save_json, load_json, decode_dict
-using NBodyIPFitting:        Dat, LsqDB, data, basis, eval_obs
+using NBodyIPFitting:        Dat, LsqDB, basis, eval_obs, observations,
+                             observation, vec_obs, devec_obs
 using NBodyIPFitting.Data:   configtype
 using NBodyIPFitting.Tools:  tfor
 using NBodyIPs:              degree, bodyorder, basisname, combiscriptor
 using HDF5:                  h5open, read
-
-import NBodyIPFitting.FIO
 
 import Base: flush, append!, union
 
@@ -79,7 +78,7 @@ kronfile(dbpath::AbstractString) = dbpath * KRONFILE
 function _backupfile(fname)
    if isfile(fname)
       fnew = fname * "." * String(rand('a':'z', 5))
-      @warn("The file $fname already exists. It will be renamed to $fnew$ to avoid overwriting.")
+      @warn("The file $fname already exists. It will be renamed to $fnew to avoid overwriting.")
       run(`mv $fname $fnew`)
    end
    return nothing
@@ -88,7 +87,7 @@ end
 function load_info(dbpath::String)
    dbinfo = load_json(infofile(dbpath))
    basis = decode_dict.(dbinfo["basis"])
-   configs = Dat.(dbinfo["data"])   # here we already know the type
+   configs = Dat.(dbinfo["configs"])   # here we already know the type
    return basis, configs
 end
 
@@ -96,7 +95,7 @@ function save_info(dbpath::String, db)
    _backupfile(infofile(dbpath))
    save_json(infofile(dbpath),
              Dict("basis" => Dict.(db.basis),
-                  "configs" => Dict.(db.configs))
+                  "configs" => Dict.(db.configs)))
    return nothing
 end
 
@@ -124,7 +123,7 @@ end
 
 save_kron(db) = save_kron(dbpath(db), db)
 
-load_kron(dbpath::String; mmap=false) = _loadmath5(dbpath)
+load_kron(dbpath::String; mmap=false) = _loadmath5(kronfile(dbpath))
 
 load_kron(db::LsqDB; mmap=false) = load_kron(dbpath(db); mmap=mmap)
 
@@ -177,9 +176,9 @@ function LsqDB(dbpath::AbstractString,
    # parallel assembly of the LSQ matrix
    # TODO: after first test, rewrite this in terms of tfor_observations
    db_lock = SpinLock()
-   lens = [length(d) for d in data]
+   lens = [length(d) for d in configs]
    tfor( n -> safe_append!(db, db_lock, n),
-         1:length(data);
+         1:length(configs);
          verbose=verbose,
          msg = "Assemble LSQ blocks",
          costs = lens)
@@ -216,7 +215,7 @@ function _alloc_lsq_matrix(configs, basis)
    nrows = 0
    for (okey, d, _) in observations(configs)
       len = length(observation(d, okey))
-      set_matrows!(d, okey, nrows .+ (1:len))
+      set_matrows!(d, okey, collect(nrows .+ (1:len)))
       nrows += len
    end
    # allocate and return the matrix
@@ -224,7 +223,8 @@ function _alloc_lsq_matrix(configs, basis)
 end
 
 # TODO: rewrite this as a loop over individual observations
-function safe_append!(db::LsqDB, db_lock, d::Dat)
+function safe_append!(db::LsqDB, db_lock, n::Integer)
+   d = db.configs[n]
    # computing the lsq blocks ("rows") can be done in parallel,
    lsqrow = evallsq(d, basis(db))
    # but writing them into the DB must be done in a threadsafe way
@@ -330,13 +330,13 @@ function _evallsq(vDT::Val,
                   at::AbstractAtoms)
    # vals will be a vector containing multiple evaluations
    vals = eval_obs(vDT, B, at)
-   # vectorise the first so we know the length of the data
-   vec1 = vec(vDT, vals[1])
+   # vectorise the first so we know the length of the observation
+   vec1 = vec_obs(vDT, vals[1])
    # create a multi-D array to reshape these into
    A = Array{Float64}(undef, length(vec1), length(B))
    A[:, 1] = vec1
    for n = 2:length(B)
-      A[:, n] = vec(vDT, vals[n])
+      A[:, n] = vec_obs(vDT, vals[n])
    end
    return A
 end

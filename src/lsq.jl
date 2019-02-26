@@ -26,10 +26,11 @@ import JuLIP, NBodyIPFitting, StatsBase
 using StaticArrays
 using JuLIP: AbstractCalculator, Atoms
 using NBodyIPs: OneBody, NBodyIP
-using NBodyIPFitting: Dat, LsqDB, data, weighthook
-using NBodyIPFitting.Data: observation, hasobservation, configname, configtype
+using NBodyIPFitting: Dat, LsqDB, weighthook, observations,
+                      observation, hasobservation
+using NBodyIPFitting.Data: configtype
 using NBodyIPFitting.DataTypes: ENERGY
-using NBodyIPFitting.DB: dbpath, _nconfigs, observations, matrows
+using NBodyIPFitting.DB: dbpath, _nconfigs, matrows
 
 using LinearAlgebra: lmul!, Diagonal, qr, cond, norm
 using InteractiveUtils: versioninfo
@@ -88,9 +89,9 @@ function collect_observations(db::LsqDB,
       Y[irows] .= obs
       # ------ Weights --------
       # modify the weights from extra information in the dat structure
-      W[irows] .= _get_weights(configweights[ct].weight,
+      W[irows] .= _get_weights(configweights[ct], # .weight, TODO
                                obsweights[obskey],
-                               weighthook(obskey, d),
+                               weighthook(obskey, dat),
                                dat, obskey, obs)
    end
    return Y, W
@@ -185,6 +186,7 @@ E0, Ibasis`.
    # # restrict the configurations that we want
    # Iconfigs = Dict( key => _random_subset(db, key, val.proportion)
    #                  for (key, val) in configweights )
+   Iconfigs = nothing
 
    # # TODO => create some suitable "hooks"
    # E0 = lsq.basis[1]()
@@ -197,8 +199,8 @@ E0, Ibasis`.
    # TODO: this is no longer needed?!?!?
    configtypes, obstypes = _keys(configweights, obsweights)
    # get the observations vector and the weights vector
-   Y, W = observations(db, configtypes, obstypes, configweights, obsweights,
-                       E0, Iconfigs)
+   Y, W = collect_observations(db, configtypes, obstypes, configweights, obsweights,
+                       E0) # , Iconfigs)
    # check for NaNs
    any(isnan, Y) && @error("NaN detected in observations vector")
    any(isnan, W) && @error("NaN detected in weights vector")
@@ -231,7 +233,7 @@ end
 
 @noinline function onb(db::LsqDB;
              solver=(:qr, ), verbose=true, E0 = nothing,
-             Ibasis = :, configweights=nothing, dataweights = nothing,
+             Ibasis = :, configweights=nothing, obsweights = nothing,
              regularisers = [],
              kwargs...)
    @assert E0 != nothing
@@ -240,7 +242,7 @@ end
    verbose && @info("assemble lsq system")
    Ψ, _ = get_lsq_system(db; verbose=verbose, E0=E0, Ibasis=Ibasis,
                              configweights = configweights,
-                             dataweights = dataweights,
+                             obsweights = obsweights,
                              regularisers = regularisers,
                              kwargs...)
    @assert solver[1] == :qr
@@ -293,7 +295,7 @@ to display these as tables and `rmse, mae` to access individual errors.
 """
 @noinline function lsqfit(db::LsqDB;
                 solver=(:qr, ), verbose=true, E0 = nothing,
-                Ibasis = :, configweights=nothing, dataweights = nothing,
+                Ibasis = :, configweights=nothing, obsweights = nothing,
                 regularisers = [],
                 kwargs...)
    @assert E0 != nothing
@@ -302,7 +304,7 @@ to display these as tables and `rmse, mae` to access individual errors.
    verbose && @info("assemble lsq system")
    Ψ, Y = get_lsq_system(db; verbose=verbose, E0=E0, Ibasis=Ibasis,
                              configweights = configweights,
-                             dataweights = dataweights,
+                             obsweights = obsweights,
                              regularisers = regularisers,
                              kwargs...)
 
@@ -330,7 +332,7 @@ to display these as tables and `rmse, mae` to access individual errors.
    # compute errors
    verbose && @info("Assemble errors table")
    @warn("new error implementation... redo this part please ")
-   errs = Err.lsqerrors(db, c, Jbasis; confignames=keys(configweights), E0=E0)
+   errs = Err.lsqerrors(db, c, Jbasis; cfgtypes=keys(configweights), E0=E0)
 
    if E0 != 0
       basis = [ OneBody(E0); db.basis[Ibasis] ]
@@ -350,17 +352,19 @@ to display these as tables and `rmse, mae` to access individual errors.
    juliainfo = String(take!(iob))
 
    # NBodyIPs and NBodyIPFitting Version Info
-   nbipinfo, nbipfitinfo = get_git_info()
+   # TODO: put back in
+   # nbipinfo, nbipfitinfo = get_git_info()
 
    # number of configurations for each configtype
-   numconfigs = Dict{String, Int}()
-   for ct in keys(db.data_groups)
-      cn = configname(ct)
-      if !haskey(numconfigs, cn)
-         numconfigs[cn] = 0
-      end
-      numconfigs[cn] +=  length(db.data_groups[ct])
-   end
+   # TODO: put back in
+   # numconfigs = Dict{String, Int}()
+   # for ct in keys(db.data_groups)
+   #    cn = configname(ct)
+   #    if !haskey(numconfigs, cn)
+   #       numconfigs[cn] = 0
+   #    end
+   #    numconfigs[cn] += length(db.data_groups[ct])
+   # end
 
    infodict = Dict("errors" => errs,
                    "solver" => String(solver[1]),
@@ -369,13 +373,13 @@ to display these as tables and `rmse, mae` to access individual errors.
                    "dbpath" => dbpath(db),
                    "configweights" => configweights,
                    "confignames" => keys(configweights),
-                   "dataweights" => dataweights,
+                   "obsweights" => obsweights,
                    "regularisers" => Dict.(regularisers),
                    "juliaversion" => juliainfo,
-                   "NBodyIPs_version" => nbipinfo,
-                   "NBodyIPFitting_version" => nbipfitinfo,
-                   "numconfigs" => numconfigs
-         )
+                   # "NBodyIPs_version" => nbipinfo,
+                   # "NBodyIPFitting_version" => nbipfitinfo,
+                   # "numconfigs" => numconfigs
+                  )
    # --------------------------------------------------------------------
 
 
@@ -383,14 +387,14 @@ to display these as tables and `rmse, mae` to access individual errors.
 end
 
 
-## TODO: THIS NEEDS A REWRITE !!!!
-function get_git_info()
-   @warn("Storing Package git version info is no longer supported; this needs a rewrite.")
-   # nbipinfo = read(`cat $(Pkg.dir("NBodyIPs")*"/.git/refs/heads/master")`, String)[1:end-1]
-   # nbipfitinfo = read(`cat $(Pkg.dir("NBodyIPFitting")*"/.git/refs/heads/master")`, String)[1:end-1]
-   # nbipinfo = readstring(`git -C $(Pkg.dir("NBodyIPs")) rev-parse HEAD`)
-   # nbipfitinfo = readstring(`git -C $(Pkg.dir("NBodyIPFitting")) rev-parse HEAD`)
-   return "", "" # nbipinfo, nbipfitinfo
-end
+# ## TODO: THIS NEEDS A REWRITE !!!!
+# function get_git_info()
+#    @warn("Storing Package git version info is no longer supported; this needs a rewrite.")
+#    # nbipinfo = read(`cat $(Pkg.dir("NBodyIPs")*"/.git/refs/heads/master")`, String)[1:end-1]
+#    # nbipfitinfo = read(`cat $(Pkg.dir("NBodyIPFitting")*"/.git/refs/heads/master")`, String)[1:end-1]
+#    # nbipinfo = readstring(`git -C $(Pkg.dir("NBodyIPs")) rev-parse HEAD`)
+#    # nbipfitinfo = readstring(`git -C $(Pkg.dir("NBodyIPFitting")) rev-parse HEAD`)
+#    return "", "" # nbipinfo, nbipfitinfo
+# end
 
 end
