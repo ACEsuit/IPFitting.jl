@@ -29,7 +29,7 @@ using NBodyIPs: OneBody, NBodyIP
 using NBodyIPFitting: Dat, LsqDB, data, weighthook
 using NBodyIPFitting.Data: observation, hasobservation, configname, configtype
 using NBodyIPFitting.DataTypes: ENERGY
-using NBodyIPFitting.DB: dbpath, _nconfigs
+using NBodyIPFitting.DB: dbpath, _nconfigs, observations, matrows
 
 using LinearAlgebra: lmul!, Diagonal, qr, cond, norm
 using InteractiveUtils: versioninfo
@@ -40,8 +40,8 @@ export lsqfit, onb
 
 
 
-_keys(configweights, dataweights) = collect(keys(configweights)),
-                                    collect(keys(dataweights))
+_keys(configweights, obsweights) = collect(keys(configweights)),
+                                    collect(keys(obsweights))
 
 function _random_subset(db::LsqDB, configtype::AbstractString, p::Real)
    @assert 0 <= p <= 1
@@ -63,41 +63,35 @@ construct a vector of observations from the database `db`, specifically from
 in `keys(configweights)` and only those datatypes are loaded whose
 ids are in `keys(dataweights)`.
 """
-function observations(db::LsqDB,
-                      configtypes::Vector{String},
-                      datatypes::Vector{String},
-                      ctweights::Dict,
-                      dtweights::Dict, E0,
-                      Iconfigs::Dict )
-   Y = Float64[]
-   W = Float64[]
-   # loop through configuration groups
-   for ct in configtypes
-      ctweight = ctweights[ct]
-      # loop through the datatypes / observation types to be assembled
-      for dt in datatypes
-         if !hasobservation(db.data_groups[ct][1], dt)
-            continue
-         end
-         # loop through the observations (x, f(x)) of the current configuration group
-         for dat in db.data_groups[ct][Iconfigs[ct]]
-            o = observation(dat, dt)
-            # TODO: This is a hack => can we replace it with a hook?
-            if dt == ENERGY # subtract the 1-body reference energy
-               o = copy(o)
-               o[1] -= length(dat) * E0
-            end
-            append!(Y, o)
-
-            # compute the weights
-            # weighthook rescales energy, forces and virials differently
-            wh = weighthook(dt, dat)
-            # then we can still modify the weights from extra information
-            # in the dat structure
-            w = _get_weights(ctweight.weight, dtweights[dt], wh, dat, dt, o)
-            append!(W, w)
-         end
+function collect_observations(db::LsqDB,
+                              configtypes::Vector{String},
+                              obstypes::Vector{String},
+                              configweights::Dict,
+                              obsweights::Dict, E0 )
+                              # , Iconfigs::Dict )  # TODO
+   nrows = size(db.Ψ, 1)  # total number of observations if we collect
+                          # everything in the database
+   Y = zeros(Float64, nrows)
+   W = zeros(Float64, nrows)
+   for (obskey, dat, _) in observations(db)  # obskey ∈ {"E","F",...}; d::Dat
+      if !(obskey in obstypes)
+         continue
       end
+      irows = matrows(dat, obskey)
+      ct = configtype(dat)
+      # ----- Observation ------
+      obs = observation(obskey, dat)
+      # TODO: fix this hack!!!! (put in basis function constraints)
+      if obskey == "E"
+         obs = copy(obs) .- length(dat) * E0
+      end
+      Y[irows] .= obs
+      # ------ Weights --------
+      # modify the weights from extra information in the dat structure
+      W[irows] .= _get_weights(configweights[ct].weight,
+                               obsweights[obskey],
+                               weighthook(obskey, d),
+                               dat, obskey, obs)
    end
    return Y, W
 end
@@ -126,29 +120,6 @@ function _get_weights(ctweight, dtweights_dt, wh, dat, dt, o)
       return w
    end
    error("_get_weights: length(w) is neither 1 nor length(o)?!?!?")
-end
-
-
-
-# TODO: this function here suggests that the ordering we are usig at the moment
-#       is perfectly fine, and is in fact the more performant ordering
-#       and we should not switch it
-function lsq_matrix!(Ψ, db, configtypes, datatypes, Ibasis, Iconfigs::Dict)
-   idx = 0
-   for ct in configtypes
-      k = db.kron_groups[ct]
-      for dt in datatypes
-         if haskey(k, dt)
-            # block[:, i, j] = <data(i), basis(j)>_{dt}
-            block = k[dt]
-            Icfg = Iconfigs[ct]  # <--- which i to keep?
-            nrows = size(block, 1) * length(Icfg)
-            Ψ[(idx+1):(idx+nrows), :] = reshape(block[:, Icfg, Ibasis], nrows, :)
-            idx += nrows
-         end
-      end
-   end
-   return nothing
 end
 
 
@@ -191,23 +162,6 @@ ConfigFitInfo(w::Real, p::Real) = ConfigFitInfo(w, p, :ignore)
 ConfigFitInfo(w::Real, p::Real, o::Any) = ConfigFitInfo(w, p, Symbol(o))
 
 
-"""
-generate a new dictionary of configtype weights where configweights is a
-dictionary of configname weights
-"""
-function _extend_configweights(configweights::Dict, configtypes)
-   names = keys(configweights) |> collect
-   newweights = Dict{String, ConfigFitInfo}()
-   for ct in configtypes
-      cn = configname(ct)
-      if cn in names
-         newweights[ct] = ConfigFitInfo(configweights[cn])
-      end
-   end
-   return newweights
-end
-
-
 
 """
 `get_lsq_system(db::LsqDB; kwargs...) -> Ψ, Y`
@@ -215,52 +169,54 @@ end
 Assemble the least squares system + rhs (observations). The `kwargs` can be used
 to select a subset of the available data or basis set, and to adjust the
 weights by config_type and observation type. See `lsqfit` for a list
-of keyword arguments. Allowed kwargs are `verbose, configweights, dataweights,
+of keyword arguments. Allowed kwargs are `verbose, configweights, obsweights,
 E0, Ibasis`.
 """
 @noinline function get_lsq_system(db::LsqDB; verbose = true,
                         configweights = nothing,
-                        dataweights = nothing,
+                        obsweights = nothing,
                         E0 = nothing,
                         Ibasis = :,
                         regularisers = nothing )
    # we need to be able to call `length` on `Ibasis`
    Jbasis = ((Ibasis == Colon()) ? (1:length(db.basis)) : Ibasis)
 
-   configweights = _extend_configweights(configweights, keys(db.data_groups))
-   Iconfigs = Dict( key => _random_subset(db, key, val.proportion)
-                    for (key, val) in configweights )
+   # TODO: put this back in!!!
+   # # restrict the configurations that we want
+   # Iconfigs = Dict( key => _random_subset(db, key, val.proportion)
+   #                  for (key, val) in configweights )
 
    # # TODO => create some suitable "hooks"
    # E0 = lsq.basis[1]()
    # # and while we're at it, subtract E0 from Y
    # Y[idx] -= E0 * len
 
-   # fix some ordering of the configtypes and datatypes
-   # even though this can be inferred from configweights and dataweights we
+   # fix some ordering of the configtypes and obstypes
+   # even though this can be inferred from configweights and obsweights we
    # need to be paranoid that the ordering does not change!
-   configtypes, datatypes = _keys(configweights, dataweights)
+   # TODO: this is no longer needed?!?!?
+   configtypes, obstypes = _keys(configweights, obsweights)
    # get the observations vector and the weights vector
-   Y, W = observations(db, configtypes, datatypes, configweights, dataweights,
+   Y, W = observations(db, configtypes, obstypes, configweights, obsweights,
                        E0, Iconfigs)
    # check for NaNs
-   any(isnan, Y) && error("NaN detected in observations vector")
-   any(isnan, W) && error("NaN detected in weights vector")
+   any(isnan, Y) && @error("NaN detected in observations vector")
+   any(isnan, W) && @error("NaN detected in weights vector")
 
-   # allocate and assemble the big fat huge enourmous LSQ matrix
-   Ψ = zeros(length(Y), length(Jbasis))
-   lsq_matrix!(Ψ, db, configtypes, datatypes, Jbasis, Iconfigs)
-   any(isnan, Ψ) && error("discovered NaNs in LSQ system matrix")
-
-   # remove anything with zero-weight
-   Idata = findall(W .!== 0.0) |> sort
-   Y, W, Ψ = Y[Idata], W[Idata], Ψ[Idata, :]
+   # get the slice of the big fat huge enourmous LSQ matrix
+   Icols = Ibasis
+   Irows = findall(W .!= 0) |> sort
+   # we can't keep this a view since we need to multiply by weights
+   Ψ = db.Ψ[Irows, Icols]
+   Y = Y[Irows]
+   W = W[Irows]
+   any(isnan, Ψ) && @error("discovered NaNs in LSQ system matrix")
 
    # now rescale Y and Ψ according to W => Y_W, Ψ_W; then the two systems
    #   \| Y_W - Ψ_W c \| -> min  and (Y - Ψ*c)^T W (Y - Ψ*x) => MIN
    # are equivalent
    # >>>>>> W .= sqrt.(W) <<<<<<< TODO: which one is it?
-   Y .*= W
+   @. Y = Y * W
    lmul!(Diagonal(W), Ψ)
 
    # regularise

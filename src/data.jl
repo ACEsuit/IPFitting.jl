@@ -39,6 +39,7 @@ forces(d::Dat) = haskey(d.D, FORCES) ? devec(Val(:F), d.D[FORCES]) : nothing
 virial(d::Dat) = haskey(d.D, VIRIAL) ? devec(Val(:V), d.D[VIRIAL]) : nothing
 observation(d::Dat, key::String) = d.D[key]
 hasobservation(d::Dat, key::String) = haskey(d.D, key)
+observation(key::String, d::Dat) = d.D[key]
 
 
 function read_energy(atpy)
