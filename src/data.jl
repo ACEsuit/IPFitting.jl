@@ -40,58 +40,58 @@ virial(d::Dat) = haskey(d.D, VIRIAL) ? devec_obs(Val(:V), d.D[VIRIAL]) : nothing
 
 
 function read_energy(atpy)
-   for key in keys(atpy[:info])
+   for key in keys(atpy.info)
       if lowercase(key) == "dft_energy"
-         return atpy[:info][key]
+         return atpy.info[key]
       end
    end
    try
-      return atpy[:get_potential_energy]()
+      return atpy.get_potential_energy()
    catch
    end
    return nothing
 end
 
 function read_forces(atpy)
-   for key in keys(atpy[:arrays])
+   for key in keys(atpy.arrays)
       if lowercase(key) == "dft_force"
-         return atpy[:arrays][key]' |> vecs
+         return atpy.arrays[key]' |> vecs
       end
    end
    try
-      return atpy[:get_array]("force")' |> vecs
+      return atpy.get_array("force")' |> vecs
    catch
    end
    return nothing
 end
 
 function read_virial(atpy)
-   for key in keys(atpy[:info])
+   for key in keys(atpy.info)
       if lowercase(key) == "dft_virial"
-         return JMat(atpy[:info][key]...)
+         return JMat(atpy.info[key]...)
       end
    end
-   if haskey(atpy[:info], "virial")
-      return JMat(atpy[:info]["virial"]...)
+   if haskey(atpy.info, "virial")
+      return JMat(atpy.info["virial"]...)
    end
    return nothing
 end
 
 function read_configtype(atpy)
-   if haskey(atpy[:info], "config_type")
-      return atpy[:info]["config_type"]
-   elseif haskey(atpy[:info], "configtype")
-      return atpy[:info]["configtype"]
+   if haskey(atpy.info, "config_type")
+      return atpy.info["config_type"]
+   elseif haskey(atpy.info, "configtype")
+      return atpy.info["configtype"]
    end
    return nothing
 end
 
-read_Atoms(atpy) = Atoms( vecs(atpy[:get_positions]()'),
-                          vecs(atpy[:get_momenta]()'),
-                          atpy[:get_masses](),
-                          atpy[:get_atomic_numbers](),
-                          atpy[:get_cell](),
-                          tuple(atpy[:get_pbc]()...) )
+read_Atoms(atpy) = Atoms( vecs(atpy.get_positions()'),
+                          vecs(atpy.get_momenta()'),
+                          atpy.get_masses(),
+                          atpy.get_atomic_numbers(),
+                          atpy.get_cell(),
+                          tuple(atpy.get_pbc()...) )
 
 """
 ```
@@ -144,7 +144,7 @@ function read_xyz(fname; verbose=true, index = ":",
       (V != nothing) && (EFV *= "V")
 
       data[idx] = Dat( at,
-                       config_type * ":$(length(at))$(EFV)";
+                       config_type;
                        E = E, F = F, V = V )
    end
    # verbose && toc()

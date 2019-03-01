@@ -16,6 +16,7 @@ mutable struct Dat
    at::Atoms                         # configuration
    configtype::String                # group identifier
    D::Dict{String, Vector{Float64}}  # list of observations
+   rows::Dict{String, Vector{Int}}   # row indices for LSQ system
    info::Dict{String, Any}           # anything else...
 end
 
@@ -26,7 +27,8 @@ end
    )
 
 function Dat(at::Atoms, config_type::AbstractString; kwargs...)
-   dat = Dat(at, config_type, Dict{String, Vector{Float64}}(), Dict{String, Any}())
+   dat = Dat(at, config_type, Dict{String, Vector{Float64}}(),
+             Dict{String, Vector{Int}}(), Dict{String, Any}())
    for (key, val) in kwargs
       str_key = string(key)
       if !(ismissing(val) || (val == nothing))
@@ -46,6 +48,7 @@ Base.Dict(d::Dat) =
          "at" => Dict(d.at),
          "configtype" => d.configtype,
          "D" => d.D,
+         "rows" => d.rows,
          "info" => d.info)
          # positions(d.at) |> mat,
          # "Z" => numbers(d.at),
@@ -61,7 +64,11 @@ function Dat(D::Dict)
                # Z = D["Z"],
                # cell = D["cell"],
                # pbc = D["pbc"] )
-   return Dat(at, D["configtype"], Dict{String, Any}(D["D"]), Dict{String, Any}())
+   return Dat(at,
+              D["configtype"],
+              Dict{String, Any}(D["D"]),
+              Dict{String, Any}(D["rows"]),
+              Dict{String, Any}())
 end
 
 convert(::Val{Symbol("NBodyIPFitting.Dat")}, D::Dict) = Dat(D)

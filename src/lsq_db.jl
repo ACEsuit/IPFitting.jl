@@ -57,7 +57,7 @@ using HDF5:                  h5open, read
 
 import Base: flush, append!, union
 
-export LsqDB, info
+export LsqDB, info, configtypes
 
 const KRONFILE = "_kron.h5"
 const INFOFILE = "_info.json"
@@ -95,7 +95,8 @@ function save_info(dbpath::String, db)
    _backupfile(infofile(dbpath))
    save_json(infofile(dbpath),
              Dict("basis" => Dict.(db.basis),
-                  "configs" => Dict.(db.configs)))
+                  "configs" => Dict.(db.configs))
+            )
    return nothing
 end
 
@@ -200,11 +201,18 @@ end
 
 
 function set_matrows!(d::Dat, okey::String, irows::Vector{Int})
-   d.info["rows_$okey"] = irows
+   d.rows[okey] = irows
    return d
 end
 
-matrows(d::Dat, okey::String) = d.info["rows_$okey"]
+matrows(d::Dat, okey::String) = try
+   d.rows[okey]
+catch
+   @show d.configtype
+   @show keys(d.D)
+   @show d.info
+   rethrow()
+end
 
 
 function _alloc_lsq_matrix(configs, basis)
@@ -383,6 +391,8 @@ _nconfigs(db::LsqDB, ct::AbstractString) =
 
 function info(db::LsqDB)
    # config names, how many
+   @warn("TODO: `info` function needs to be rewritten...")
+   return
    configs_info = Dict{String, Int}()
    for (key, dg) in db.data_groups
       cn = configname(key)
