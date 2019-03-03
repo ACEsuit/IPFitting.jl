@@ -32,16 +32,30 @@ function tfor(f, rg; verbose=true, msg="tfor", costs = ones(Int, length(rg)))
       Isort = sortperm(costs, rev=true)
       # remember what the last job was
       last_job = 0
+      last_job_lock = SpinLock()
       # start a simple loop over nthreads() just to split this
       # into parallel "tasks"
-      @threads for i = 1:length(Isort)
-         rgidx = Isort[i]
-         f(rg[rgidx])
-         if verbose
-            lock(p_lock)
-            p_ctr += costs[rgidx]
-            ProgressMeter.update!(p, p_ctr)
-            unlock(p_lock)
+      @threads for i = 1:nthreads()
+         while true
+            # acquire a new job index
+            lock(last_job_lock)
+            last_job += 1
+            if last_job > length(Isort)
+               unlock(last_job_lock)
+               break # break the while loop and then wait for the
+                     # other threads to finish
+            end
+            local rgidx = Isort[last_job]
+            unlock(last_job_lock)
+            # do the job
+            f(rg[rgidx])
+            # submit progress
+            if verbose
+               lock(p_lock)
+               p_ctr += costs[rgidx]
+               ProgressMeter.update!(p, p_ctr)
+               unlock(p_lock)
+            end
          end
       end
    end
