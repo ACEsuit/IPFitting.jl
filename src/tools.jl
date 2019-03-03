@@ -26,6 +26,7 @@ function tfor(f, rg; verbose=true, msg="tfor", costs = ones(Int, length(rg)))
    else
       if verbose
          @info("$msg with $(nthreads()) threads")
+         ProgressMeter.update!(p, 0)  # not sure this is useful/needed
          p_lock = SpinLock()
       end
       # sort the tasks by cost: do the expensive ones first
@@ -35,9 +36,11 @@ function tfor(f, rg; verbose=true, msg="tfor", costs = ones(Int, length(rg)))
       last_job_lock = SpinLock()
       # start a simple loop over nthreads() just to split this
       # into parallel "tasks"
+      rgidx = Vector{Int}(undef, nthreads())
       @threads for i = 1:nthreads()
          while true
             # acquire a new job index
+            tid = threadid()
             lock(last_job_lock)
             last_job += 1
             if last_job > length(Isort)
@@ -45,14 +48,14 @@ function tfor(f, rg; verbose=true, msg="tfor", costs = ones(Int, length(rg)))
                break # break the while loop and then wait for the
                      # other threads to finish
             end
-            local rgidx = Isort[last_job]
+            rgidx[tid] = Isort[last_job]
             unlock(last_job_lock)
             # do the job
-            f(rg[rgidx])
+            f(rg[rgidx[tid]])
             # submit progress
             if verbose
                lock(p_lock)
-               p_ctr += costs[rgidx]
+               p_ctr += costs[rgidx[tid]]
                ProgressMeter.update!(p, p_ctr)
                unlock(p_lock)
             end
