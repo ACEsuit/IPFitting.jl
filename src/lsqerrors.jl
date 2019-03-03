@@ -81,9 +81,9 @@ function _err_table(errs, relerrs, title)
    for ct in keys(errs)  # ct in configtypes
       s = @sprintf("┃ %12s ┃ %6.4f ┊ %5.2f%% │ %6.3f ┊ %5.2f%% │ %6.3f ┊ %5.2f%% ┃\n",
          truncate_string(ct, 12),
-         _err(errs, ct, "E"), _relerr(errs, ct, "E"),
-         _err(errs, ct, "F"), _relerr(errs, ct, "F"),
-         _err(errs, ct, "V"), _relerr(errs, ct, "V") )
+         _err(errs, ct, "E"), _relerr(relerrs, ct, "E"),
+         _err(errs, ct, "F"), _relerr(relerrs, ct, "F"),
+         _err(errs, ct, "V"), _relerr(relerrs, ct, "V") )
       if ct == "set"
          s_set = s
       else

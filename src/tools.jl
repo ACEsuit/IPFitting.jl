@@ -3,13 +3,19 @@ module Tools
 
 using ProgressMeter, Base.Threads
 
+"""
+`tfor(f, rg; verbose=true, msg="tfor", costs = ones(Int, length(rg)))`
+
+Multi-threaded for loop. At each iteration the function f(n) is executed,
+where n loops over `rg`.
+"""
 function tfor(f, rg; verbose=true, msg="tfor", costs = ones(Int, length(rg)))
    p = Progress(sum(costs))
    p_ctr = 0
+   t0 = time_ns()
    if nthreads() == 1
       verbose && println("$msg in serial")
       dt = verbose ? 1.0 : Inf
-      t0 = time_ns()
       for (n, c) in zip(rg, costs)
          f(n)
          if verbose
@@ -17,30 +23,32 @@ function tfor(f, rg; verbose=true, msg="tfor", costs = ones(Int, length(rg)))
             ProgressMeter.update!(p, p_ctr)
          end
       end
-      t1 = time_ns()
-      verbose && @info("Elapsed: $(round((t1-t0)*1e-9, digits=1))s")
    else
       if verbose
          @info("$msg with $(nthreads()) threads")
          p_lock = SpinLock()
       end
-      # tic()
-      @threads for i = 1:length(rg)
-         f(rg[i])
+      # sort the tasks by cost: do the expensive ones first
+      Isort = sortperm(costs, rev=true)
+      # remember what the last job was
+      last_job = 0
+      # start a simple loop over nthreads() just to split this
+      # into parallel "tasks"
+      @threads for i = 1:length(Isort)
+         rgidx = Isort[i]
+         f(rg[rgidx])
          if verbose
             lock(p_lock)
-            p_ctr += costs[i]
+            p_ctr += costs[rgidx]
             ProgressMeter.update!(p, p_ctr)
             unlock(p_lock)
          end
       end
-      # verbose && toc()
    end
+   t1 = time_ns()
+   verbose && @info("Elapsed: $(round((t1-t0)*1e-9, digits=1))s")
    return nothing
 end
-
-decode(D::Dict) = convert(Val(Symbol(D["__id__"])), D)
-
 
 
 function analyse_include_exclude(set, include, exclude)

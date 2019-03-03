@@ -391,17 +391,13 @@ _nconfigs(db::LsqDB, ct::AbstractString) =
 
 function info(db::LsqDB)
    # config names, how many
-   @warn("TODO: `info` function needs to be rewritten...")
-   return
+   all_cts = configtype.(db.configs)
+   unq_cts = unique(all_cts)
    configs_info = Dict{String, Int}()
-   for (key, dg) in db.data_groups
-      cn = configname(key)
-      if haskey(configs_info, cn)
-         configs_info[cn] += length(dg)
-      else
-         configs_info[cn] = length(dg)
-      end
+   for ct in unq_cts
+      configs_info[ct] = sum(all_cts .== ct)
    end
+
    println("======================================================")
    println("       LsqDB Summary ")
    println("------------------------------------------------------")
