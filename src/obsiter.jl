@@ -2,20 +2,23 @@
 import Base.iterate
 
 struct ObservationsIterator
-   configs::Vector{Dat}
+   configs::Vector{Dat}   # remember the database
+   Icfg::Vector{Int}      # vector of indices over which we iterate
 end
 
-observations(db::LsqDB) = observations(db.configs)
-observations(configs::Vector{Dat}) = ObservationsIterator(configs)
+observations(db::LsqDB, args...) = observations(db.configs, args...)
+observations(configs::Vector{Dat}) = observations(configs, 1:length(configs))
+observations(configs::Vector{Dat}, Icfg) =
+     ObservationsIterator(configs, collect(Icfg))
 
 iterate(iter::ObservationsIterator) = iterate(iter, 1)
 
 function iterate(iter::ObservationsIterator, i::Integer)
-   if i > length(iter.configs)
+   if i > length(iter.Icfg)
       return nothing
    end
    # the observation keys for the current config
-   okeys = collect(keys(iter.configs[i].D))
+   okeys = collect(keys(iter.configs[Icfg[i]].D))
    # get the next observation
    return iterate(iter, (i=i, okeys=okeys, ikey=1))
 end
@@ -27,14 +30,15 @@ function iterate(iter::ObservationsIterator, state::NamedTuple)
    end
    # if there is another observation left...
    obskey = state.okeys[state.ikey]
-   d = iter.configs[state.i]
-   return (obskey, d, state.i),  # returned to user
+   icfg = iter.Icfg[state.i]
+   d = iter.configs[icfg]
+   return (obskey, d, icfg),  # returned to user
           (i=state.i, okeys=state.okeys, ikey=state.ikey+1)   # next state
 end
 
 
 tfor_observations(db::LsqDB, callback; kwargs...) =
-      observations(db.configs, callback; kwargs...)
+      tfor_observations(db.configs, callback; kwargs...)
 
 function tfor_observations(configs::Vector{Dat}, callback;
                   verbose=true,
