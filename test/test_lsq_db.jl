@@ -2,6 +2,7 @@
 using Test
 using NBodyIPFitting, NBodyIPs, ProgressMeter, JuLIP
 using NBodyIPs: blpolys
+using JuLIP: decode_dict
 Fit = NBodyIPFitting
 DB = NBodyIPFitting.DB
 Data = Fit.Data
@@ -18,8 +19,8 @@ end
 println("Double-Check (de-)dictionisation of basis: ")
 basis1 = blpolys(2, "exp( - 2 * (r/3-1))", "(:cos, 5.0, 7.0)", 10)
 basis2 = blpolys(3, "exp( - 2.5 * (r/3-1))", "(:cos2s, 2.0, 2.5, 4.0, 5.5)", 6)
-println(@test Fit.Tools.decode.( Dict.( basis1 ) ) == basis1)
-println(@test Fit.Tools.decode.( Dict.( basis2 ) ) == basis2)
+println(@test decode_dict.( Dict.( basis1 ) ) == basis1)
+println(@test decode_dict.( Dict.( basis2 ) ) == basis2)
 
 println("Double-Check (de-)dictionisation of Dat: ")
 data1 = [ rand_data(:Ti, 3, "md") for n = 1:10 ]
@@ -38,7 +39,7 @@ try
    global db = DB.LsqDB(dbpath, basis, data)
    println(@test true)
 catch
-   println("...something went wrong...")
+   @info("...something went wrong...")
    println(@test false)
 end
 

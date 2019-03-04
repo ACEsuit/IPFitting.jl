@@ -38,6 +38,9 @@ include("lsq_db.jl")
 @reexport using NBodyIPFitting.DB
 # export LsqDB
 
+include("filtering.jl")
+@reexport using NBodyIPFitting.Filtering 
+
 include("lsqerrors.jl")
 @reexport using NBodyIPFitting.Errors
 

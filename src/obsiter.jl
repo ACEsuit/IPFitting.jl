@@ -18,7 +18,7 @@ function iterate(iter::ObservationsIterator, i::Integer)
       return nothing
    end
    # the observation keys for the current config
-   okeys = collect(keys(iter.configs[Icfg[i]].D))
+   okeys = collect(keys(iter.configs[iter.Icfg[i]].D))
    # get the next observation
    return iterate(iter, (i=i, okeys=okeys, ikey=1))
 end

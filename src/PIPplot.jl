@@ -8,9 +8,9 @@ using Plots; gr()
 using PyCall
 unshift!(PyVector(pyimport("sys")["path"]), Pkg.dir()*"/NBodyIPs/src")
 
-@pyimport plottools
-@pyimport numpy
-@pyimport matplotlib.pyplot as plt
+plottools = pyimport("plottools")
+numpy     = pyimport("numpy")
+plt       = pyimport("matplotlib.pyplot")
 
 export PIPpotplot, PIPenergyplot, PIPforceplot, PIPenergyplot2, PIPforceplot2, PIP3Body3D, PIPfullplot
 

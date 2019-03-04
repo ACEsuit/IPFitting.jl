@@ -41,9 +41,6 @@ export lsqfit, onb
 
 
 
-_keys(configweights, obsweights) = collect(keys(configweights)),
-                                    collect(keys(obsweights))
-
 function _random_subset(db::LsqDB, configtype::AbstractString, p::Real)
    @assert 0 <= p <= 1
    # number of configurations in db for this configtype
@@ -65,8 +62,6 @@ in `keys(configweights)` and only those datatypes are loaded whose
 ids are in `keys(dataweights)`.
 """
 function collect_observations(db::LsqDB,
-                              configtypes::Vector{String},
-                              obstypes::Vector{String},
                               configweights::Dict,
                               obsweights::Dict, E0 )
                               # , Iconfigs::Dict )  # TODO
@@ -75,7 +70,7 @@ function collect_observations(db::LsqDB,
    Y = zeros(Float64, nrows)
    W = zeros(Float64, nrows)
    for (obskey, dat, _) in observations(db)  # obskey ∈ {"E","F",...}; d::Dat
-      if !(obskey in obstypes)
+      if !haskey(obsweights, obskey)
          continue
       end
       irows = matrows(dat, obskey)
@@ -180,7 +175,7 @@ E0, Ibasis`.
                         Ibasis = :,
                         regularisers = nothing )
    # we need to be able to call `length` on `Ibasis`
-   Jbasis = ((Ibasis == Colon()) ? (1:length(db.basis)) : Ibasis)
+   Jbasis = ((Ibasis == :) ? (1:length(db.basis)) : Ibasis)
 
    # TODO: put this back in!!!
    # # restrict the configurations that we want
@@ -193,14 +188,8 @@ E0, Ibasis`.
    # # and while we're at it, subtract E0 from Y
    # Y[idx] -= E0 * len
 
-   # fix some ordering of the configtypes and obstypes
-   # even though this can be inferred from configweights and obsweights we
-   # need to be paranoid that the ordering does not change!
-   # TODO: this is no longer needed?!?!?
-   configtypes, obstypes = _keys(configweights, obsweights)
    # get the observations vector and the weights vector
-   Y, W = collect_observations(db, configtypes, obstypes, configweights, obsweights,
-                       E0) # , Iconfigs)
+   Y, W = collect_observations(db, configweights, obsweights, E0) # , Iconfigs)
    # check for NaNs
    any(isnan, Y) && @error("NaN detected in observations vector")
    any(isnan, W) && @error("NaN detected in weights vector")
