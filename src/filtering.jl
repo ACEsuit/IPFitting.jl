@@ -2,7 +2,8 @@
 module Filtering
 
 using NBodyIPFitting: LsqDB
-export filter_basis, filter_configs
+export filter_basis, filter_configs,
+       anyf, allf
 
 
 function filter_basis(db::LsqDB, args...)
@@ -22,6 +23,10 @@ function filter_configs(db::LsqDB, args...)
       choose_cfg[i] = all( a(cfg) for a in args )
    end
 end
+
+anyf(args...) = x -> any( f(x) for f in args )
+allf(args...) = x -> all( f(x) for f in args )
+
 
 
 end

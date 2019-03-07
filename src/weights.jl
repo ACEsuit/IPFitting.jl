@@ -1,13 +1,13 @@
 module Weights
 
 import JuLIP, NBodyIPFitting
-using NBodyIPFitting: LsqDB, Dat, configname
+using NBodyIPFitting: LsqDB, Dat
 using JuLIP: forces, Atoms, positions
 
 function hess_weights!(cn::String, db::LsqDB; h = :auto, wE = 0.0, rscal = 3, verbose=false)
 
    @error("`hess_weights!` needs to be rewritten!")
-   
+
    # temporarily assume h is a floating point number
    # => this needs to be automated
    @assert (h isa AbstractFloat)

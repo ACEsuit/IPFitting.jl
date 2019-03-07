@@ -27,13 +27,11 @@ import ASE     # use ASE since this will have already figured out how to
                # load `ase` without problems
 ase_io = ASE.ase_io
 
-export configtype, configname, weight, load_data
+export configtype, weight, load_data
 
 Atoms(d) = d.at
 length(d::Dat) = length(d.at)
 configtype(d::Dat) = d.configtype
-configname(d::Dat) = configname(configtype(d))
-configname(s::String) = match(r"[a-z,A-Z,0-9,_,%]*", s).match
 energy(d::Dat) = haskey(d.D, ENERGY) ? devec_obs(Val(:E), d.D[ENERGY]) : nothing
 forces(d::Dat) = haskey(d.D, FORCES) ? devec_obs(Val(:F), d.D[FORCES]) : nothing
 virial(d::Dat) = haskey(d.D, VIRIAL) ? devec_obs(Val(:V), d.D[VIRIAL]) : nothing
