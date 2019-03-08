@@ -12,7 +12,7 @@ function filter_basis(db::LsqDB, args...)
    for (i, b) in enumerate(db.basis)
       choose_b[i] = all( a(b) for a in args )
    end
-   return find(choose_b)
+   return findall(choose_b)
 end
 
 
@@ -22,6 +22,7 @@ function filter_configs(db::LsqDB, args...)
    for (i, cfg) in enumerate(db.configs)
       choose_cfg[i] = all( a(cfg) for a in args )
    end
+   return findall(choose_cfg)
 end
 
 anyf(args...) = x -> any( f(x) for f in args )

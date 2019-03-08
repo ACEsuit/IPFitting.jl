@@ -30,9 +30,17 @@ rcut2 = cutoff(calc)*1.6
 CUTOFF2 = "(:cos, $(rcut2-1), $rcut2)"
 D2 = BondLengthDesc(TRANSFORM, CUTOFF2)
 
-rcut3 = cutoff(calc)*1.6
-CUTOFF3 = "(:cos, $(rcut3-1), $rcut3)"
+# rcut3 = cutoff(calc)*1.6
+# CUTOFF3 = "(:cos, $(rcut3-1), $rcut3)"
+# D3 = BondLengthDesc(TRANSFORM, CUTOFF3)
+
+rcut3 = cutoff(calc)*2.0
+CUTOFF3 = "(:penv, 2, $r0, $rcut3)"
 D3 = BondLengthDesc(TRANSFORM, CUTOFF3)
+
+# rcut3 = cutoff(calc)*2.0
+# CUTOFF3 = "(:penv2s, 2, $(-rcut3), 0.0, $rcut3)"
+# D3 = BondLengthDesc(TRANSFORM, CUTOFF3)
 
 ##
 err_erms = Float64[]
@@ -45,24 +53,22 @@ for deg3 in degrees
    B = nbpolys(3, D3, deg3)
    @show length(B)
    db = LsqDB("", B, data)
-   IP, errs = Lsq.lsqfit( db,
+   IP, fitinfo = Lsq.lsqfit( db,
                          E0 = 0.0,
                          configweights = Dict("rand" => 1.0),
-                         dataweights   = Dict("E" => 100.0, "F" => 1.0) )
-   # push!(err_erms, Err.relrmse(errs, "rand", "E"))
-   # push!(err_frms, Err.relrmse(errs, "rand", "F"))
+                         obsweights   = Dict("E" => 100.0, "F" => 1.0) )
+   push!(err_erms, fitinfo["errors"]["rmse"]["set"]["E"])
+   push!(err_frms, fitinfo["errors"]["rmse"]["set"]["F"])
 end
 
-# TODO: put this back in!!!!
+##
+df = DataFrame( :degrees => degrees,
+                :relrms_E => err_erms,
+                :relrms_F => err_frms )
+display(df)
 
-# ##
-# df = DataFrame( :degrees => degrees,
-#                 :relrms_E => err_erms,
-#                 :relrms_F => err_frms )
-# display(df)
-#
-# (@test minimum(err_erms) < 0.0001) |> println
-# (@test minimum(err_frms) < 0.01) |> println
+(@test minimum(err_erms) < 0.01) |> println
+(@test minimum(err_frms) < 0.2) |> println
 
 
 # BOND LENGTH

@@ -6,7 +6,6 @@ using NBodyIPFitting: LsqDB, Dat, configtype, weighthook, eval_obs,
                       observation, hasobservation, observations,
                       vec_obs
 using NBodyIPFitting.DB: matrows
-using ASE: ASEAtoms   # TODO: WE SHOULD AVOID THIS!!!!
 using FileIO, Printf
 using NBodyIPs: fast
 
