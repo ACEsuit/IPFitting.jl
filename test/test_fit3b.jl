@@ -26,21 +26,16 @@ data = generate_data(:Si, 2, 0.33*r0, 100, calc)
 
 TRANSFORM = "exp( - 2 * (r/$r0 - 1.5) )"
 
-rcut2 = cutoff(calc)*1.6
-CUTOFF2 = "(:cos, $(rcut2-1), $rcut2)"
+rcut2 = cutoff(calc)*2.0
+CUTOFF2 = PolyCutSym(2, rcut2)
 D2 = BondLengthDesc(TRANSFORM, CUTOFF2)
 
-# rcut3 = cutoff(calc)*1.6
-# CUTOFF3 = "(:cos, $(rcut3-1), $rcut3)"
-# D3 = BondLengthDesc(TRANSFORM, CUTOFF3)
+# CUTOFF3 = CosCut(rcut3-1, rcut3)
+CUTOFF3 = PolyCut(2, rcut3)
+# CUTOFF3 = PolyCut2s(2, 0.0, rnn(:Si), rcut3)
 
 rcut3 = cutoff(calc)*2.0
-CUTOFF3 = "(:penv, 2, $r0, $rcut3)"
 D3 = BondLengthDesc(TRANSFORM, CUTOFF3)
-
-# rcut3 = cutoff(calc)*2.0
-# CUTOFF3 = "(:penv2s, 2, $(-rcut3), 0.0, $rcut3)"
-# D3 = BondLengthDesc(TRANSFORM, CUTOFF3)
 
 ##
 err_erms = Float64[]
@@ -49,17 +44,19 @@ degrees = [4, 6, 8, 10] # [4, 6, 8, 10, 12]
 rr = range(0.9*r0, stop=cutoff(calc), length=200)
 for deg3 in degrees
    # B = [B1; gen_basis(2, D2, deg2); gen_basis(3, D3, deg3)]
-   # B = [nbpolys(2, D2, 8); nbpolys(3, D3, deg3)]
-   B = nbpolys(3, D3, deg3)
+   B = [nbpolys(2, D2, 10); nbpolys(3, D3, deg3)]
+   # B = nbpolys(3, D3, deg3)
    @show length(B)
    db = LsqDB("", B, data)
    IP, fitinfo = Lsq.lsqfit( db,
                          E0 = 0.0,
                          configweights = Dict("rand" => 1.0),
                          obsweights   = Dict("E" => 100.0, "F" => 1.0) )
-   push!(err_erms, fitinfo["errors"]["rmse"]["set"]["E"])
-   push!(err_frms, fitinfo["errors"]["rmse"]["set"]["F"])
+   push!(err_erms, fitinfo["errors"]["relrmse"]["set"]["E"])
+   push!(err_frms, fitinfo["errors"]["relrmse"]["set"]["F"])
 end
+
+
 
 ##
 df = DataFrame( :degrees => degrees,
@@ -67,8 +64,8 @@ df = DataFrame( :degrees => degrees,
                 :relrms_F => err_frms )
 display(df)
 
-(@test minimum(err_erms) < 0.01) |> println
-(@test minimum(err_frms) < 0.2) |> println
+(@test minimum(err_erms) < 0.001) |> println
+(@test minimum(err_frms) < 0.05) |> println
 
 
 # BOND LENGTH

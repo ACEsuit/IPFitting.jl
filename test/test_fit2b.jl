@@ -28,8 +28,7 @@ calc = let r0=r0
 end
 data = generate_data(:Cu, 3, 0.25*r0, 50, calc)
 rcut2 = cutoff(calc)
-# D2 = BondLengthDesc("exp( - 2 * (r/$r0 - 1) )", (:cos, rcut2-1, rcut2))
-D2 = BondLengthDesc("($r0)/r", (:cos, rcut2-1, rcut2))
+D2 = BondLengthDesc("($r0)/r", CosCut(rcut2-1, rcut2))
 
 ##
 err_eunif = Float64[]
