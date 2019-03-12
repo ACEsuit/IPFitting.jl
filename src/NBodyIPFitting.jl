@@ -39,7 +39,7 @@ include("lsq_db.jl")
 # export LsqDB
 
 include("filtering.jl")
-@reexport using NBodyIPFitting.Filtering 
+@reexport using NBodyIPFitting.Filtering
 
 include("lsqerrors.jl")
 @reexport using NBodyIPFitting.Errors
@@ -53,6 +53,7 @@ include("regularisers.jl")
 include("weights.jl")
 @reexport using NBodyIPFitting.Weights
 
+# TODO: move this into NBodyIPs or a separate module 
 # #visualisation module
 # include("PIPplot.jl")
 # @reexport using NBodyIPs.PIPplot

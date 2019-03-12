@@ -26,9 +26,9 @@ import JuLIP, NBodyIPFitting, StatsBase
 using StaticArrays
 using JuLIP: AbstractCalculator, Atoms
 using JuLIP.Potentials: OneBody
-using NBodyIPs: NBodyIP
+using NBodyIPs: NBodyIP  # TODO: remove this => conver to `sum` ???
 using NBodyIPFitting: Dat, LsqDB, weighthook, observations,
-                      observation, hasobservation, eval_obs, vec_obs 
+                      observation, hasobservation, eval_obs, vec_obs
 using NBodyIPFitting.Data: configtype
 using NBodyIPFitting.DataTypes: ENERGY
 using NBodyIPFitting.DB: dbpath, _nconfigs, matrows

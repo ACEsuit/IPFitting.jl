@@ -52,6 +52,7 @@ using NBodyIPFitting:        Dat, LsqDB, basis, eval_obs, observations,
                              observation, vec_obs, devec_obs
 using NBodyIPFitting.Data:   configtype
 using NBodyIPFitting.Tools:  tfor
+# TODO: remove this dependence?! => can all be turned into `string`?
 using NBodyIPs:              degree, bodyorder, basisname
 using HDF5:                  h5open, read
 

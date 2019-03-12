@@ -30,6 +30,8 @@ terms.
 """
 module Regularisers
 
+# TODO: move all this into NBodyIPs!
+
 using StaticArrays
 using JuLIP: AbstractCalculator
 using JuLIP.Potentials: evaluate_d
@@ -70,7 +72,7 @@ struct EnergyRegulariser{N, T} <: NBodyRegulariser{N}
 end
 
 Dict(reg::NBodyRegulariser) = Dict(
-   "type" => string(typeof(reg)), 
+   "type" => string(typeof(reg)),
    "N" => reg.N,
    "npoints" => reg.npoints,
    "creg" => reg.creg,
