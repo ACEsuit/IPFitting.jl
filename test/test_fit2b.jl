@@ -57,7 +57,7 @@ for d in degrees
    errs = fitinfo["errors"]
    @info("done assembling errors")
    Err.rmse_table(rmse(errs)...)
-   V2 = IP.components[1]
+   V2 = IP.components[2]
    ev2 = norm(V2.(rr) - 0.5 * calc.(rr), Inf)
    dev2 = norm(evaluate_d.(Ref(V2), rr) - 0.5 * evaluate_d.(Ref(calc), rr), Inf)
    println("   V2 - uniform error = ", ev2, " | ", dev2)

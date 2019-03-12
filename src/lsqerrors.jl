@@ -160,11 +160,10 @@ end
 
 # TODO: the next fucntion is to be retired!!
 
-@noinline function lsqerrors(db, c, Ibasis; cfgtypes = Colon(), E0 = nothing)
+@noinline function lsqerrors(db, c, Ibasis; cfgtypes = Colon(), Vref = nothing)
 
    cfgtypes isa Colon ?  cfgtypes = configtypes(db) :
                          cfgtypes = collect(cfgtypes)
-   @assert E0 != nothing
 
    # create the dict for the fit errors
    errs = Dict("rmse" => errdict([cfgtypes; "set"]),
@@ -189,7 +188,6 @@ end
          errs["nrm2"][ct][okey] = 0.0
          errs["mae"][ct][okey] = 0.0
          errs["nrm1"][ct][okey] = 0.0
-         # errs["allerr"][ct][okey] = Float64[]
          errs["maxe"][ct][okey] = 0.0
          errs["nrminf"][ct][okey] = 0.0
          lengths[ct][okey] = 0
@@ -199,7 +197,6 @@ end
          errs["nrm2"]["set"][okey] = 0.0
          errs["mae"]["set"][okey] = 0.0
          errs["nrm1"]["set"][okey] = 0.0
-         # errs["allerr"]["set"][okey] = Float64[]
          errs["maxe"]["set"][okey] = 0.0
          errs["nrminf"]["set"][okey] = 0.0
          lengths["set"][okey] = 0
@@ -207,10 +204,9 @@ end
       # assemble the observation vector
       y = Float64[]
       o = observation(dat, okey)
-      # TODO: hack again!!!
-      if okey == "E"
-         o = copy(o)
-         o[1] -= length(dat) * E0
+      # correct the observation if we are fitting from a reference potential
+      if Vref != nothing
+         o -= vec_obs(okey, eval_obs(okey, Vref, dat.at))
       end
       append!(y, o)
       # get the lsq block
@@ -224,7 +220,6 @@ end
       errs["nrm2"][ct][okey] += w^2 * norm(y)^2
       errs["mae"][ct][okey]  += w * norm(e, 1)
       errs["nrm1"][ct][okey] += w * norm(y, 1)
-      # append!(errs["allerr"][ct][okey], w * abs.(e) )
       errs["maxe"][ct][okey] = max(errs["maxe"][ct][okey], norm(e, Inf))
       errs["nrminf"][ct][okey] = max(errs["nrminf"][ct][okey], norm(y, Inf))
       lengths[ct][okey] += length(y)
@@ -235,9 +230,6 @@ end
       errs["maxe"]["set"][okey] = max(errs["maxe"]["set"][okey], norm(e, Inf))
       errs["nrminf"]["set"][okey] = max(errs["nrminf"]["set"][okey], norm(y, Inf))
       lengths["set"][okey] += length(y)
-      # append!(errs["allerr"]["set"][okey], w * abs.(block * c - y) )
-      # @show length(errs["allerr"]["set"][okey])
-      # @show lengths["set"][okey]
    end
 
    for ct in [cfgtypes; "set"]
@@ -248,15 +240,8 @@ end
          errs["mae"][ct][okey] = errs["mae"][ct][okey] / len
          errs["nrm1"][ct][okey] = errs["nrm1"][ct][okey] / len
          errs["relrmse"][ct][okey] = errs["rmse"][ct][okey] / errs["nrm2"][ct][okey]
-         # errs["allerr"][ct][okey] = quantile(errs["allerr"][ct][okey] ,range(0., stop=1., length=nb_points_cdf))
       end
    end
-
-   # # ------- - scatter E -------
-   # push!(scatterE[ct][1], E_data/len)
-   # push!(scatterE[ct][2], E_fit/len)
-   # append!(scatterF[ct][1], f_data)
-   # append!(scatterF[ct][2], f_fit)
 
    return errs
 end

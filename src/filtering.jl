@@ -29,5 +29,6 @@ anyf(args...) = x -> any( f(x) for f in args )
 allf(args...) = x -> all( f(x) for f in args )
 
 
+# TODO: create a random filter 
 
 end

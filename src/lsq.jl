@@ -25,9 +25,10 @@ import JuLIP, NBodyIPFitting, StatsBase
 
 using StaticArrays
 using JuLIP: AbstractCalculator, Atoms
-using NBodyIPs: OneBody, NBodyIP
+using JuLIP.Potentials: OneBody
+using NBodyIPs: NBodyIP
 using NBodyIPFitting: Dat, LsqDB, weighthook, observations,
-                      observation, hasobservation
+                      observation, hasobservation, eval_obs, vec_obs 
 using NBodyIPFitting.Data: configtype
 using NBodyIPFitting.DataTypes: ENERGY
 using NBodyIPFitting.DB: dbpath, _nconfigs, matrows
@@ -54,7 +55,7 @@ end
 
 
 """
-`observations(db::LsqDB, configweights::Dict, dataweights::Dict) -> Vector{Float64}`
+`observations(db::LsqDB, configweights::Dict, obsweights::Dict, Vref) -> Vector{Float64}`
 
 construct a vector of observations from the database `db`, specifically from
 `db.data`. Only those configurations are considered whose config_type is
@@ -63,8 +64,8 @@ ids are in `keys(dataweights)`.
 """
 function collect_observations(db::LsqDB,
                               configweights::Dict,
-                              obsweights::Dict, E0 )
-                              # , Iconfigs::Dict )  # TODO
+                              obsweights::Dict, Vref )
+
    nrows = size(db.Ψ, 1)  # total number of observations if we collect
                           # everything in the database
    Y = zeros(Float64, nrows)
@@ -77,9 +78,10 @@ function collect_observations(db::LsqDB,
       ct = configtype(dat)
       # ----- Observation ------
       obs = observation(obskey, dat)
-      # TODO: fix this hack!!!! (put in basis function constraints)
-      if obskey == "E"
-         obs = copy(obs) .- length(dat) * E0
+      # If Vref != nothing the it is a calculator and we can subtract
+      # its value => this allows us to fit from a reference potential
+      if Vref != nothing
+         obs = obs - vec_obs(obskey, eval_obs(obskey, Vref, Atoms(dat)))
       end
       Y[irows] .= obs
       # ------ Weights --------
@@ -140,22 +142,22 @@ function _regularise!(Ψ::Matrix{T}, Y::Vector{T}, basis, regularisers;
    return vcat(Ψ, Ψreg), vcat(Y, Yreg)
 end
 
-
-"""
-`struct ConfigFitInfo` : stores `configtype`-dependent
-weights and also proportion of configurations to fit to
-"""
-struct ConfigFitInfo
-   weight::Float64
-   proportion::Float64
-   order::Symbol
-end
-
-ConfigFitInfo(cfi::ConfigFitInfo) = deepcopy(cfi)
-ConfigFitInfo(cfi::Tuple) = ConfigFitInfo(cfi...)
-ConfigFitInfo(w::Real) = ConfigFitInfo(w, 1.0, :ignore)
-ConfigFitInfo(w::Real, p::Real) = ConfigFitInfo(w, p, :ignore)
-ConfigFitInfo(w::Real, p::Real, o::Any) = ConfigFitInfo(w, p, Symbol(o))
+# TODO: put this back in???
+# """
+# `struct ConfigFitInfo` : stores `configtype`-dependent
+# weights and also proportion of configurations to fit to
+# """
+# struct ConfigFitInfo
+#    weight::Float64
+#    proportion::Float64
+#    order::Symbol
+# end
+#
+# ConfigFitInfo(cfi::ConfigFitInfo) = deepcopy(cfi)
+# ConfigFitInfo(cfi::Tuple) = ConfigFitInfo(cfi...)
+# ConfigFitInfo(w::Real) = ConfigFitInfo(w, 1.0, :ignore)
+# ConfigFitInfo(w::Real, p::Real) = ConfigFitInfo(w, p, :ignore)
+# ConfigFitInfo(w::Real, p::Real, o::Any) = ConfigFitInfo(w, p, Symbol(o))
 
 
 
@@ -168,14 +170,15 @@ weights by config_type and observation type. See `lsqfit` for a list
 of keyword arguments. Allowed kwargs are `verbose, configweights, obsweights,
 E0, Ibasis`.
 """
-@noinline function get_lsq_system(db::LsqDB; verbose = true,
-                        configweights = nothing,
-                        obsweights = nothing,
-                        E0 = nothing,
-                        Ibasis = :,
-                        regularisers = nothing )
-   # we need to be able to call `length` on `Ibasis`
-   Jbasis = ((Ibasis == :) ? (1:length(db.basis)) : Ibasis)
+@noinline function get_lsq_system(db::LsqDB;
+                         solver=(:qr, ), verbose=true,
+                         Ibasis = :,
+                         E0 = nothing,
+                         Vref = OneBody(E0),
+                         configweights = nothing,
+                         obsweights = nothing,
+                         regularisers = [],
+                         kwargs...)
 
    # TODO: put this back in!!!
    # # restrict the configurations that we want
@@ -183,13 +186,10 @@ E0, Ibasis`.
    #                  for (key, val) in configweights )
    Iconfigs = nothing
 
-   # # TODO => create some suitable "hooks"
-   # E0 = lsq.basis[1]()
-   # # and while we're at it, subtract E0 from Y
-   # Y[idx] -= E0 * len
-
    # get the observations vector and the weights vector
-   Y, W = collect_observations(db, configweights, obsweights, E0) # , Iconfigs)
+   # the Vref potential is subtracted from the observations
+   Y, W = collect_observations(db, configweights, obsweights, Vref) # , Iconfigs)
+
    # check for NaNs
    any(isnan, Y) && @error("NaN detected in observations vector")
    any(isnan, W) && @error("NaN detected in weights vector")
@@ -197,6 +197,7 @@ E0, Ibasis`.
    # get the slice of the big fat huge enourmous LSQ matrix
    Icols = Ibasis
    Irows = findall(W .!= 0) |> sort
+
    # we can't keep this a view since we need to multiply by weights
    Ψ = db.Ψ[Irows, Icols]
    Y = Y[Irows]
@@ -212,7 +213,7 @@ E0, Ibasis`.
 
    # regularise
    if regularisers != nothing
-      Ψ, Y = _regularise!(Ψ, Y, db.basis[Jbasis], regularisers; verbose=verbose)
+      Ψ, Y = _regularise!(Ψ, Y, db.basis[Ibasis], regularisers; verbose=verbose)
    end
 
    # this should be it ...
@@ -221,15 +222,17 @@ end
 
 
 @noinline function onb(db::LsqDB;
-             solver=(:qr, ), verbose=true, E0 = nothing,
-             Ibasis = :, configweights=nothing, obsweights = nothing,
-             regularisers = [],
-             kwargs...)
-   @assert E0 != nothing
-   Jbasis = ((Ibasis == Colon()) ? (1:length(db.basis)) : Ibasis)
+                         solver=(:qr, ), verbose=true,
+                         Ibasis = :,
+                         E0 = nothing,
+                         Vref = OneBody(E0),
+                         configweights = nothing,
+                         obsweights = nothing,
+                         regularisers = [],
+                         kwargs...)
 
    verbose && @info("assemble lsq system")
-   Ψ, _ = get_lsq_system(db; verbose=verbose, E0=E0, Ibasis=Ibasis,
+   Ψ, _ = get_lsq_system(db; verbose=verbose, Vref=Vref, Ibasis=Ibasis,
                              configweights = configweights,
                              obsweights = obsweights,
                              regularisers = regularisers,
@@ -257,7 +260,8 @@ squares system, compute the solution and return an interatomic potential
 
 ## Keyword Arguments:
 
-* `E0` (required) : energy of the `OneBody` term
+* `E0` (required unless `Vref` is provided) : energy of the `OneBody` term
+* `Vref` : a reference potential from which to start the fit.
 * `configweights` (required) : A dictionary specifying the weights for different
 types of configurations, e.g.,
 ```
@@ -283,15 +287,19 @@ configtypes and datatypes. Use `table_relative(errs)` and `table_absolute(errs)`
 to display these as tables and `rmse, mae` to access individual errors.
 """
 @noinline function lsqfit(db::LsqDB;
-                solver=(:qr, ), verbose=true, E0 = nothing,
-                Ibasis = :, configweights=nothing, obsweights = nothing,
+                solver=(:qr, ), verbose=true,
+                Ibasis = :,
+                E0 = nothing,
+                Vref = OneBody(E0),
+                configweights = nothing,
+                obsweights = nothing,
                 regularisers = [],
                 kwargs...)
-   @assert E0 != nothing
+
    Jbasis = ((Ibasis == Colon()) ? (1:length(db.basis)) : Ibasis)
 
    verbose && @info("assemble lsq system")
-   Ψ, Y = get_lsq_system(db; verbose=verbose, E0=E0, Ibasis=Ibasis,
+   Ψ, Y = get_lsq_system(db; verbose=verbose, Vref=Vref, Ibasis=Ibasis,
                              configweights = configweights,
                              obsweights = obsweights,
                              regularisers = regularisers,
@@ -321,10 +329,10 @@ to display these as tables and `rmse, mae` to access individual errors.
    # compute errors
    verbose && @info("Assemble errors table")
    @warn("new error implementation... redo this part please ")
-   errs = Err.lsqerrors(db, c, Jbasis; cfgtypes=keys(configweights), E0=E0)
+   errs = Err.lsqerrors(db, c, Jbasis; cfgtypes=keys(configweights), Vref=Vref)
 
-   if E0 != 0
-      basis = [ OneBody(E0); db.basis[Ibasis] ]
+   if Vref != nothing
+      basis = [ Vref; db.basis[Ibasis] ]
       c = [1.0; c]
    else
       basis = db.basis[Ibasis]

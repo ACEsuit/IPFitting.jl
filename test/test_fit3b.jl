@@ -30,6 +30,7 @@ rcut2 = cutoff(calc)*2.0
 CUTOFF2 = PolyCutSym(2, rcut2)
 D2 = BondLengthDesc(TRANSFORM, CUTOFF2)
 
+rcut3 = cutoff(calc)*2.0
 # CUTOFF3 = CosCut(rcut3-1, rcut3)
 CUTOFF3 = PolyCut(2, rcut3)
 # CUTOFF3 = PolyCut2s(2, 0.0, rnn(:Si), rcut3)
