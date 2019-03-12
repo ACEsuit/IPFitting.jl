@@ -86,7 +86,7 @@ function collect_observations(db::LsqDB,
       Y[irows] .= obs
       # ------ Weights --------
       # modify the weights from extra information in the dat structure
-      W[irows] .= _get_weights(configweights[ct], # .weight, TODO
+      W[irows] .= _get_weights(configweights[ct],
                                obsweights[obskey],
                                weighthook(obskey, dat),
                                dat, obskey, obs)
@@ -142,23 +142,6 @@ function _regularise!(Ψ::Matrix{T}, Y::Vector{T}, basis, regularisers;
    return vcat(Ψ, Ψreg), vcat(Y, Yreg)
 end
 
-# TODO: put this back in???
-# """
-# `struct ConfigFitInfo` : stores `configtype`-dependent
-# weights and also proportion of configurations to fit to
-# """
-# struct ConfigFitInfo
-#    weight::Float64
-#    proportion::Float64
-#    order::Symbol
-# end
-#
-# ConfigFitInfo(cfi::ConfigFitInfo) = deepcopy(cfi)
-# ConfigFitInfo(cfi::Tuple) = ConfigFitInfo(cfi...)
-# ConfigFitInfo(w::Real) = ConfigFitInfo(w, 1.0, :ignore)
-# ConfigFitInfo(w::Real, p::Real) = ConfigFitInfo(w, p, :ignore)
-# ConfigFitInfo(w::Real, p::Real, o::Any) = ConfigFitInfo(w, p, Symbol(o))
-
 
 
 """
@@ -180,15 +163,9 @@ E0, Ibasis`.
                          regularisers = [],
                          kwargs...)
 
-   # TODO: put this back in!!!
-   # # restrict the configurations that we want
-   # Iconfigs = Dict( key => _random_subset(db, key, val.proportion)
-   #                  for (key, val) in configweights )
-   Iconfigs = nothing
-
    # get the observations vector and the weights vector
    # the Vref potential is subtracted from the observations
-   Y, W = collect_observations(db, configweights, obsweights, Vref) # , Iconfigs)
+   Y, W = collect_observations(db, configweights, obsweights, Vref)
 
    # check for NaNs
    any(isnan, Y) && @error("NaN detected in observations vector")
@@ -326,7 +303,7 @@ to display these as tables and `rmse, mae` to access individual errors.
       @info("Relative RMSE on training set: $rel_rms")
    end
 
-   # compute errors
+   # compute errors TODO: still need to fix this!
    verbose && @info("Assemble errors table")
    @warn("new error implementation... redo this part please ")
    errs = Err.lsqerrors(db, c, Jbasis; cfgtypes=keys(configweights), Vref=Vref)
@@ -348,21 +325,6 @@ to display these as tables and `rmse, mae` to access individual errors.
    versioninfo(iob)
    juliainfo = String(take!(iob))
 
-   # NBodyIPs and NBodyIPFitting Version Info
-   # TODO: put back in
-   # nbipinfo, nbipfitinfo = get_git_info()
-
-   # number of configurations for each configtype
-   # TODO: put back in
-   # numconfigs = Dict{String, Int}()
-   # for ct in keys(db.data_groups)
-   #    cn = configname(ct)
-   #    if !haskey(numconfigs, cn)
-   #       numconfigs[cn] = 0
-   #    end
-   #    numconfigs[cn] += length(db.data_groups[ct])
-   # end
-
    infodict = Dict("errors" => errs,
                    "solver" => String(solver[1]),
                    "E0" => E0,
@@ -373,9 +335,8 @@ to display these as tables and `rmse, mae` to access individual errors.
                    "obsweights" => obsweights,
                    "regularisers" => Dict.(regularisers),
                    "juliaversion" => juliainfo,
-                   # "NBodyIPs_version" => nbipinfo,
-                   # "NBodyIPFitting_version" => nbipfitinfo,
-                   # "numconfigs" => numconfigs
+                   "NBodyIPs_version" => get_pkg_info("NBodyIPs"),
+                   "IPFitting_version" => get_pkg_info("NBodyIPFitting"),
                   )
    # --------------------------------------------------------------------
 
@@ -384,14 +345,22 @@ to display these as tables and `rmse, mae` to access individual errors.
 end
 
 
-# ## TODO: THIS NEEDS A REWRITE !!!!
-# function get_git_info()
-#    @warn("Storing Package git version info is no longer supported; this needs a rewrite.")
-#    # nbipinfo = read(`cat $(Pkg.dir("NBodyIPs")*"/.git/refs/heads/master")`, String)[1:end-1]
-#    # nbipfitinfo = read(`cat $(Pkg.dir("NBodyIPFitting")*"/.git/refs/heads/master")`, String)[1:end-1]
-#    # nbipinfo = readstring(`git -C $(Pkg.dir("NBodyIPs")) rev-parse HEAD`)
-#    # nbipfitinfo = readstring(`git -C $(Pkg.dir("NBodyIPFitting")) rev-parse HEAD`)
-#    return "", "" # nbipinfo, nbipfitinfo
-# end
+
+import Pkg
+
+function get_pkg_info(pkg::AbstractString)
+    pkgs = [Pkg.API.check_package_name(pkg)]
+    ctx = Pkg.Types.Context()
+    Pkg.API.project_resolve!(ctx.env, pkgs)
+    Pkg.API.project_deps_resolve!(ctx.env, pkgs)
+    Pkg.API.manifest_resolve!(ctx.env, pkgs)
+    Pkg.API.ensure_resolved(ctx.env, pkgs)
+    i = Pkg.Display.status(ctx, pkgs)[1]
+    return Dict("name" => i.name,
+                "uuid" => string(i.uuid),
+                "ver" => string(i.new.ver))
+end
+
+
 
 end

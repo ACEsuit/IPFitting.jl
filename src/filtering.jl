@@ -29,6 +29,25 @@ anyf(args...) = x -> any( f(x) for f in args )
 allf(args...) = x -> all( f(x) for f in args )
 
 
-# TODO: create a random filter 
 
 end
+
+
+
+# TODO: create a filter that picks a random subset of the configurations,
+# this used to be controlled by the following:
+# """
+# `struct ConfigFitInfo` : stores `configtype`-dependent
+# weights and also proportion of configurations to fit to
+# """
+# struct ConfigFitInfo
+#    weight::Float64
+#    proportion::Float64
+#    order::Symbol
+# end
+#
+# ConfigFitInfo(cfi::ConfigFitInfo) = deepcopy(cfi)
+# ConfigFitInfo(cfi::Tuple) = ConfigFitInfo(cfi...)
+# ConfigFitInfo(w::Real) = ConfigFitInfo(w, 1.0, :ignore)
+# ConfigFitInfo(w::Real, p::Real) = ConfigFitInfo(w, p, :ignore)
+# ConfigFitInfo(w::Real, p::Real, o::Any) = ConfigFitInfo(w, p, Symbol(o))
