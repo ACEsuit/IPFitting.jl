@@ -3,8 +3,8 @@ using NBodyIPs, JuLIP, Test, NBodyIPFitting, DataFrames
 using JuLIP.Potentials: evaluate_d
 using NBodyIPFitting: Dat, LsqDB
 using NBodyIPs: BondLengthDesc, BondAngleDesc
-const Lsq = NBodyIPFitting.Lsq
-const Err = NBodyIPFitting.Errors
+Lsq = NBodyIPFitting.Lsq
+Err = NBodyIPFitting.Errors
 using LinearAlgebra: norm
 
 # generate random data

@@ -52,7 +52,7 @@ using NBodyIPFitting:        Dat, LsqDB, basis, eval_obs, observations,
                              observation, vec_obs, devec_obs
 using NBodyIPFitting.Data:   configtype
 using NBodyIPFitting.Tools:  tfor
-using NBodyIPs:              degree, bodyorder, basisname, combiscriptor
+using NBodyIPs:              degree, bodyorder, basisname
 using HDF5:                  h5open, read
 
 import Base: flush, append!, union
@@ -299,7 +299,7 @@ Take a basis and split it into individual basis groups.
 """
 function split_basis(basis)
    # get the types of the individual basis elements
-   tps = combiscriptor.(basis)
+   tps = hash.(Ref(Val(:basis)), basis)
    Iord = Vector{Int}[]
    Bord = Any[]
    for tp in unique(tps)

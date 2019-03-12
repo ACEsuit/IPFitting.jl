@@ -33,7 +33,7 @@ to model Si, we first define a descriptor
 ```julia
 r0 = rnn(:Si)
 rcut = 2.5 * r0
-desc = BondAngleDesc("exp(- (r/$r0 - 1.0))", "(:cos, $(rcut-1), $rcut)")
+desc = BondAngleDesc("exp(- (r/$r0 - 1.0))", CosCut(rcut-1, rcut))
 ```
 We can then generate basis functions using `nbpolys`, e.g.,
 ```julia
@@ -58,19 +58,19 @@ for high body-orders, large basis sets and large data sets. Therefore this
 matrix is stored in a block format that allows us to later re-use it in a variety
 of different ways. This is done via
 ```julia
-db = LsqDB(fname, data, basis)
+db = LsqDB(fname, configs, basis)
 ```
 * The db is stored in two files: `fname_info.jld2` and `fname_kron.h5`. In
 particular, `fname` is the path + name of the db, but without ending. E.g,
 `"~/scratch/nbodyips/W5Bdeg12env"`.
-* `data` is a `Vector{Dat}`
+* `configs` is a `Vector{Dat}`
 * `basis` is a `Vector{<: AbstractCalculator}`
-* The command `db = LsqDB(fname, data, basis)` evaluates the basis functions,
-e.g.,  `energy(basis[i], data[j].at)` for all `i, j`, and stores these values
+* The command `db = LsqDB(fname, configs, basis)` evaluates the basis functions,
+e.g.,  `energy(basis[i], configs[j].at)` for all `i, j`, and stores these values
 which make up the lsq matrix.
 
 To reload a pre-computed lsq system, use `LsqDB(fname)`. To compute a lsq
-system without storing it on disk, use `LsqDB("", data, basis)`, i.e.,
+system without storing it on disk, use `LsqDB("", configs, basis)`, i.e.,
 pass an empty string as the filename.
 
 ### Step 4: Lsq fit, Analyse the fitting errors

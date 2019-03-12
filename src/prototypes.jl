@@ -132,3 +132,6 @@ create special weights for different observations
 """
 weighthook(::Val, d::Dat) = 1.0
 weighthook(s::String, d::Dat) = weighthook(Val(Symbol(s)), d)
+
+
+const BASIS = Val{:basis}

@@ -7,7 +7,6 @@ using NBodyIPFitting: LsqDB, Dat, configtype, weighthook, eval_obs,
                       vec_obs
 using NBodyIPFitting.DB: matrows
 using FileIO, Printf
-using NBodyIPs: fast
 
 using Statistics: quantile
 using LinearAlgebra: norm
