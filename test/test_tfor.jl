@@ -26,7 +26,7 @@ for (okey, cfg, _) in observations(data)
 end
 
 tfor_observations(data,
-   (okey, cfg, _, lck) -> begin
+   (n, okey, cfg, lck) -> begin
       lock(lck)
       cfg.info["tfor_$okey"] = hash((hash(cfg.at), hash(okey)))
       unlock(lck)
