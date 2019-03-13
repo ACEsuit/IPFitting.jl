@@ -375,7 +375,7 @@ function info(db::LsqDB)
    println(" Basis Group  | length | description ")
    for (i, B1) in enumerate(Bord)
       lenstr = replace(string(length(B1), pad=5), '0' => ' ')
-      idxstr = replace(string(i), pad=2, '0' => ' ')
+      idxstr = replace(string(i, pad=2), '0' => ' ')
       desc = string(B1)
       desc = desc[1:min(50, length(desc))]
       println("          $idxstr  | $lenstr  | $desc" )
