@@ -231,20 +231,114 @@ function _alloc_lsq_matrix(configs, basis)
    return zeros(Float64, nrows, length(basis))
 end
 
-# TODO: rewrite this as a loop over individual observations
-function safe_append!(db::LsqDB, db_lock, n::Integer)
-   d = db.configs[n]
+
+function safe_append!(db::LsqDB, db_lock, n::Integer, okey::AbstractString)
+   cfg = db.configs[n]
    # computing the lsq blocks ("rows") can be done in parallel,
-   lsqrow = evallsq(d, basis(db))
+   lsqrow = evallsq(cfg, basis(db), okey)
+   irows = matrows(cfg, okey)
    # but writing them into the DB must be done in a threadsafe way
    lock(db_lock)
-   for okey in keys(d.D)        # loop over observation types
-      irows = matrows(d, okey)  # rows in the matrix
-      db.Ψ[irows, :] .= lsqrow[okey]
-   end
+   db.Ψ[irows, :] .= lsqrow
    unlock(db_lock)
    return nothing
 end
+
+
+
+
+
+# ------------------- Evaluating LSQ Blocks -----------------
+
+
+"""
+Take a basis and split it into individual basis groups.
+"""
+function split_basis(basis)
+   # get some basis hashs of the individual basis functions
+   tps = hash.(Ref(Val(:basis)), basis)
+   Iord = Vector{Int}[]
+   Bord = Any[]
+   for tp in unique(tps)
+      # find which elements of basis have type `tp`
+      I = findall( [tp == t  for t in tps] )
+      push!(Iord, I)
+      push!(Bord, [b for b in basis[I]])
+   end
+   return Bord, Iord
+end
+
+
+
+# fill the LSQ system, i.e. evaluate basis at data points
+function evallsq(d::Dat, B::AbstractVector{TB}, okey) where {TB <: AbstractCalculator}
+   B1 = [b for b in B]
+   if !(isconcretetype(eltype(B1)))
+      return evallsq_split(d, B1, okey)
+   end
+   # TB is a leaf-type so we can use "evaluate_many"
+   return _evallsq(Val(Symbol(key)), B1, Atoms(d))
+                for key in keys(d.D) )
+end
+
+"""
+evaluate one specific kind of datum, such as energy, forces, etc
+for one Dat across a large section of the basis; implicitly this will
+normally be done via `evaluate_many` or similar. The line
+```
+vals = eval_obs(vDT, B, at)
+```
+should likely be the bottleneck of `evallsq`
+"""
+function _evallsq(vDT::Val,
+                  B::AbstractVector{<:AbstractCalculator},
+                  at::AbstractAtoms)
+   # vals will be a vector containing multiple evaluations
+   vals = eval_obs(vDT, B, at)
+   # vectorise the first so we know the length of the observation
+   vec1 = vec_obs(vDT, vals[1])
+   # create a multi-D array to reshape these into
+   A = Array{Float64}(undef, length(vec1), length(B))
+   A[:, 1] = vec1
+   for n = 2:length(B)
+      A[:, n] = vec_obs(vDT, vals[n])
+   end
+   return A
+end
+
+# """
+# concatenate several arrays Ai of shape ni x m  along the last dimension into
+# an array ∑ni x m.
+# """
+# function _cat_(As, Iord)
+#    TA = eltype(As[1])
+#    A = Array{TA}(undef, size(As[1],1),
+#                         sum(size(AA, 2) for AA in As))
+#    for i = 1:length(As)
+#       A[:, Iord[i]] = As[i]
+#    end
+#    return A
+# end
+
+"""
+split the Basis `B` into subsets of identical types and evaluate
+those independently (fast).
+"""
+function evallsq_split(d, basis)
+   # TB is not a leaf-type so we should split the basis to be able to
+   # evaluate_many & co
+   Bord, Iord = split_basis(basis)
+   D_ord = [ evallsq(d, BB)  for BB in Bord ]
+   # each D_ord[i] is a Dict storing the LSQ system components.
+   # we assume that all D_ord[i] contain the same keys.
+   sizes = Dict( key => [size(DD[key]) for DD in D_ord]
+                 for key in keys(D_ord[1]) )
+   return Dict( key => _cat_( [DD[key] for DD in D_ord], Iord )
+                for key in keys(D_ord[1]) )
+end
+
+
+# =========================== Convenience =================================
 
 
 # TODO: THIS NEEDS TO BE REWRITTEN! => ALSO WRITE TESTS!
@@ -290,99 +384,6 @@ end
 #       <values, basis, data> => reconsider this!!!!
 
 
-
-
-# ------------------- Evaluating LSQ Blocks -----------------
-
-
-"""
-Take a basis and split it into individual basis groups.
-"""
-function split_basis(basis)
-   # get the types of the individual basis elements
-   tps = hash.(Ref(Val(:basis)), basis)
-   Iord = Vector{Int}[]
-   Bord = Any[]
-   for tp in unique(tps)
-      # find which elements of basis have type `tp`
-      I = findall( [tp == t  for t in tps] )
-      push!(Iord, I)
-      push!(Bord, [b for b in basis[I]])
-   end
-   return Bord, Iord
-end
-
-
-
-# fill the LSQ system, i.e. evaluate basis at data points
-function evallsq(d::Dat, B::AbstractVector{TB}) where {TB <: AbstractCalculator}
-   B1 = [b for b in B]
-   if !(isconcretetype(eltype(B1)))
-      return evallsq_split(d, B1)
-   end
-   # TB is a leaf-type so we can use "evaluate_many"
-   return Dict( key => _evallsq(Val(Symbol(key)), B1, Atoms(d))
-                for key in keys(d.D) )
-end
-
-"""
-evaluate one specific kind of datum, such as energy, forces, etc
-for one Dat across a large section of the basis; implicitly this will
-normally be done via `evaluate_many` or similar. The line
-```
-vals = eval_obs(vDT, B, at)
-```
-should likely be the bottleneck of `evallsq`
-"""
-function _evallsq(vDT::Val,
-                  B::AbstractVector{<:AbstractCalculator},
-                  at::AbstractAtoms)
-   # vals will be a vector containing multiple evaluations
-   vals = eval_obs(vDT, B, at)
-   # vectorise the first so we know the length of the observation
-   vec1 = vec_obs(vDT, vals[1])
-   # create a multi-D array to reshape these into
-   A = Array{Float64}(undef, length(vec1), length(B))
-   A[:, 1] = vec1
-   for n = 2:length(B)
-      A[:, n] = vec_obs(vDT, vals[n])
-   end
-   return A
-end
-
-"""
-concatenate several arrays Ai of shape ni x m  along the last dimension into
-an array ∑ni x m.
-"""
-function _cat_(As, Iord)
-   TA = eltype(As[1])
-   A = Array{TA}(undef, size(As[1],1),
-                        sum(size(AA, 2) for AA in As))
-   for i = 1:length(As)
-      A[:, Iord[i]] = As[i]
-   end
-   return A
-end
-
-"""
-split the Basis `B` into subsets of identical types and evaluate
-those independently (fast).
-"""
-function evallsq_split(d, basis)
-   # TB is not a leaf-type so we should split the basis to be able to
-   # evaluate_many & co
-   Bord, Iord = split_basis(basis)
-   D_ord = [ evallsq(d, BB)  for BB in Bord ]
-   # each D_ord[i] is a Dict storing the LSQ system components.
-   # we assume that all D_ord[i] contain the same keys.
-   sizes = Dict( key => [size(DD[key]) for DD in D_ord]
-                 for key in keys(D_ord[1]) )
-   return Dict( key => _cat_( [DD[key] for DD in D_ord], Iord )
-                for key in keys(D_ord[1]) )
-end
-
-
-# ================ Convenience =============
 
 configtypes(db::LsqDB) = unique(configtype.(db.configs))
 
