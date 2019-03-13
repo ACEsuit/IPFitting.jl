@@ -4,9 +4,9 @@ module Errors
 using JuLIP: Atoms, energy, forces, virial
 using NBodyIPFitting: LsqDB, Dat, configtype, weighthook, eval_obs,
                       observation, hasobservation, observations,
-                      vec_obs
+                      vec_obs, tfor
 using NBodyIPFitting.DB: matrows
-using FileIO, Printf
+using FileIO, Printf, Base.Threads
 
 using Statistics: quantile
 using LinearAlgebra: norm
@@ -18,14 +18,21 @@ export add_fits!, rmse, mae, rmse_table, mae_table,
 # ------------------------- USER INTERFACE FUNCTIONS -------------------------
 
 rmse(data::Vector{Dat}; fitkey="fit") = _fiterrs(data; fitkey=fitkey, p=2)
-# TODO: add back in!
-# mae(data::Vector{Dat}; fitkey="fit") = _fiterrs(data; fitkey=fitkey, p=1)
-# maxe(data::Vector{Dat}; fitkey="fit") = _fiterrs(data; fitkey=fitkey, p=Inf)
-
-rmse_table(data::AbstractVector{Dat}) = rmse_table(rmse(data)...)
-rmse_table(errs::Dict, errs_rel::Dict) = _err_table(errs, errs_rel, "RMSE")
+mae(data::Vector{Dat}; fitkey="fit") = _fiterrs(data; fitkey=fitkey, p=1)
 
 rmse(D::Dict) = D["rmse"], D["relrmse"]
+mae(D::Dict) = D["mae"], D["relmae"]
+
+rmse_table(data::AbstractVector{Dat}) = rmse_table(rmse(data)...)
+mae_table( data::AbstractVector{Dat}) =  mae_table( mae(data)...)
+
+rmse_table(D::Dict) = rmse_table(rmse(D)...)
+mae_table(D::Dict) =  mae_table( mae(D)...)
+
+rmse_table(errs::Dict, errs_rel::Dict) = _err_table(errs, errs_rel, "RMSE")
+mae_table(errs::Dict, errs_rel::Dict) = _err_table(errs, errs_rel, "MAE")
+
+
 
 
 """
@@ -38,17 +45,28 @@ The key `"fit"` can be replaced with any string, through the kwarg
 `fitkey`, e.g.,
 ```julia
 data = ...
-add_fits(PIP4Benv, data; fitkey = "PIP4Benv")
-add_fits(GAP, data; fitkey = "GAP2010")
+add_fits!(PIP4Benv, data; fitkey = "PIP4Benv")
+add_fits!(GAP, data; fitkey = "GAP2010")
 ```
 """
-function add_fits!(IP, data::Vector{Dat}; fitkey = "fit")
-   @showprogress for d in data   # TODO: multi-threaded
-      d.info[fitkey] = Dict{String, Vector{Float64}}()
-      for okey in keys(d.D)   # d.D are the observations
-         d.info[fitkey][okey] = vec_obs(okey, eval_obs(okey, IP, d.at))
-      end
-   end
+function add_fits!(IP, configs::Vector{Dat}; fitkey = "fit")
+   lck = SpinLock()
+   tfor( n -> begin
+         d = configs[n]
+         D = Dict{String, Vector{Float64}}()
+         for okey in keys(d.D)   # d.D are the observations
+            D[okey] = vec_obs(okey, eval_obs(okey, IP, d.at))
+         end
+         lock(lck)
+         d.info[fitkey] = Dict{String, Vector{Float64}}()
+         for okey in keys(d.D)
+            d.info[fitkey][okey] = D[okey]
+         end
+         unlock(lck)
+      end,
+      1:length(configs); msg="Add Fit info to configs",
+                      costs = length.(configs)
+   )
    return nothing
 end
 

@@ -14,3 +14,4 @@ StaticArrays
 ASE 0.3
 StatsBase
 Printf
+Pkg 

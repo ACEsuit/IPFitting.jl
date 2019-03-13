@@ -1,11 +1,31 @@
 
 import Base.iterate
+using NBodyIPFitting.Tools: tfor
+using Base.Threads: SpinLock
 
 struct ObservationsIterator
    configs::Vector{Dat}   # remember the database
    Icfg::Vector{Int}      # vector of indices over which we iterate
 end
 
+"""
+```
+observations(db::LsqDB, Icfg=:)
+observations(configs::Vector{Dat}, Icfg=:)
+```
+
+Creates an iterator over all observations stored in the
+list of configurations. I.e., the resulting loop will iterate
+over all configurations and within each configuration over all
+observations stored in that configuration. E.g.,
+```
+for (okey, cfg, icfg) in observations(configs)
+   # okey -> String key
+   # cfg :: Dat
+   # icfg :: Int, the index of cfg in configs
+end
+```
+"""
 observations(db::LsqDB, args...) = observations(db.configs, args...)
 observations(configs::Vector{Dat}) = observations(configs, 1:length(configs))
 observations(configs::Vector{Dat}, Icfg) =
@@ -40,9 +60,25 @@ end
 tfor_observations(db::LsqDB, callback; kwargs...) =
       tfor_observations(db.configs, callback; kwargs...)
 
+"""
+```
+tfor_observations(configs::Vector{Dat}, callback; kwargs...)
+tfor_observations(db::LsqDB, callback; kwargs...)
+```
+
+Create a multi-threaded for loop over all observations in the db of
+list of configs. The callback is expected to be of the form
+```
+callback(obskey::AbstractString, cfg::Dat, configs::Vector{Dat}, lock::SpinLock)
+```
+
+### Kwargs
+* `verbose=true`
+* `msg = "Loop over observations"`
+"""
 function tfor_observations(configs::Vector{Dat}, callback;
-                  verbose=true,
-                  msg = "Loop over observations")
+                           verbose=true,
+                           msg = "Loop over observations")
 
    # collect a complete list of observations
    idats = Int[]; sizehint!(idats, 3*length(configs))
@@ -51,13 +87,15 @@ function tfor_observations(configs::Vector{Dat}, callback;
       push!(idats, idat)
       push!(okeys, okey)
    end
+   # a rough cost estimate
+   costs = [ length(configs[i]) for i in idats ]
 
    # start a threaded for loop
-   db_lock = SpinLock()
-   tfor( n -> callback(okeys[n], configs[idats[n]], db, db_lock),
+   lock = SpinLock()
+   tfor( n -> callback(okeys[n], configs[idats[n]], configs, lock),
          1:length(idats),
          verbose=verbose, msg = msg,
-         costs = [ length(configs[i]) for i in idats ] )
+         costs = costs )
 
    return nothing
 end

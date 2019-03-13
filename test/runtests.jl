@@ -8,4 +8,5 @@ using BenchmarkTools
    @testset "Lsq" begin include("test_lsq.jl") end
    @testset "Fitting" begin include("test_fit.jl") end
    @testset "Errors" begin include("test_errors.jl") end
+   @testset "Tfor" begin include("test_tfor.jl") end
 end
