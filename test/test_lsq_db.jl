@@ -35,6 +35,7 @@ dbpath = joinpath(tmpdir, "temp")
 basis = [basis1; basis2]
 data = [data1; data2]
 db = nothing
+
 try
    global db = DB.LsqDB(dbpath, basis, data)
    println(@test true)

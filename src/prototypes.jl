@@ -39,10 +39,6 @@ function Dat(at::Atoms, config_type::AbstractString; kwargs...)
    return dat
 end
 
-# TODO: using `JuLIP.Dict(::Atoms...)` and
-# enable storage of the complete Atoms object,
-# which may contain additional information
-
 Base.Dict(d::Dat) =
    Dict("__id__" => "NBodyIPFitting.Dat",
          "at" => Dict(d.at),
@@ -50,20 +46,10 @@ Base.Dict(d::Dat) =
          "D" => d.D,
          "rows" => d.rows,
          "info" => d.info)
-         # positions(d.at) |> mat,
-         # "Z" => numbers(d.at),
-         # "cell" => cell(d.at) |> Matrix,
-         # "pbc" => Int.([pbc(d.at)...]),
-         # "configtype" => d.configtype,
-         # "D" => d.D )
 
 
 function Dat(D::Dict)
    at = Atoms(D["at"])
-               # X = D["X"],
-               # Z = D["Z"],
-               # cell = D["cell"],
-               # pbc = D["pbc"] )
    return Dat(at,
               D["configtype"],
               Dict{String, Any}(D["D"]),

@@ -49,11 +49,9 @@ using StaticArrays:          SVector
 using JuLIP:                 AbstractCalculator, AbstractAtoms, Atoms,
                              save_json, load_json, decode_dict
 using NBodyIPFitting:        Dat, LsqDB, basis, eval_obs, observations,
-                             observation, vec_obs, devec_obs
+                             observation, vec_obs, devec_obs,
+                             tfor_observations
 using NBodyIPFitting.Data:   configtype
-using NBodyIPFitting.Tools:  tfor
-# TODO: remove this dependence?! => can all be turned into `string`?
-using NBodyIPs:              degree, bodyorder, basisname
 using HDF5:                  h5open, read
 
 import Base: flush, append!, union
@@ -166,7 +164,6 @@ function flush(db::LsqDB)
    return nothing
 end
 
-
 function LsqDB(dbpath::AbstractString,
                basis::AbstractVector{<: AbstractCalculator},
                configs::AbstractVector{Dat};
@@ -176,14 +173,10 @@ function LsqDB(dbpath::AbstractString,
    # create the struct where everything is stored
    db = LsqDB(basis, configs, Ψ, dbpath)
    # parallel assembly of the LSQ matrix
-   # TODO: after first test, rewrite this in terms of tfor_observations
-   db_lock = SpinLock()
-   lens = [length(d) for d in configs]
-   tfor( n -> safe_append!(db, db_lock, n),
-         1:length(configs);
-         verbose=verbose,
-         msg = "Assemble LSQ blocks",
-         costs = lens)
+   tfor_observations( configs,
+      (n, okey, cfg, lck) -> safe_append!(db, lck, cfg, okey),
+      msg = "Assemble LSQ blocks",
+      verbose=verbose )
    # save to file
    if dbpath != ""
       verbose && @info("Writing db to disk...")
@@ -206,15 +199,7 @@ function set_matrows!(d::Dat, okey::String, irows::Vector{Int})
    return d
 end
 
-matrows(d::Dat, okey::String) = try
-   d.rows[okey]
-catch
-   @show d.configtype
-   @show keys(d.D)
-   @show d.info
-   rethrow()
-end
-
+matrows(d::Dat, okey::String) = d.rows[okey]
 
 function _alloc_lsq_matrix(configs, basis)
    # the indices associated with the basis are simply the indices within
@@ -232,8 +217,7 @@ function _alloc_lsq_matrix(configs, basis)
 end
 
 
-function safe_append!(db::LsqDB, db_lock, n::Integer, okey::AbstractString)
-   cfg = db.configs[n]
+function safe_append!(db::LsqDB, db_lock, cfg, okey)
    # computing the lsq blocks ("rows") can be done in parallel,
    lsqrow = evallsq(cfg, basis(db), okey)
    irows = matrows(cfg, okey)
@@ -243,8 +227,6 @@ function safe_append!(db::LsqDB, db_lock, n::Integer, okey::AbstractString)
    unlock(db_lock)
    return nothing
 end
-
-
 
 
 
@@ -277,8 +259,7 @@ function evallsq(d::Dat, B::AbstractVector{TB}, okey) where {TB <: AbstractCalcu
       return evallsq_split(d, B1, okey)
    end
    # TB is a leaf-type so we can use "evaluate_many"
-   return _evallsq(Val(Symbol(key)), B1, Atoms(d))
-                for key in keys(d.D) )
+   return _evallsq(Val(Symbol(okey)), B1, Atoms(d))
 end
 
 """
@@ -306,35 +287,20 @@ function _evallsq(vDT::Val,
    return A
 end
 
-# """
-# concatenate several arrays Ai of shape ni x m  along the last dimension into
-# an array ∑ni x m.
-# """
-# function _cat_(As, Iord)
-#    TA = eltype(As[1])
-#    A = Array{TA}(undef, size(As[1],1),
-#                         sum(size(AA, 2) for AA in As))
-#    for i = 1:length(As)
-#       A[:, Iord[i]] = As[i]
-#    end
-#    return A
-# end
-
 """
 split the Basis `B` into subsets of identical types and evaluate
 those independently (fast).
 """
-function evallsq_split(d, basis)
+function evallsq_split(d, basis, okey)
    # TB is not a leaf-type so we should split the basis to be able to
    # evaluate_many & co
    Bord, Iord = split_basis(basis)
-   D_ord = [ evallsq(d, BB)  for BB in Bord ]
-   # each D_ord[i] is a Dict storing the LSQ system components.
-   # we assume that all D_ord[i] contain the same keys.
-   sizes = Dict( key => [size(DD[key]) for DD in D_ord]
-                 for key in keys(D_ord[1]) )
-   return Dict( key => _cat_( [DD[key] for DD in D_ord], Iord )
-                for key in keys(D_ord[1]) )
+   lenobs = length(d.D[okey])
+   lsqrow = zeros(lenobs, length(basis))
+   for (B, IB) in zip(Bord, Iord)
+      lsqrow[:, IB] = evallsq(d, B, okey)
+   end
+   return lsqrow
 end
 
 
@@ -379,11 +345,6 @@ end
 #    data(db::LsqDB) = db.data
 # end
 
-# TODO: the following function suggests that the ordering of
-#       <values, data, basis> was poorly chosen and it should instead be
-#       <values, basis, data> => reconsider this!!!!
-
-
 
 configtypes(db::LsqDB) = unique(configtype.(db.configs))
 
@@ -411,10 +372,13 @@ function info(db::LsqDB)
    B = db.basis
    Bord, Iord = split_basis(B)
    println("------------------------------------------------------")
-   println(" Basis Group  |  type   | body-order |  degree | descriptor")
+   println(" Basis Group  | length | description ")
    for (i, B1) in enumerate(Bord)
-      deg = maximum(degree.(B1))
-      println("           $i  |  $(basisname(B1[1])) | $(bodyorder(B1[1])) | $deg |  " )
+      lenstr = replace(string(length(B1), pad=5), '0' => ' ')
+      idxstr = replace(string(i), pad=2, '0' => ' ')
+      desc = string(B1)
+      desc = desc[1:min(50, length(desc))]
+      println("          $idxstr  | $lenstr  | $desc" )
       #
    end
    println("======================================================")

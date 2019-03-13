@@ -69,7 +69,7 @@ tfor_observations(db::LsqDB, callback; kwargs...)
 Create a multi-threaded for loop over all observations in the db of
 list of configs. The callback is expected to be of the form
 ```
-callback(obskey::AbstractString, cfg::Dat, configs::Vector{Dat}, lock::SpinLock)
+callback(n, obskey::AbstractString, cfg::Dat, lock::SpinLock)
 ```
 
 ### Kwargs

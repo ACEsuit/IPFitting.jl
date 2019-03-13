@@ -1,11 +1,3 @@
-#
-# TODO
-#  * change datatypes => observationtypes
-#  * load the kron_groups on demand (mmap)
-#  * create LsqSettings struct => to store inside IP
-#    as well as pass around the hooks
-#
-
 """
 # `NBodyIPFitting.jl`
 
@@ -36,7 +28,6 @@ include("data.jl")
 
 include("lsq_db.jl")
 @reexport using NBodyIPFitting.DB
-# export LsqDB
 
 include("filtering.jl")
 @reexport using NBodyIPFitting.Filtering
@@ -53,9 +44,5 @@ include("regularisers.jl")
 include("weights.jl")
 @reexport using NBodyIPFitting.Weights
 
-# TODO: move this into NBodyIPs or a separate module 
-# #visualisation module
-# include("PIPplot.jl")
-# @reexport using NBodyIPs.PIPplot
 
 end # module
