@@ -32,8 +32,9 @@ using NBodyIPFitting: Dat, LsqDB, weighthook, observations,
 using NBodyIPFitting.Data: configtype
 using NBodyIPFitting.DB: dbpath, _nconfigs, matrows
 
-using LinearAlgebra: lmul!, Diagonal, qr, cond, norm
+using LinearAlgebra: lmul!, Diagonal, qr, cond, norm, svd
 using InteractiveUtils: versioninfo
+using LowRankApprox
 
 const Err = NBodyIPFitting.Errors
 
@@ -290,9 +291,13 @@ to display these as tables and `rmse, mae` to access individual errors.
    elseif solver[1] == :svd
       verbose && @info("solve $(size(Ψ)) LSQ system using SVD factorisation")
       ndiscard = solver[2]
-      F = svdfact(Ψ)
-      c = F[:V][:,1:(end-ndiscard)] * (Diagonal(F[:S][1:(end-ndiscard)]) \ (F[:U]' * Y)[1:(end-ndiscard)])
-
+      F = svd(Ψ)
+      c = F.V[:,1:(end-ndiscard)] * (Diagonal(F.S[1:(end-ndiscard)]) \ (F.U' * Y)[1:(end-ndiscard)])
+   elseif solver[1] == :rrqr
+       verbose && @info("solve $(size(Ψ)) LSQ system using Rank-Revealing QR factorisation")
+       qrΨ = pqrfact(Ψ, rtol=solver[2])
+       verbose && @info("cond(R) = $(cond(qrΨ.R))")
+       c = qrΨ \ Y
    else
       error("unknown `solver` in `lsqfit`")
    end
