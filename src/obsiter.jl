@@ -91,8 +91,8 @@ function tfor_observations(configs::Vector{Dat}, callback;
    costs = [ length(configs[i]) for i in idats ]
 
    # start a threaded for loop
-   lock = SpinLock()
-   tfor( n -> callback(okeys[n], configs[idats[n]], configs, lock),
+   lck = SpinLock()
+   tfor( n -> callback(n, okeys[n], configs[idats[n]], lck),
          1:length(idats),
          verbose=verbose, msg = msg,
          costs = costs )

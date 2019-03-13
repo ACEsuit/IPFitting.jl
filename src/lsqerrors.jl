@@ -4,7 +4,7 @@ module Errors
 using JuLIP: Atoms, energy, forces, virial
 using NBodyIPFitting: LsqDB, Dat, configtype, weighthook, eval_obs,
                       observation, hasobservation, observations,
-                      vec_obs, tfor
+                      vec_obs, tfor_observations
 using NBodyIPFitting.DB: matrows
 using FileIO, Printf, Base.Threads
 
@@ -50,23 +50,19 @@ add_fits!(GAP, data; fitkey = "GAP2010")
 ```
 """
 function add_fits!(IP, configs::Vector{Dat}; fitkey = "fit")
-   lck = SpinLock()
-   tfor( n -> begin
-         d = configs[n]
-         D = Dict{String, Vector{Float64}}()
-         for okey in keys(d.D)   # d.D are the observations
-            D[okey] = vec_obs(okey, eval_obs(okey, IP, d.at))
-         end
-         lock(lck)
-         d.info[fitkey] = Dict{String, Vector{Float64}}()
-         for okey in keys(d.D)
-            d.info[fitkey][okey] = D[okey]
-         end
-         unlock(lck)
-      end,
-      1:length(configs); msg="Add Fit info to configs",
-                      costs = length.(configs)
-   )
+   # create the nec essary dictionaries
+   for cfg in configs
+      cfg.info[fitkey] = Dict{String, Vector{Float64}}()
+   end
+   tfor_observations( configs,
+         (n, okey, cfg, lck) -> begin
+            obs = vec_obs(okey, eval_obs(okey, IP, cfg.at))
+            lock(lck)
+            cfg.info[fitkey][okey] = obs
+            unlock(lck)
+         end;
+         msg="Add Fit info to configs")
+
    return nothing
 end
 
