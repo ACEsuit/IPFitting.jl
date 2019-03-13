@@ -92,6 +92,7 @@ end
 
 
 # bond-length filters
+bl_is_simplex(r::MVector) = bl_is_simplex(SVector(r))
 
 bl_is_simplex(r::SVector{1}) = true
 
