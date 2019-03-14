@@ -12,7 +12,7 @@ using Statistics: quantile
 using LinearAlgebra: norm
 using ProgressMeter
 
-export add_fits!, rmse, mae, rmse_table, mae_table,
+export add_fits!, add_fits_serial!, rmse, mae, rmse_table, mae_table,
        lsqerrors
 
 # ------------------------- USER INTERFACE FUNCTIONS -------------------------
@@ -63,6 +63,19 @@ function add_fits!(IP, configs::Vector{Dat}; fitkey = "fit")
          end;
          msg="Add Fit info to configs")
 
+   return nothing
+end
+
+
+function add_fits_serial!(IP, configs::Vector{Dat}; fitkey = "fit")
+   # create the nec essary dictionaries
+   for cfg in configs
+      cfg.info[fitkey] = Dict{String, Vector{Float64}}()
+   end
+   for (okey, cfg, _) in observations(configs)
+      obs = vec_obs(okey, eval_obs(okey, IP, cfg.at))
+      cfg.info[fitkey][okey] = obs
+   end
    return nothing
 end
 
