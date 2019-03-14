@@ -242,7 +242,6 @@ function assemble_reg_matrix(X, B, nB, Ib, inv_tv, freg)
    @assert length(B) == length(Ib)
    # split the basis into "nice" parts
    Bord, Iord = split_basis(B; splitfun = b -> typeof(b))
-   @show length(Bord)
    # allocate regularisation matrices for each of these
    Ψ = zeros(length(X), nB)
    # go through the basis subsets
