@@ -1,4 +1,5 @@
 using Sobol: SobolSeq, next!
+using LinearAlgebra: det 
 
 """
 * N : body-order

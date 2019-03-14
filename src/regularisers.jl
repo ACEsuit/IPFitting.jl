@@ -39,6 +39,7 @@ using NBodyIPs: bodyorder, transform, evaluate_many_ricoords!, descriptor
 using NBodyIPs.Polys: NBPoly
 using NBodyIPs.EnvIPs: EnvIP
 using NBodyIPFitting.Tools: @def
+using LinearAlgebra: I
 
 import Base: Matrix, Dict
 
@@ -247,7 +248,7 @@ function laplace_regulariser(x::SVector{DIM,T}, B::Vector{<: AbstractCalculator}
    evaluate_many_ricoords!(temp, B, r)
    L = 2 * DIM * copy(temp)
 
-   EE = @SMatrix eye(DIM)
+   EE = SMatrix{DIM,DIM}(1.0I)
    for j = 1:DIM
       rp = inv_tv(x + h * EE[:,j])
       evaluate_many_ricoords!(temp, B, rp)
