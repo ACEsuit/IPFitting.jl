@@ -39,6 +39,7 @@ using NBodyIPs: bodyorder, transform, evaluate_many_ricoords!, descriptor
 using NBodyIPs.Polys: NBPoly
 using NBodyIPs.EnvIPs: EnvIP
 using NBodyIPFitting.Tools: @def
+using NBodyIPFitting.DB: split_basis
 using LinearAlgebra: I
 
 import Base: Matrix, Dict
@@ -218,21 +219,45 @@ function regularise_2b(B::Vector, r0::Number, r1::Number, creg, Nquad)
 end
 
 
+# # B = basis[Ib]
+# # nB = length(basis)
+# function assemble_reg_matrix(X, B, nB, Ib, inv_tv, freg)
+#    @assert length(B) == length(Ib)
+#    envdegs = unique(_envdeg_.(B))
+#    Ψ = [ zeros(length(X), nB)  for _=1:length(envdegs) ]
+#    Ib_deg = [ findall(_envdeg_.(B) .== p) for p in envdegs ]
+#    for (ii, (Ψ_, Ib_, p)) in enumerate(zip(Ψ, Ib_deg, envdegs))
+#       temp = zeros(length(Ib_))
+#       B_ = [_Vr(b) for b in B[Ib_]]
+#       for (ix, x) in enumerate(X)
+#          Ψ_[ix, Ib[Ib_]] = freg(x, B_, temp, inv_tv)
+#       end
+#    end
+#    return vcat(Ψ...)
+# end
+
 # B = basis[Ib]
 # nB = length(basis)
 function assemble_reg_matrix(X, B, nB, Ib, inv_tv, freg)
    @assert length(B) == length(Ib)
-   envdegs = unique(_envdeg_.(B))
-   Ψ = [ zeros(length(X), nB)  for _=1:length(envdegs) ]
-   Ib_deg = [ findall(_envdeg_.(B) .== p) for p in envdegs ]
-   for (ii, (Ψ_, Ib_, p)) in enumerate(zip(Ψ, Ib_deg, envdegs))
-      temp = zeros(length(Ib_))
-      B_ = [_Vr(b) for b in B[Ib_]]
+   # split the basis into "nice" parts
+   Bord, Iord = split_basis(B; splitfun = b -> typeof(b))
+   @show length(Bord)
+   # allocate regularisation matrices for each of these
+   Ψ = zeros(length(X), nB)
+   # go through the basis subsets
+   for n = 1:length(Bord)
+      # indices of basis subset Bord[n] in basis
+      Jb = Ib[Iord[n]]
+      # temprary storage for the regularisation
+      temp = zeros(length(Jb))
+      # loop through points x ∈ X at which to apply the regularisation
+      # function freg
       for (ix, x) in enumerate(X)
-         Ψ_[ix, Ib[Ib_]] = freg(x, B_, temp, inv_tv)
+         Ψ[ix, Jb] = freg(x, Bord[n], temp, inv_tv)
       end
    end
-   return vcat(Ψ...)
+   return Ψ
 end
 
 

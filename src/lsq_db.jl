@@ -236,9 +236,9 @@ end
 """
 Take a basis and split it into individual basis groups.
 """
-function split_basis(basis)
+function split_basis(basis; splitfun = b -> hash(Val{:basis}(), b))
    # get some basis hashs of the individual basis functions
-   tps = hash.(Ref(Val(:basis)), basis)
+   tps = splitfun.(basis)
    Iord = Vector{Int}[]
    Bord = Any[]
    for tp in unique(tps)
