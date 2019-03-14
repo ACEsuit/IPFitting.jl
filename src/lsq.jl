@@ -76,6 +76,10 @@ function collect_observations(db::LsqDB,
       end
       irows = matrows(dat, obskey)
       ct = configtype(dat)
+      if !haskey(configweights, ct) #check that we want to fit this configuration
+         continue
+      end
+
       # ----- Observation ------
       obs = observation(obskey, dat)
       # If Vref != nothing the it is a calculator and we can subtract
