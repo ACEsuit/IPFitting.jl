@@ -1,6 +1,6 @@
 
-using JuLIP, NBodyIPs, NBodyIPFitting
-using NBodyIPFitting: Dat, LsqDB
+using JuLIP, NBodyIPs, IPFitting
+using IPFitting: Dat, LsqDB
 using NBodyIPs: bodyorder, degree
 using Test
 using LinearAlgebra: norm

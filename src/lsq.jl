@@ -21,21 +21,21 @@ Y = [E, E, E, E...., F, F, F, F, ...]
 """
 module Lsq
 
-import JuLIP, NBodyIPFitting, StatsBase
+import JuLIP, IPFitting, StatsBase
 
 using StaticArrays
 using JuLIP: AbstractCalculator, Atoms
 using JuLIP.Potentials: OneBody
-using NBodyIPFitting: Dat, LsqDB, weighthook, observations,
+using IPFitting: Dat, LsqDB, weighthook, observations,
                       observation, hasobservation, eval_obs, vec_obs
-using NBodyIPFitting.Data: configtype
-using NBodyIPFitting.DB: dbpath, _nconfigs, matrows
+using IPFitting.Data: configtype
+using IPFitting.DB: dbpath, _nconfigs, matrows
 
 using LinearAlgebra: lmul!, Diagonal, qr, cond, norm, svd
 using InteractiveUtils: versioninfo
 using LowRankApprox
 
-const Err = NBodyIPFitting.Errors
+const Err = IPFitting.Errors
 
 export lsqfit, onb
 
@@ -362,7 +362,7 @@ to display these as tables and `rmse, mae` to access individual errors.
                    "obsweights"    => obsweights,
                    "regularisers"  => Dict.(regularisers),
                    "juliaversion"  => juliainfo,
-                   "IPFitting_version" => get_pkg_info("NBodyIPFitting"),
+                   "IPFitting_version" => get_pkg_info("IPFitting"),
                   )
    # --------------------------------------------------------------------
 

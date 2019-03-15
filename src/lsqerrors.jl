@@ -2,10 +2,10 @@
 module Errors
 
 using JuLIP: Atoms, energy, forces, virial
-using NBodyIPFitting: LsqDB, Dat, configtype, weighthook, eval_obs,
+using IPFitting: LsqDB, Dat, configtype, weighthook, eval_obs,
                       observation, hasobservation, observations,
                       vec_obs, tfor_observations
-using NBodyIPFitting.DB: matrows
+using IPFitting.DB: matrows
 using FileIO, Printf, Base.Threads
 
 using Statistics: quantile

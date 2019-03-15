@@ -48,10 +48,10 @@ using Base.Threads:          SpinLock, nthreads
 using StaticArrays:          SVector
 using JuLIP:                 AbstractCalculator, AbstractAtoms, Atoms,
                              save_json, load_json, decode_dict
-using NBodyIPFitting:        Dat, LsqDB, basis, eval_obs, observations,
+using IPFitting:        Dat, LsqDB, basis, eval_obs, observations,
                              observation, vec_obs, devec_obs,
                              tfor_observations
-using NBodyIPFitting.Data:   configtype
+using IPFitting.Data:   configtype
 using HDF5:                  h5open, read
 
 import Base: flush, append!, union

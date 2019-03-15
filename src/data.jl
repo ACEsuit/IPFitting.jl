@@ -5,7 +5,7 @@
 Provides methods to read files containing simulation data. Primarily this is
 intended to load `.xyz` files and convert them to JuLIP-compatible data:
 ```
-data = NBodyIPFitting.Data.load_data("mydata.xyz")
+data = IPFitting.Data.load_data("mydata.xyz")
 ```
 where `mydata.xyz` contains multiple configurations, will read in those
 configurations, then convert them into a `JuLIP.Atoms` object, extract
@@ -18,8 +18,8 @@ loaded information.
 module Data
 
 using JuLIP, ProgressMeter, FileIO
-using NBodyIPFitting: Dat, vec_obs, devec_obs, observation, hasobservation
-using NBodyIPFitting.DataTypes
+using IPFitting: Dat, vec_obs, devec_obs, observation, hasobservation
+using IPFitting.DataTypes
 import JuLIP: Atoms, energy, forces, virial
 import Base: length, Dict
 

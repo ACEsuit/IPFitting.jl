@@ -3,9 +3,9 @@
 using JuLIP, ASE
 using NBodyIPs
 using NBodyIPs: bodyorder, degree
-using NBodyIPFitting
-using NBodyIPFitting.Lsq
-using NBodyIPFitting.Data: observation, hasobservation, configname
+using IPFitting
+using IPFitting.Lsq
+using IPFitting.Data: observation, hasobservation, configname
 using FileIO, Plots, DataFrames
 using Distributions
 using Test

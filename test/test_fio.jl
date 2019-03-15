@@ -1,12 +1,12 @@
 
 
 using Test
-import NBodyIPFitting
-import NBodyIPFitting.FIO
+import IPFitting
+import IPFitting.FIO
 
 ##
 println("===================================")
-println("Testing NBodyIPFitting.FIO")
+println("Testing IPFitting.FIO")
 println("===================================")
 
 for filetype in [".h5", ".json"]

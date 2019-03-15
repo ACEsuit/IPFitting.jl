@@ -1,6 +1,6 @@
 
-using NBodyIPFitting, JuLIP, Random, Test
-using NBodyIPFitting: observations, tfor_observations
+using IPFitting, JuLIP, Random, Test
+using IPFitting: observations, tfor_observations
 
 function generate_data(species, L, rmax, N, calc)
    data = Dat[]

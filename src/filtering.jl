@@ -1,7 +1,7 @@
 
 module Filtering
 
-using NBodyIPFitting: LsqDB
+using IPFitting: LsqDB
 export filter_basis, filter_configs,
        anyf, allf
 

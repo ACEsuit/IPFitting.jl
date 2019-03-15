@@ -1,8 +1,8 @@
 
 using Test, JuLIP
-using NBodyIPFitting
-using NBodyIPFitting: Dat
-using NBodyIPFitting.Data: configtype
+using IPFitting
+using IPFitting: Dat
+using IPFitting.Data: configtype
 
 ##
 
@@ -27,7 +27,7 @@ println(@test(virial(dat) ≈ virial(lj, at)))
 D = Dict(dat)
 dat1 = Dat(D)
 println(@test(dat == dat1))
-dat2 = convert(Val(Symbol("NBodyIPFitting.Dat")), D)
+dat2 = convert(Val(Symbol("IPFitting.Dat")), D)
 println(@test(dat == dat2))
 
 println("===================================")

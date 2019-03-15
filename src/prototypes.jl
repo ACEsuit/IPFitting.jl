@@ -40,7 +40,7 @@ function Dat(at::Atoms, config_type::AbstractString; kwargs...)
 end
 
 Base.Dict(d::Dat) =
-   Dict("__id__" => "NBodyIPFitting.Dat",
+   Dict("__id__" => "IPFitting.Dat",
          "at" => Dict(d.at),
          "configtype" => d.configtype,
          "D" => d.D,
@@ -57,7 +57,7 @@ function Dat(D::Dict)
               Dict{String, Any}())
 end
 
-convert(::Val{Symbol("NBodyIPFitting.Dat")}, D::Dict) = Dat(D)
+convert(::Val{Symbol("IPFitting.Dat")}, D::Dict) = Dat(D)
 
 observation(d::Dat, key::String) = d.D[key]
 hasobservation(d::Dat, key::String) = haskey(d.D, key)

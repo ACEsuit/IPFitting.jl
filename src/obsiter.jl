@@ -1,6 +1,6 @@
 
 import Base.iterate
-using NBodyIPFitting.Tools: tfor
+using IPFitting.Tools: tfor
 using Base.Threads: SpinLock, nthreads
 
 struct ObservationsIterator

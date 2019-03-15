@@ -1,10 +1,10 @@
 
 using Test
-using NBodyIPFitting, NBodyIPs, ProgressMeter, JuLIP
+using IPFitting, NBodyIPs, ProgressMeter, JuLIP
 using NBodyIPs: blpolys
 using JuLIP: decode_dict
-Fit = NBodyIPFitting
-DB = NBodyIPFitting.DB
+Fit = IPFitting
+DB = IPFitting.DB
 Data = Fit.Data
 
 function rand_data(sym, N, configtype="rand")
