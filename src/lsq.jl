@@ -317,8 +317,13 @@ to display these as tables and `rmse, mae` to access individual errors.
    errs = Err.lsqerrors(db, c, Jbasis; cfgtypes=keys(configweights), Vref=Vref)
 
    if Vref != nothing
-      basis = [ Vref; db.basis[Ibasis] ]
-      c = [1.0; c]
+      if Vref isa NBodyIP
+         basis = [ Vref.components; db.basis[Ibasis] ]
+         c = [ ones(length(Vref.components)); c ]
+      else
+         basis = [ Vref; db.basis[Ibasis] ]
+         c = [1.0; c]
+      end
    else
       basis = db.basis[Ibasis]
    end
