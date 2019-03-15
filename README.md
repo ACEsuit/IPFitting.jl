@@ -78,13 +78,13 @@ pass an empty string as the filename.
 The main function to call is
 `lsqfit(db; kwargs...) -> IP, fitinfo`
 The system is solved via (variants of) the QR factorisation. See `?lsqfit`
-for details. 
+for details.
 
 ### Step 5: Usage
 
 The output `IP` of `lsqfit` is a `JuLIP.AbstractCalculator` which supports
-`energy, forces, virial, site_energies`. (todo: write more here)
-
+`energy, forces, virial, site_energies`. (todo: write more here, in
+particular mention `fast`)
 
 
 ## More on Descriptors and Basis sets

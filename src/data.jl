@@ -3,9 +3,9 @@
 # `module Data`
 
 Provides methods to read files containing simulation data. Primarily this is
-intended to load `.xyz` files and convert them to JuLIP/NBodyIPs-compatible data:
+intended to load `.xyz` files and convert them to JuLIP-compatible data:
 ```
-data = NBodyIPs.Data.load_data("mydata.xyz")
+data = NBodyIPFitting.Data.load_data("mydata.xyz")
 ```
 where `mydata.xyz` contains multiple configurations, will read in those
 configurations, then convert them into a `JuLIP.Atoms` object, extract
@@ -157,7 +157,7 @@ function load_data(fname; kwargs...)
    elseif fname[end-3:end] == ".jld" || fname[end-4:end] == ".jld2"
       return load(fname)
    end
-   error("NBodyIPs.Data.load_data: unknown file format $(fname[end-3:end])")
+   error("unknown file format $(fname[end-3:end])")
 end
 
 

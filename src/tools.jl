@@ -9,11 +9,13 @@ using ProgressMeter, Base.Threads
 Multi-threaded for loop. At each iteration the function f(n) is executed,
 where n loops over `rg`.
 """
-function tfor(f, rg; verbose=true, msg="tfor", costs = ones(Int, length(rg)))
+function tfor(f, rg; verbose=true, msg="tfor", costs = ones(Int, length(rg)),
+                     maxnthreads=nthreads())
    p = Progress(sum(costs))
    p_ctr = 0
    t0 = time_ns()
-   if nthreads() == 1
+   nthr = max(1, min(nthreads(), maxnthreads))
+   if nthr == 1
       verbose && println("$msg in serial")
       dt = verbose ? 1.0 : Inf
       for (n, c) in zip(rg, costs)

@@ -1,5 +1,4 @@
 julia 0.7
-NBodyIPs
 PyCall 1.90.0
 HDF5
 JSON

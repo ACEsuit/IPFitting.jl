@@ -4,7 +4,7 @@
 
 This sub-modules contains code to convert a database `LsqDB` into
 linear LSQ systems, apply suitable weights, solve the resulting systems
-and return an NBodyIP.
+and return an IP (e.g. an NBodyIP).
 
 The ordering of observations (entries of Y, row-indices of Psi) is given by
 the loop ordering
@@ -26,7 +26,6 @@ import JuLIP, NBodyIPFitting, StatsBase
 using StaticArrays
 using JuLIP: AbstractCalculator, Atoms
 using JuLIP.Potentials: OneBody
-using NBodyIPs: NBodyIP  # TODO: remove this => conver to `sum` ???
 using NBodyIPFitting: Dat, LsqDB, weighthook, observations,
                       observation, hasobservation, eval_obs, vec_obs
 using NBodyIPFitting.Data: configtype
@@ -209,6 +208,7 @@ end
                          configweights = nothing,
                          obsweights = nothing,
                          regularisers = [],
+                         combineIP = nothing,
                          kwargs...)
 
    verbose && @info("assemble lsq system")
@@ -225,7 +225,7 @@ end
    basis = db.basis[Ibasis]
    onb = []
    for n = 1:size(Rinv, 2)
-      push!(onb, NBodyIP(basis, Rinv[:,n]))
+      push!(onb, combineIP(basis, Rinv[:,n]))
    end
    return [b for b in onb]
 end
@@ -257,6 +257,17 @@ obsweights = Dict("E" => 100.0, "F" => 1.0, "V" => 0.1)
 * `Ibasis` : indices of basis functions to be used in the fit, default is `:`
 * `verbose` : true or false
 * `solver` : -experimental, still need to  write the docs for this-
+* `regularisers` : a list of regularisers to be added to the lsq functional.
+Each regulariser `R` can be of an arbtirary type but this type must implement the
+conversion to matrix
+* `combineIP` : this is a required kwarg, it tells `lsqfit` how to
+combine `basis` and `coeffs` into an IP by calling `combineIP(basis, coeffs)`;
+use `(b, c) -> c` to just return the coefficients.
+```
+Matrix(R, basis; verbose={true,false})
+```
+If `Areg = Matrix(R, basis)` then this corresponds to adding
+`|| Areg * x ||²` to the least squares functional.
 
 ## More on Weights
 
@@ -264,11 +275,11 @@ The `configweights` and `obsweights` dictionaries specify weights as follows:
 for an observation `o` from a config `cfg` where the `obsweights is `wo` and
 the configweight is `wc` the weight on this observation `o` will be `w = w0*wc`.
 This given a diagonal weight matrix `W`. The least squares functional then becomes
-$\| W (A * x - Y) \|^2$ where `x` are the unknown coefficients.
+|| W (A * x - Y) ||²` where `x` are the unknown coefficients.
 
 ## Return types
 
-* `IP::NBodyIP`: see documentation of `NBodyIPS.jl`
+* `IP`: whatever `combineIP` returns
 * `errs::LsqErrors`: stores individual RMSE and MAE for the different
 configtypes and datatypes. Use `table_relative(errs)` and `table_absolute(errs)`
 to display these as tables and `rmse, mae` to access individual errors.
@@ -281,6 +292,7 @@ to display these as tables and `rmse, mae` to access individual errors.
                 configweights = nothing,
                 obsweights = nothing,
                 regularisers = [],
+                combineIP = nothing,
                 kwargs...)
 
    Jbasis = ((Ibasis == Colon()) ? (1:length(db.basis)) : Ibasis)
@@ -343,19 +355,18 @@ to display these as tables and `rmse, mae` to access individual errors.
                    "solver" => String(solver[1]),
                    "E0"     => E0,
                    "Ibasis" => Vector{Int}(Jbasis),
+                   "c"      => c,
                    "dbpath" => dbpath(db),
                    "configweights" => configweights,
                    "confignames"   => keys(configweights),
                    "obsweights"    => obsweights,
                    "regularisers"  => Dict.(regularisers),
                    "juliaversion"  => juliainfo,
-                   "NBodyIPs_version"  => get_pkg_info("NBodyIPs"),
                    "IPFitting_version" => get_pkg_info("NBodyIPFitting"),
                   )
    # --------------------------------------------------------------------
 
-
-   return NBodyIP(basis, c), infodict
+   return combineIP(basis, c), infodict
 end
 
 

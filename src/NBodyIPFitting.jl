@@ -38,11 +38,8 @@ include("lsqerrors.jl")
 include("lsq.jl")
 @reexport using NBodyIPFitting.Lsq
 
-include("regularisers.jl")
-@reexport using NBodyIPFitting.Regularisers
-
-include("weights.jl")
-@reexport using NBodyIPFitting.Weights
+# include("weights.jl")
+# @reexport using NBodyIPFitting.Weights
 
 
 end # module
