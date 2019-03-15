@@ -1,5 +1,5 @@
 
-using JuLIP, NBodyIPs, NBodyIPFitting, StaticArrays, Plots
+using JuLIP, NBodyIPs, IPFitting, StaticArrays, Plots
 
 include(homedir() * "/Dropbox/PIBmat/W_Data/W.jl")
 E0 = W.get_E0()

@@ -1,9 +1,9 @@
 
-using NBodyIPs, JuLIP, Test, NBodyIPFitting
+using NBodyIPs, JuLIP, Test, IPFitting
 using JuLIP.Potentials: evaluate_d
-using NBodyIPFitting: Dat, LsqDB
+using IPFitting: Dat, LsqDB
 using NBodyIPs: BondLengthDesc
-const Lsq = NBodyIPFitting.Lsq
+const Lsq = IPFitting.Lsq
 
 # generate random data
 function generate_data(species, L, rmax, N, calc)

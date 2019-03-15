@@ -1,7 +1,7 @@
 
 import Base.iterate
-using NBodyIPFitting.Tools: tfor
-using Base.Threads: SpinLock
+using IPFitting.Tools: tfor
+using Base.Threads: SpinLock, nthreads
 
 struct ObservationsIterator
    configs::Vector{Dat}   # remember the database
@@ -78,7 +78,8 @@ callback(n, obskey::AbstractString, cfg::Dat, lock::SpinLock)
 """
 function tfor_observations(configs::Vector{Dat}, callback;
                            verbose=true,
-                           msg = "Loop over observations")
+                           msg = "Loop over observations",
+                           maxnthreads=nthreads())
 
    # collect a complete list of observations
    idats = Int[]; sizehint!(idats, 3*length(configs))
@@ -95,7 +96,8 @@ function tfor_observations(configs::Vector{Dat}, callback;
    tfor( n -> callback(n, okeys[n], configs[idats[n]], lck),
          1:length(idats),
          verbose=verbose, msg = msg,
-         costs = costs )
+         costs = costs,
+         maxnthreads=maxnthreads )
 
    return nothing
 end

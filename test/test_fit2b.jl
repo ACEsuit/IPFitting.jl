@@ -1,10 +1,10 @@
 
-using NBodyIPs, JuLIP, Test, NBodyIPFitting, DataFrames
+using NBodyIPs, JuLIP, Test, IPFitting, DataFrames
 using JuLIP.Potentials: evaluate_d
-using NBodyIPFitting: Dat, LsqDB
+using IPFitting: Dat, LsqDB
 using NBodyIPs: BondLengthDesc
-Lsq = NBodyIPFitting.Lsq
-Err = NBodyIPFitting.Errors
+Lsq = IPFitting.Lsq
+Err = IPFitting.Errors
 import Random
 using LinearAlgebra: norm
 
@@ -28,7 +28,7 @@ calc = let r0=r0
 end
 data = generate_data(:Cu, 3, 0.25*r0, 50, calc)
 rcut2 = cutoff(calc)
-D2 = BondLengthDesc("($r0)/r", CosCut(rcut2-1, rcut2))
+D2 = BondLengthDesc(PolyTransform(1, r0), CosCut(rcut2-1, rcut2))
 
 ##
 degrees = [4, 6, 8, 10, 12, 14, 16]
@@ -54,7 +54,8 @@ for solve_met in [(:qr,), (:svd, 2), (:rrqr, 1e-14)]
       IP, fitinfo = Lsq.lsqfit(db, E0 = 0.0,
                                configweights = Dict("rand" => 1.0),
                                obsweights   = Dict("E" => 100.0, "F" => 1.0),
-                               solver = solve_met )
+                               solver = solve_met,
+                               combineIP = NBodyIP )
       @info("done fitting...")
       errs = fitinfo["errors"]
       @info("done assembling errors")

@@ -1,4 +1,4 @@
-# NBodyIPFitting Development Notes
+# IPFitting Development Notes
 
 ## List of variations to explore
 

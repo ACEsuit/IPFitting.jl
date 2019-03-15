@@ -3,7 +3,7 @@ module DataTypes
 
 using StaticArrays
 using JuLIP: vecs, mat, JVec, energy, forces, virial
-import NBodyIPFitting: vec_obs, devec_obs, eval_obs, weighthook, Dat
+import IPFitting: vec_obs, devec_obs, eval_obs, weighthook, Dat
 
 export ENERGY, FORCES, VIRIAL
 

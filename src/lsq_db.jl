@@ -4,7 +4,7 @@
 ## Overview
 
 This module implements a "database" for storing a precomputed LSQ system. This
-is useful for fitting NBodyIPs since it allows one to precompute the <basis,
+is useful for fitting e.g. NBodyIPs since it allows one to precompute the <basis,
 data> inner products which are very expensive, and then quickly construct LSQ
 systems from them using e.g., many variants of weighting and regularisation.
 
@@ -44,14 +44,14 @@ or equivalently
 """
 module DB
 
-using Base.Threads:          SpinLock
+using Base.Threads:          SpinLock, nthreads
 using StaticArrays:          SVector
 using JuLIP:                 AbstractCalculator, AbstractAtoms, Atoms,
                              save_json, load_json, decode_dict
-using NBodyIPFitting:        Dat, LsqDB, basis, eval_obs, observations,
+using IPFitting:        Dat, LsqDB, basis, eval_obs, observations,
                              observation, vec_obs, devec_obs,
                              tfor_observations
-using NBodyIPFitting.Data:   configtype
+using IPFitting.Data:   configtype
 using HDF5:                  h5open, read
 
 import Base: flush, append!, union
@@ -167,7 +167,8 @@ end
 function LsqDB(dbpath::AbstractString,
                basis::AbstractVector{<: AbstractCalculator},
                configs::AbstractVector{Dat};
-               verbose=true)
+               verbose=true,
+               maxnthreads=nthreads())
    # assign indices, count observations and allocate a matrix
    Ψ = _alloc_lsq_matrix(configs, basis)
    # create the struct where everything is stored
@@ -176,7 +177,8 @@ function LsqDB(dbpath::AbstractString,
    tfor_observations( configs,
       (n, okey, cfg, lck) -> safe_append!(db, lck, cfg, okey),
       msg = "Assemble LSQ blocks",
-      verbose=verbose )
+      verbose=verbose,
+      maxnthreads=maxnthreads )
    # save to file
    if dbpath != ""
       verbose && @info("Writing db to disk...")

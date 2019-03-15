@@ -3,9 +3,9 @@
 using JuLIP, ASE
 using NBodyIPs
 using NBodyIPs: bodyorder, degree
-using NBodyIPFitting
-using NBodyIPFitting.Lsq
-using NBodyIPFitting.Data: observation, hasobservation, configname
+using IPFitting
+using IPFitting.Lsq
+using IPFitting.Data: observation, hasobservation, configname
 using FileIO, Plots, DataFrames
 using Distributions
 using Test
@@ -70,7 +70,8 @@ IP, lsqinfo = lsqfit( db; E0 = W.get_E0(),
                       dataweights = dataweights,
                       configweights = configweights,
                       Ibasis = Ibasis,
-                      verbose = false )
+                      verbose = false,
+                      combineIP = NBodyIP )
 
 @time res_dict = results_dict(data, IP; confignames = Colon(), pathname = homedir() * "/Research/01_En_cours/Post-doc/nbodyips/res_dict_W.jld2")
 

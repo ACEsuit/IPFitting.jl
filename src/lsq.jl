@@ -4,7 +4,7 @@
 
 This sub-modules contains code to convert a database `LsqDB` into
 linear LSQ systems, apply suitable weights, solve the resulting systems
-and return an NBodyIP.
+and return an IP (e.g. an NBodyIP).
 
 The ordering of observations (entries of Y, row-indices of Psi) is given by
 the loop ordering
@@ -21,22 +21,21 @@ Y = [E, E, E, E...., F, F, F, F, ...]
 """
 module Lsq
 
-import JuLIP, NBodyIPFitting, StatsBase
+import JuLIP, IPFitting, StatsBase
 
 using StaticArrays
 using JuLIP: AbstractCalculator, Atoms
 using JuLIP.Potentials: OneBody
-using NBodyIPs: NBodyIP  # TODO: remove this => conver to `sum` ???
-using NBodyIPFitting: Dat, LsqDB, weighthook, observations,
+using IPFitting: Dat, LsqDB, weighthook, observations,
                       observation, hasobservation, eval_obs, vec_obs
-using NBodyIPFitting.Data: configtype
-using NBodyIPFitting.DB: dbpath, _nconfigs, matrows
+using IPFitting.Data: configtype
+using IPFitting.DB: dbpath, _nconfigs, matrows
 
 using LinearAlgebra: lmul!, Diagonal, qr, cond, norm, svd
 using InteractiveUtils: versioninfo
 using LowRankApprox
 
-const Err = NBodyIPFitting.Errors
+const Err = IPFitting.Errors
 
 export lsqfit, onb
 
@@ -186,9 +185,8 @@ E0, Ibasis`.
    any(isnan, Ψ) && @error("discovered NaNs in LSQ system matrix")
 
    # now rescale Y and Ψ according to W => Y_W, Ψ_W; then the two systems
-   #   \| Y_W - Ψ_W c \| -> min  and (Y - Ψ*c)^T W (Y - Ψ*x) => MIN
+   #   \| Y_W - Ψ_W c \| -> min  and \| W (Y - Ψ*c)^T \| -> min
    # are equivalent
-   # >>>>>> W .= sqrt.(W) <<<<<<< TODO: which one is it?
    @. Y = Y * W
    lmul!(Diagonal(W), Ψ)
 
@@ -210,6 +208,7 @@ end
                          configweights = nothing,
                          obsweights = nothing,
                          regularisers = [],
+                         combineIP = nothing,
                          kwargs...)
 
    verbose && @info("assemble lsq system")
@@ -226,7 +225,7 @@ end
    basis = db.basis[Ibasis]
    onb = []
    for n = 1:size(Rinv, 2)
-      push!(onb, NBodyIP(basis, Rinv[:,n]))
+      push!(onb, combineIP(basis, Rinv[:,n]))
    end
    return [b for b in onb]
 end
@@ -250,19 +249,37 @@ configweights = Dict("solid" => 10.0, "liquid" => 0.1)
 ```
 The keys, `["solid", "liquid"]` in the above example, specify which configtypes
 are to be fitted - all other configtypes are ignored.
-* `dataweights` (required) : a `Dict` specifying how different kinds of
-observations (data) should be weighted, e.g.,
+* `obsweights` (required) : a `Dict` specifying how different kinds of
+observations should be weighted, e.g.,
 ```
-dataweights = Dict("E" => 100.0, "F" => 1.0, "V" => 0.1)
+obsweights = Dict("E" => 100.0, "F" => 1.0, "V" => 0.1)
 ```
 * `Ibasis` : indices of basis functions to be used in the fit, default is `:`
 * `verbose` : true or false
-* `solver` : at the moment this should be ignored, only admissible choice
-is `:qr`. On request we can try others.
+* `solver` : -experimental, still need to  write the docs for this-
+* `regularisers` : a list of regularisers to be added to the lsq functional.
+Each regulariser `R` can be of an arbtirary type but this type must implement the
+conversion to matrix
+* `combineIP` : this is a required kwarg, it tells `lsqfit` how to
+combine `basis` and `coeffs` into an IP by calling `combineIP(basis, coeffs)`;
+use `(b, c) -> c` to just return the coefficients.
+```
+Matrix(R, basis; verbose={true,false})
+```
+If `Areg = Matrix(R, basis)` then this corresponds to adding
+`|| Areg * x ||²` to the least squares functional.
+
+## More on Weights
+
+The `configweights` and `obsweights` dictionaries specify weights as follows:
+for an observation `o` from a config `cfg` where the `obsweights is `wo` and
+the configweight is `wc` the weight on this observation `o` will be `w = w0*wc`.
+This given a diagonal weight matrix `W`. The least squares functional then becomes
+|| W (A * x - Y) ||²` where `x` are the unknown coefficients.
 
 ## Return types
 
-* `IP::NBodyIP`: see documentation of `NBodyIPS.jl`
+* `IP`: whatever `combineIP` returns
 * `errs::LsqErrors`: stores individual RMSE and MAE for the different
 configtypes and datatypes. Use `table_relative(errs)` and `table_absolute(errs)`
 to display these as tables and `rmse, mae` to access individual errors.
@@ -275,6 +292,7 @@ to display these as tables and `rmse, mae` to access individual errors.
                 configweights = nothing,
                 obsweights = nothing,
                 regularisers = [],
+                combineIP = nothing,
                 kwargs...)
 
    Jbasis = ((Ibasis == Colon()) ? (1:length(db.basis)) : Ibasis)
@@ -342,19 +360,18 @@ to display these as tables and `rmse, mae` to access individual errors.
                    "solver" => String(solver[1]),
                    "E0"     => E0,
                    "Ibasis" => Vector{Int}(Jbasis),
+                   "c"      => c,
                    "dbpath" => dbpath(db),
                    "configweights" => configweights,
                    "confignames"   => keys(configweights),
                    "obsweights"    => obsweights,
                    "regularisers"  => Dict.(regularisers),
                    "juliaversion"  => juliainfo,
-                   "NBodyIPs_version"  => get_pkg_info("NBodyIPs"),
-                   "IPFitting_version" => get_pkg_info("NBodyIPFitting"),
+                   "IPFitting_version" => get_pkg_info("IPFitting"),
                   )
    # --------------------------------------------------------------------
 
-
-   return NBodyIP(basis, c), infodict
+   return combineIP(basis, c), infodict
 end
 
 

@@ -1,7 +1,7 @@
 module Weights
 
-import JuLIP, NBodyIPFitting
-using NBodyIPFitting: LsqDB, Dat
+import JuLIP, IPFitting
+using IPFitting: LsqDB, Dat
 using JuLIP: forces, Atoms, positions
 
 function hess_weights!(cn::String, db::LsqDB; h = :auto, wE = 0.0, rscal = 3, verbose=false)
@@ -52,3 +52,35 @@ end
 
 
 end # module
+
+
+# function hess_weights_hook!(w, d::Dat)
+#    at = Atoms(d)
+#    if energy(d) == nothing || forces(d) == nothing
+#       warn("""hess_weights_hook!: a training configuration does not contain
+#               energy and forces => ignore""")
+#      return w
+#   end
+#    # compute R vectors
+#    X = positions(at)
+#    h = 0.01 # norm(X[1])
+#    # if h < 1e-5 || h > 0.02
+#    #    warn("unexpected location of X[1] in hess_weights_hook => ignore")
+#    #    @show X[1], h
+#    #    return w
+#    # end
+#
+#    # give this energy a lot of weight to make sure we match the
+#    # ground state (which we assume this is)
+#    w[1] = 0.0
+#
+#    # now fix the scaling for the force weights
+#    # X[1] *= 0
+#    R = [ JuLIP.project_min(at, x - X[1])  for x in X ]
+#    r = norm.(R)
+#    r3 = (ones(3) * r')[:]
+#    If = 2:(1+3*length(R))
+#    w[If] .= w[If] .* (r3.^7) / h
+#    w[2] = 0.0
+#    return w
+# end

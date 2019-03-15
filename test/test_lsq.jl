@@ -1,9 +1,9 @@
 
-using NBodyIPs, JuLIP, Test, NBodyIPFitting
+using NBodyIPs, JuLIP, Test, IPFitting
 using JuLIP.Potentials: evaluate_d
-using NBodyIPFitting: Dat, LsqDB, observation, vec_obs
+using IPFitting: Dat, LsqDB, observation, vec_obs
 using NBodyIPs: BondLengthDesc, nbpolys
-const Lsq = NBodyIPFitting.Lsq
+const Lsq = IPFitting.Lsq
 using LinearAlgebra: qr, norm
 
 # generate random data
@@ -39,7 +39,7 @@ Y = zeros(length(data) * len)
 for (okey, evalb, w) in zip(["E", "F"], (energy, forces), (1.345/atlen, 2.987))
    for d in data
       o = observation(d, okey)
-      irows = NBodyIPFitting.DB.matrows(d, okey)
+      irows = IPFitting.DB.matrows(d, okey)
       leno = length(o)
       Y[irows] = w * o
       for colidx = 1:length(B2)
@@ -50,7 +50,7 @@ end
 
 ## test that Ψ_man, F_man are equivalent to a system generated from a db
 Ψ_man, Y_man = Ψ, Y
-Ψ, Y = NBodyIPFitting.Lsq.get_lsq_system( db,
+Ψ, Y = IPFitting.Lsq.get_lsq_system( db,
                E0 = 0.0,
                configweights = Dict("rand" => 1.0),
                obsweights = Dict("E" => 1.345, "F" => 2.987)
@@ -59,6 +59,3 @@ end
 ##
 println(@test Y ≈ Y_man)
 println(@test Ψ ≈ Ψ_man)
-
-# TODO: this could be expanded to add multiple basis function types and
-#       multiple configuration types

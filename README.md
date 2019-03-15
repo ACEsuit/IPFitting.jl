@@ -1,10 +1,10 @@
-# NBodyIPFitting
+# IPFitting
 
-<!-- [![Build Status](https://travis-ci.org/cortner/NBodyIPFitting.jl.svg?branch=master)](https://travis-ci.org/cortner/NBodyIPFitting.jl)
+<!-- [![Build Status](https://travis-ci.org/cortner/IPFitting.jl.svg?branch=master)](https://travis-ci.org/cortner/IPFitting.jl)
 
-[![Coverage Status](https://coveralls.io/repos/cortner/NBodyIPFitting.jl/badge.svg?branch=master&service=github)](https://coveralls.io/github/cortner/NBodyIPFitting.jl?branch=master)
+[![Coverage Status](https://coveralls.io/repos/cortner/IPFitting.jl/badge.svg?branch=master&service=github)](https://coveralls.io/github/cortner/IPFitting.jl?branch=master)
 
-[![codecov.io](http://codecov.io/github/cortner/NBodyIPFitting.jl/coverage.svg?branch=master)](http://codecov.io/github/cortner/NBodyIPFitting.jl?branch=master) -->
+[![codecov.io](http://codecov.io/github/cortner/IPFitting.jl/coverage.svg?branch=master)](http://codecov.io/github/cortner/IPFitting.jl?branch=master) -->
 
 
 ## Basic Usage
@@ -13,7 +13,7 @@
 
 To import a database stored as an `xyz` file, use
 ```julia
-data = NBodyIPFitting.Data.read_xyz(fname)
+data = IPFitting.Data.read_xyz(fname)
 ```
 See `?read_xyz` for further options. This will return a `Vector{Dat}` where
 each `Dat` is a container storing the atomistic configurion (`JuLIP.Atoms`),
@@ -75,14 +75,16 @@ pass an empty string as the filename.
 
 ### Step 4: Lsq fit, Analyse the fitting errors
 
-(todo) For now, see `?NBodyIPFitting.Lsq.lsqfit`, which gives decent amount
-of detail.
+The main function to call is
+`lsqfit(db; kwargs...) -> IP, fitinfo`
+The system is solved via (variants of) the QR factorisation. See `?lsqfit`
+for details.
 
 ### Step 5: Usage
 
 The output `IP` of `lsqfit` is a `JuLIP.AbstractCalculator` which supports
-`energy, forces, virial, site_energies`. (todo: write more here)
-
+`energy, forces, virial, site_energies`. (todo: write more here, in
+particular mention `fast`)
 
 
 ## More on Descriptors and Basis sets

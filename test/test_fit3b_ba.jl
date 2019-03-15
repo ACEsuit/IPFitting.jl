@@ -1,10 +1,10 @@
 
-using NBodyIPs, JuLIP, Test, NBodyIPFitting, DataFrames
+using NBodyIPs, JuLIP, Test, IPFitting, DataFrames
 using JuLIP.Potentials: evaluate_d
-using NBodyIPFitting: Dat, LsqDB
+using IPFitting: Dat, LsqDB
 using NBodyIPs: BondLengthDesc, BondAngleDesc
-const Lsq = NBodyIPFitting.Lsq
-const Err = NBodyIPFitting.Errors
+const Lsq = IPFitting.Lsq
+const Err = IPFitting.Errors
 
 # generate random data
 function generate_data(species, L, rmax, N, calc)
@@ -46,7 +46,8 @@ for deg3 in degrees
    IP, errs = Lsq.lsqfit( db,
                          E0 = 0.0,
                          configweights = Dict("rand" => 1.0),
-                         dataweights   = Dict("E" => 100.0, "F" => 1.0) )
+                         dataweights   = Dict("E" => 100.0, "F" => 1.0),
+                         combineIP=NBodyIP )
    push!(err_erms, Err.relrmse(errs, "rand", "E"))
    push!(err_frms, Err.relrmse(errs, "rand", "F"))
 end

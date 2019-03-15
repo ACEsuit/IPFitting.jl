@@ -20,7 +20,7 @@ mutable struct Dat
    info::Dict{String, Any}           # anything else...
 end
 
-# TODO: should D.info also be compared?
+# should D.info also be compared?
 ==(d1::Dat, d2::Dat) = (
       (d1.configtype == d2.configtype) && (d1.D == d2.D) &&
       all( f(d1.at) == f(d2.at) for f in (positions, numbers, cell, pbc) )
@@ -40,7 +40,7 @@ function Dat(at::Atoms, config_type::AbstractString; kwargs...)
 end
 
 Base.Dict(d::Dat) =
-   Dict("__id__" => "NBodyIPFitting.Dat",
+   Dict("__id__" => "IPFitting.Dat",
          "at" => Dict(d.at),
          "configtype" => d.configtype,
          "D" => d.D,
@@ -57,7 +57,7 @@ function Dat(D::Dict)
               Dict{String, Any}())
 end
 
-convert(::Val{Symbol("NBodyIPFitting.Dat")}, D::Dict) = Dat(D)
+convert(::Val{Symbol("IPFitting.Dat")}, D::Dict) = Dat(D)
 
 observation(d::Dat, key::String) = d.D[key]
 hasobservation(d::Dat, key::String) = haskey(d.D, key)

@@ -1,10 +1,10 @@
 
 using Test
-using NBodyIPFitting, NBodyIPs, ProgressMeter, JuLIP
+using IPFitting, NBodyIPs, ProgressMeter, JuLIP
 using NBodyIPs: blpolys
 using JuLIP: decode_dict
-Fit = NBodyIPFitting
-DB = NBodyIPFitting.DB
+Fit = IPFitting
+DB = IPFitting.DB
 Data = Fit.Data
 
 function rand_data(sym, N, configtype="rand")
@@ -17,8 +17,8 @@ end
 
 ##
 println("Double-Check (de-)dictionisation of basis: ")
-basis1 = blpolys(2, "exp( - 2 * (r/3-1))", "(:cos, 5.0, 7.0)", 10)
-basis2 = blpolys(3, "exp( - 2.5 * (r/3-1))", "(:cos2s, 2.0, 2.5, 4.0, 5.5)", 6)
+basis1 = blpolys(2, ExpTransform(2.0, 3.0), CosCut(5.0, 7.0), 10)
+basis2 = blpolys(3, ExpTransform(2.5, 3.0), CosCut2s(2.0, 2.5, 4.0, 5.5), 6)
 println(@test decode_dict.( Dict.( basis1 ) ) == basis1)
 println(@test decode_dict.( Dict.( basis2 ) ) == basis2)
 
@@ -69,16 +69,3 @@ println(@test db2.Ψ == db.Ψ)
 ##
 println("Delete the temporary database")
 rm(tmpdir; force=true, recursive=true)
-
-
-
-# TODO: Some test like this will be needed when we switch to
-#       loading the kron_groups on demand
-# ## Confirm that the LSQ entries load correctly and
-# db2 = DB.LsqDB(dbpath)
-# println("Reload all dat files and check they are consistent with (data, basis)")
-# @showprogress for n = 1:length(DB.data(db2))
-#    lsq1 = DB.load_dat(db2, n)
-#    lsq2 = Fit.Lsq.evallsq(DB.data(db2, 1), DB.basis(db2))
-#    @test lsq1 == lsq2
-# end
