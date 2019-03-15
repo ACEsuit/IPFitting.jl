@@ -20,7 +20,7 @@ mutable struct Dat
    info::Dict{String, Any}           # anything else...
 end
 
-# TODO: should D.info also be compared?
+# should D.info also be compared?
 ==(d1::Dat, d2::Dat) = (
       (d1.configtype == d2.configtype) && (d1.D == d2.D) &&
       all( f(d1.at) == f(d2.at) for f in (positions, numbers, cell, pbc) )

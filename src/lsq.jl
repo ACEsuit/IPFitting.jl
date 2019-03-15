@@ -186,9 +186,8 @@ E0, Ibasis`.
    any(isnan, Ψ) && @error("discovered NaNs in LSQ system matrix")
 
    # now rescale Y and Ψ according to W => Y_W, Ψ_W; then the two systems
-   #   \| Y_W - Ψ_W c \| -> min  and (Y - Ψ*c)^T W (Y - Ψ*x) => MIN
+   #   \| Y_W - Ψ_W c \| -> min  and \| W (Y - Ψ*c)^T \| -> min
    # are equivalent
-   # >>>>>> W .= sqrt.(W) <<<<<<< TODO: which one is it?
    @. Y = Y * W
    lmul!(Diagonal(W), Ψ)
 
@@ -250,15 +249,22 @@ configweights = Dict("solid" => 10.0, "liquid" => 0.1)
 ```
 The keys, `["solid", "liquid"]` in the above example, specify which configtypes
 are to be fitted - all other configtypes are ignored.
-* `dataweights` (required) : a `Dict` specifying how different kinds of
-observations (data) should be weighted, e.g.,
+* `obsweights` (required) : a `Dict` specifying how different kinds of
+observations should be weighted, e.g.,
 ```
-dataweights = Dict("E" => 100.0, "F" => 1.0, "V" => 0.1)
+obsweights = Dict("E" => 100.0, "F" => 1.0, "V" => 0.1)
 ```
 * `Ibasis` : indices of basis functions to be used in the fit, default is `:`
 * `verbose` : true or false
-* `solver` : at the moment this should be ignored, only admissible choice
-is `:qr`. On request we can try others.
+* `solver` : -experimental, still need to  write the docs for this-
+
+## More on Weights
+
+The `configweights` and `obsweights` dictionaries specify weights as follows:
+for an observation `o` from a config `cfg` where the `obsweights is `wo` and
+the configweight is `wc` the weight on this observation `o` will be `w = w0*wc`.
+This given a diagonal weight matrix `W`. The least squares functional then becomes
+$\| W (A * x - Y) \|^2$ where `x` are the unknown coefficients.
 
 ## Return types
 

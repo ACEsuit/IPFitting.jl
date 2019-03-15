@@ -75,8 +75,10 @@ pass an empty string as the filename.
 
 ### Step 4: Lsq fit, Analyse the fitting errors
 
-(todo) For now, see `?NBodyIPFitting.Lsq.lsqfit`, which gives decent amount
-of detail.
+The main function to call is
+`lsqfit(db; kwargs...) -> IP, fitinfo`
+The system is solved via (variants of) the QR factorisation. See `?lsqfit`
+for details. 
 
 ### Step 5: Usage
 

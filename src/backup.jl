@@ -119,7 +119,7 @@ normalise_E = true, normalise_V = true,
 hooks = Dict("hess" => hess_weights_hook!)) =
 
 
-      # TODO: this should be generalised to be able to hook into
+      #       this should be generalised to be able to hook into
       #       other kinds of weight modifications
       idx_end = idx
       if w != 0 && length(config_type(d)) >= 4 && config_type(d)[1:4] == "hess"
