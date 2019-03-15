@@ -59,6 +59,3 @@ end
 ##
 println(@test Y ≈ Y_man)
 println(@test Ψ ≈ Ψ_man)
-
-# TODO: this could be expanded to add multiple basis function types and
-#       multiple configuration types

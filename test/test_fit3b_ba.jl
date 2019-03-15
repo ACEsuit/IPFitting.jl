@@ -46,7 +46,8 @@ for deg3 in degrees
    IP, errs = Lsq.lsqfit( db,
                          E0 = 0.0,
                          configweights = Dict("rand" => 1.0),
-                         dataweights   = Dict("E" => 100.0, "F" => 1.0) )
+                         dataweights   = Dict("E" => 100.0, "F" => 1.0),
+                         combineIP=NBodyIP )
    push!(err_erms, Err.relrmse(errs, "rand", "E"))
    push!(err_frms, Err.relrmse(errs, "rand", "F"))
 end

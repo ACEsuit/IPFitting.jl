@@ -43,7 +43,8 @@ db = LsqDB("", B, data)
 IP, fitinfo = lsqfit( db,
                    E0 = 0.0,
                    configweights = Dict("rand1" => 1.0, "rand2" => 0.5),
-                   obsweights   = Dict("E" => 100.0, "F" => 1.0)
+                   obsweights   = Dict("E" => 100.0, "F" => 1.0),
+                   combineIP = NBodyIP
                    )
 IPf = fast(IP)
 
