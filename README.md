@@ -86,6 +86,22 @@ The output `IP` of `lsqfit` is a `JuLIP.AbstractCalculator` which supports
 `energy, forces, virial, site_energies`. (todo: write more here, in
 particular mention `fast`)
 
+## Analysis
+
+### Add fit information to a list of configurations
+
+Suppose `configs::Vector{Dat}` is a list of configurations, then we can
+add fitting error information by calling
+```
+add_fits!(myIP, configs, fitkey="myIP")
+```
+This will evaluate all observations stored in configs with the new IP and store
+them in `configs[n].info[fitkey]["okey"]`. These observation values can then
+be used to compute RMSE, produce scatter plots, etc.
+
+This calculation can take a while. If `myIP` has just been fitted using `lsqfit`
+then there is a quicker way to generate the fitting errors, but this is not
+yet implemented. TODO: implement this!
 
 ## More on Descriptors and Basis sets
 
