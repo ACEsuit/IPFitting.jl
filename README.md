@@ -86,6 +86,18 @@ The output `IP` of `lsqfit` is a `JuLIP.AbstractCalculator` which supports
 `energy, forces, virial, site_energies`. (todo: write more here, in
 particular mention `fast`)
 
+
+### More comments
+
+there are two functions `filter_basis` and `filter_configs` that can be
+used to choose a subset of the data and a subset of the basis. For example,
+to take only 2B:
+```
+Ib2 = filter_basis(db, b -> (bodyorder(b) < 2))
+```
+See inline documentation for more details.
+
+
 ## Analysis
 
 ### Add fit information to a list of configurations
@@ -102,17 +114,6 @@ be used to compute RMSE, produce scatter plots, etc.
 This calculation can take a while. If `myIP` has just been fitted using `lsqfit`
 then there is a quicker way to generate the fitting errors, but this is not
 yet implemented. TODO: implement this!
-
-## More on Descriptors and Basis sets
-
-### Bond-length descriptor
-
-### Bond-angle descriptor
-
-### Environment-dependent N-Body potentials
-
-
-## Regularisation
 
 
 ## Hooks
