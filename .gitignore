@@ -4,3 +4,4 @@
 *.pyc
 src/plottools.pyc
 temp
+Manifest.toml
