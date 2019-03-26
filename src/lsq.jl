@@ -182,7 +182,17 @@ E0, Ibasis`.
    Ψ = db.Ψ[Irows, Icols]
    Y = Y[Irows]
    W = W[Irows]
-   any(isnan, Ψ) && @error("discovered NaNs in LSQ system matrix")
+
+   if any(isnan, Ψ)
+      @info("discovered NaNs in LSQ system matrix")
+
+      naninds = findall(isnan.(Ψ))
+      n = min(length(naninds), 10)
+      @show length(naninds)
+      @show naninds[1:n]
+
+      @error("discovered NaNs in LSQ system matrix")
+   end
 
    # now rescale Y and Ψ according to W => Y_W, Ψ_W; then the two systems
    #   \| Y_W - Ψ_W c \| -> min  and \| W (Y - Ψ*c)^T \| -> min
