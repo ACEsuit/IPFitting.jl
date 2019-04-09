@@ -2,7 +2,7 @@
 module Errors
 
 using JuLIP: Atoms, energy, forces, virial
-using IPFitting: LsqDB, Dat, configtype, weighthook, eval_obs,
+using IPFitting: LsqDB, Dat, configtype, err_weighthook, eval_obs,
                       observation, hasobservation, observations,
                       vec_obs, tfor_observations
 using IPFitting.DB: matrows
@@ -161,7 +161,7 @@ function _fiterrs(configs::Vector{Dat}; fitkey="fit", p=2)
          nrm["set"][okey] = 0.0
          err["set"][okey] = 0.0
       end
-      w = weighthook(okey, dat)  # the default weight for this observation
+      w = err_weighthook(okey, dat)  # the default weight for this observation
       exval = dat.D[okey] * w
       fitval = dat.info[fitkey][okey] * w
       len[ct][okey] += length(exval)
@@ -242,7 +242,7 @@ end
       # the error on this particular data-point
       e = block * c - y
       # compute the various errors for this ct/okey combination
-      w = weighthook(okey, dat)
+      w = err_weighthook(okey, dat)
       errs["rmse"][ct][okey] += w^2 * norm(e)^2
       errs["nrm2"][ct][okey] += w^2 * norm(y)^2
       errs["mae"][ct][okey]  += w * norm(e, 1)
