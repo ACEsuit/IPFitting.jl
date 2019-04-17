@@ -83,7 +83,9 @@ function collect_observations(db::LsqDB,
       obs = observation(obskey, dat)
       # If Vref != nothing the it is a calculator and we can subtract
       # its value => this allows us to fit from a reference potential
-      if Vref != nothing
+      if haskey(dat.info, "Vref")
+         obs = obs - dat.info["Vref"][obskey]
+      elseif Vref != nothing
          obs = obs - vec_obs(obskey, eval_obs(obskey, Vref, Atoms(dat)))
       end
       Y[irows] .= obs
