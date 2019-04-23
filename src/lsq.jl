@@ -339,10 +339,28 @@ to display these as tables and `rmse, mae` to access individual errors.
       @info("Relative RMSE on training set: $rel_rms")
    end
 
+   infodict = asm_fitinfo(db, c, Ibasis, configweights, obsweights,
+                          Vref, solver, E0, regularisers, verbose)
+
+   if Vref != nothing
+      basis = [ Vref; db.basis[Ibasis] ]
+      c = [1.0; c]
+   else
+      basis = db.basis[Ibasis]
+   end
+
+   return combineIP(basis, c), infodict
+end
+
+function asm_fitinfo(db, c, Ibasis, configweights, obsweights,
+                     Vref, solver, E0, regularisers, verbose)
+   if Ibasis isa Colon
+      Jbasis = collect(1:length(db.basis))
+   end
    # compute errors TODO: still need to fix this!
    verbose && @info("Assemble errors table")
    @warn("new error implementation... redo this part please ")
-   errs = Err.lsqerrors(db, c, Jbasis; cfgtypes=keys(configweights), Vref=Vref)
+   errs = Err.lsqerrors(db, c, Jbasis; cfgtypes=keys(configweights), Vref=OneBody(E0))
 
    if Vref != nothing
       basis = [ Vref; db.basis[Ibasis] ]
@@ -375,11 +393,8 @@ to display these as tables and `rmse, mae` to access individual errors.
                    "IPFitting_version" => get_pkg_info("IPFitting"),
                   )
    # --------------------------------------------------------------------
-
-   return combineIP(basis, c), infodict
+   return infodict
 end
-
-
 
 import Pkg
 
