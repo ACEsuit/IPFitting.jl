@@ -160,7 +160,7 @@ E0, Ibasis`.
 """
 @noinline function get_lsq_system(db::LsqDB;
                          solver=(:qr, ), verbose=true,
-                         Ibasis = :,
+                         Ibasis = :, Itrain = :,
                          E0 = nothing,
                          Vref = OneBody(E0),
                          configweights = nothing,
@@ -177,8 +177,9 @@ E0, Ibasis`.
    any(isnan, W) && @error("NaN detected in weights vector")
 
    # get the slice of the big fat huge enourmous LSQ matrix
+   if Itrain == : ; Itrain = 1:length(db.configs); end
+   Irows = intersect(findall(W .!= 0) |> sort, Itrain)
    Icols = Ibasis
-   Irows = findall(W .!= 0) |> sort
 
    # we can't keep this a view since we need to multiply by weights
    Ψ = db.Ψ[Irows, Icols]
@@ -215,6 +216,7 @@ end
 @noinline function onb(db::LsqDB;
                          solver=(:qr, ), verbose=true,
                          Ibasis = :,
+                         Itrain = :,
                          E0 = nothing,
                          Vref = OneBody(E0),
                          configweights = nothing,
@@ -224,7 +226,8 @@ end
                          kwargs...)
 
    verbose && @info("assemble lsq system")
-   Ψ, _ = get_lsq_system(db; verbose=verbose, Vref=Vref, Ibasis=Ibasis,
+   Ψ, _ = get_lsq_system(db; verbose=verbose, Vref=Vref,
+                             Ibasis=Ibasis, Itrain=Itrain,
                              configweights = configweights,
                              obsweights = obsweights,
                              regularisers = regularisers,
@@ -299,6 +302,8 @@ to display these as tables and `rmse, mae` to access individual errors.
 @noinline function lsqfit(db::LsqDB;
                 solver=(:qr, ), verbose=true,
                 Ibasis = :,
+                Itrain = :,
+                Itest = nothing,
                 E0 = nothing,
                 Vref = OneBody(E0),
                 configweights = nothing,
@@ -342,7 +347,8 @@ to display these as tables and `rmse, mae` to access individual errors.
    end
 
    infodict = asm_fitinfo(db, c, Ibasis, configweights, obsweights,
-                          Vref, solver, E0, regularisers, verbose)
+                          Vref, solver, E0, regularisers, verbose,
+                          Itrain, Itest)
 
    if Vref != nothing
       basis = [ Vref; db.basis[Ibasis] ]
@@ -354,15 +360,24 @@ to display these as tables and `rmse, mae` to access individual errors.
    return combineIP(basis, c), infodict
 end
 
+
 function asm_fitinfo(db, c, Ibasis, configweights, obsweights,
-                     Vref, solver, E0, regularisers, verbose)
+                     Vref, solver, E0, regularisers, verbose,
+                     Itrain, Itest)
    if Ibasis isa Colon
       Jbasis = collect(1:length(db.basis))
    end
    # compute errors TODO: still need to fix this!
    verbose && @info("Assemble errors table")
    @warn("new error implementation... redo this part please ")
-   errs = Err.lsqerrors(db, c, Jbasis; cfgtypes=keys(configweights), Vref=OneBody(E0))
+   errs = Err.lsqerrors(db, c, Jbasis;
+            cfgtypes=keys(configweights), Vref=OneBody(E0), Icfg=Itrain)
+   if Itest != nothing
+      errtest = Err.lsqerrors(db, c, Jbasis;
+               cfgtypes=keys(configweights), Vref=OneBody(E0), Icfg=Itest)
+   else
+      errtest = Dict()
+   end
 
    if Vref != nothing
       basis = [ Vref; db.basis[Ibasis] ]
@@ -382,6 +397,7 @@ function asm_fitinfo(db, c, Ibasis, configweights, obsweights,
    juliainfo = String(take!(iob))
 
    infodict = Dict("errors" => errs,
+                   "errtest" => errtest,
                    "solver" => String(solver[1]),
                    "E0"     => E0,
                    "Ibasis" => Vector{Int}(Jbasis),

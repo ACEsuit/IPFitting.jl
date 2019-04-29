@@ -30,6 +30,8 @@ observations(db::LsqDB, args...) = observations(db.configs, args...)
 observations(configs::Vector{Dat}) = observations(configs, 1:length(configs))
 observations(configs::Vector{Dat}, Icfg) =
      ObservationsIterator(configs, collect(Icfg))
+observations(configs::Vector{Dat}, ::Colon) =
+     observations(configs, 1:length(configs))
 
 iterate(iter::ObservationsIterator) = iterate(iter, 1)
 

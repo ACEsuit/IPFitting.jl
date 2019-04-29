@@ -11,9 +11,11 @@ using FileIO, Printf, Base.Threads
 using Statistics: quantile
 using LinearAlgebra: norm
 using ProgressMeter
+using Random: shuffle!
 
 export add_fits!, add_fits_serial!, rmse, mae, rmse_table, mae_table,
-       lsqerrors
+       lsqerrors, splittraintest
+
 
 # ------------------------- USER INTERFACE FUNCTIONS -------------------------
 
@@ -187,7 +189,8 @@ end
 
 # TODO: the next fucntion is to be retired!!
 
-@noinline function lsqerrors(db, c, Ibasis; cfgtypes = Colon(), Vref = nothing)
+@noinline function lsqerrors(db, c, Ibasis; cfgtypes = Colon(), Vref = nothing,
+                                            Icfg=Colon())
 
    cfgtypes isa Colon ?  cfgtypes = configtypes(db) :
                          cfgtypes = collect(cfgtypes)
@@ -205,7 +208,7 @@ end
       lengths[ct] = Dict{String, Int}()
    end
 
-   for (okey, dat, _) in observations(db)
+   for (okey, dat, _) in observations(db, Icfg)
       ct = configtype(dat)
       if !(ct in cfgtypes)
          continue
@@ -274,6 +277,24 @@ end
 end
 
 
+splittraintest(db::LsqDB, ptrain=0.8) = splittraintest(db.configs, ptrain)
+
+function splittraintest(cfgs::AbstractVector{Dat}, ptrain=0.8)
+   cfgtypes = unique(configtype.(cfgs))
+   Itrain = Int[]
+   Itest = Int[]
+   for ct in cfgtypes
+      # find all indices of configurations with the current configtype
+      Ict = findall(configtype.(cfgs) .== ct)
+      # randomly permute the indices
+      shuffle!(Ict)
+      # first 80% go into train, remaining 20% into test
+      ntrain = ceil(Int, length(Ict) * ptrain)
+      append!(Itrain, Ict[1:ntrain])
+      append!(Itest, Ict[ntrain+1:end])
+   end
+   return Itrain, Itest
+end
 
 
 end

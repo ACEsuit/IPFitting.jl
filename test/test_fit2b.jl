@@ -39,6 +39,8 @@ for solve_met in [(:qr,), (:svd, 2), (:rrqr, 1e-14)]
    global err_erms = Float64[]
    global err_frms = Float64[]
 
+   ptrain = 0.8
+
    for d in degrees
       rr = range(0.9*r0, stop=cutoff(calc), length=200)
       global err_eunif
@@ -51,15 +53,28 @@ for solve_met in [(:qr,), (:svd, 2), (:rrqr, 1e-14)]
       B2 = nbpolys(2, D2, d)
       @show length(B2)
       db = LsqDB("", B2, data)
+      Itrain, Itest = splittraintest(db)
+      @show Itrain
+      @show Itest
+      @show length(Itrain), length(Itest)
+      @test isempty(intersect(Itrain, Itest))
+      @test sort(union(Itrain, Itest)) == 1:length(db.configs)
+
       IP, fitinfo = Lsq.lsqfit(db, E0 = 0.0,
+                               Itrain = Itrain,
+                               Itest = Itest,
                                configweights = Dict("rand" => 1.0),
                                obsweights   = Dict("E" => 100.0, "F" => 1.0),
                                solver = solve_met,
                                combineIP = NBodyIP )
       @info("done fitting...")
       errs = fitinfo["errors"]
+      errs_test = fitinfo["errtest"]
       @info("done assembling errors")
+      @info("Training Errors")
       Err.rmse_table(rmse(errs)...)
+      @info("Test Errors")
+      Err.rmse_table(rmse(errs_test)...)
       V2 = IP.components[2]
       ev2 = norm(V2.(rr) - 0.5 * calc.(rr), Inf)
       dev2 = norm(evaluate_d.(Ref(V2), rr) - 0.5 * evaluate_d.(Ref(calc), rr), Inf)
