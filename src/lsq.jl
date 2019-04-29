@@ -177,7 +177,7 @@ E0, Ibasis`.
    any(isnan, W) && @error("NaN detected in weights vector")
 
    # get the slice of the big fat huge enourmous LSQ matrix
-   if Itrain == : ; Itrain = 1:length(db.configs); end
+   if Itrain == : ; Itrain = 1:length(Y); end
    Irows = intersect(findall(W .!= 0) |> sort, Itrain)
    Icols = Ibasis
 

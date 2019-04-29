@@ -26,7 +26,7 @@ r0 = rnn(:Cu)
 calc = let r0=r0
    LennardJones(r0=r0) * C2Shift(2.5*r0)
 end
-data = generate_data(:Cu, 3, 0.25*r0, 100, calc)
+data = generate_data(:Cu, 3, 0.25*r0, 50, calc)
 rcut2 = cutoff(calc)
 D2 = BondLengthDesc(PolyTransform(1, r0), CosCut(rcut2-1, rcut2))
 
@@ -54,9 +54,6 @@ for solve_met in [(:qr,), (:svd, 2), (:rrqr, 1e-14)]
       @show length(B2)
       db = LsqDB("", B2, data)
       Itrain, Itest = splittraintest(db)
-      @show Itrain
-      @show Itest
-      @show length(Itrain), length(Itest)
       @test isempty(intersect(Itrain, Itest))
       @test sort(union(Itrain, Itest)) == 1:length(db.configs)
 
