@@ -366,6 +366,8 @@ function asm_fitinfo(db, c, Ibasis, configweights, obsweights,
                      Itrain, Itest)
    if Ibasis isa Colon
       Jbasis = collect(1:length(db.basis))
+   else
+      Jbasis = Ibasis
    end
    # compute errors TODO: still need to fix this!
    verbose && @info("Assemble errors table")
@@ -380,10 +382,10 @@ function asm_fitinfo(db, c, Ibasis, configweights, obsweights,
    end
 
    if Vref != nothing
-      basis = [ Vref; db.basis[Ibasis] ]
+      basis = [ Vref; db.basis[Jbasis] ]
       c = [1.0; c]
    else
-      basis = db.basis[Ibasis]
+      basis = db.basis[Jbasis]
    end
 
    # --------------------------------------------------------------------
