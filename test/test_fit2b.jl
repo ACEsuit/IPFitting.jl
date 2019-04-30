@@ -26,7 +26,7 @@ r0 = rnn(:Cu)
 calc = let r0=r0
    LennardJones(r0=r0) * C2Shift(2.5*r0)
 end
-data = generate_data(:Cu, 3, 0.25*r0, 50, calc)
+data = generate_data(:Cu, 3, 0.25*r0, 70, calc)
 rcut2 = cutoff(calc)
 D2 = BondLengthDesc(PolyTransform(1, r0), CosCut(rcut2-1, rcut2))
 
@@ -95,3 +95,40 @@ for solve_met in [(:qr,), (:svd, 2), (:rrqr, 1e-14)]
    (@test minimum(err_eunif) < 3e-4) |> println
    (@test minimum(err_funif) < 4e-4) |> println
 end
+
+
+# OLD DEBUGGING CODE ...
+#
+# ##
+#
+#
+# B2 = nbpolys(2, D2, 8)
+# @show length(B2)
+# db = LsqDB("", B2, data)
+# Itrain, Itest = splittraintest(db)
+# @test isempty(intersect(Itrain, Itest))
+# @test sort(union(Itrain, Itest)) == 1:length(db.configs)
+#
+#
+# ##
+#
+# Itrain, Itest = splittraintest(db, 0.02)
+#
+# IP, fitinfo = Lsq.lsqfit(db, E0 = 0.0,
+#                          Itrain = Itrain,
+#                          Itest = Itest,
+#                          configweights = Dict("rand" => 1.0),
+#                          obsweights   = Dict("E" => 100.0, "F" => 1.0),
+#                          combineIP = NBodyIP )
+# @info("done fitting...")
+# errs = fitinfo["errors"]
+# errs_test = fitinfo["errtest"]
+# @info("done assembling errors")
+# @info("Training Errors")
+# Err.rmse_table(rmse(errs)...)
+# @info("Test Errors")
+# Err.rmse_table(rmse(errs_test)...)
+# # V2 = IP.components[2]
+# # ev2 = norm(V2.(rr) - 0.5 * calc.(rr), Inf)
+# # dev2 = norm(evaluate_d.(Ref(V2), rr) - 0.5 * evaluate_d.(Ref(calc), rr), Inf)
+# # println("   V2 - uniform error = ", ev2, " | ", dev2)

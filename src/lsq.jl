@@ -69,7 +69,8 @@ function collect_observations(db::LsqDB,
                           # everything in the database
    Y = zeros(Float64, nrows)
    W = zeros(Float64, nrows)
-   for (obskey, dat, _) in observations(db)  # obskey ∈ {"E","F",...}; d::Dat
+   Icfg = zeros(Int, nrows)
+   for (obskey, dat, icfg) in observations(db)  # obskey ∈ {"E","F",...}; d::Dat
       if !haskey(obsweights, obskey)
          continue
       end
@@ -89,6 +90,7 @@ function collect_observations(db::LsqDB,
          obs = obs - vec_obs(obskey, eval_obs(obskey, Vref, Atoms(dat)))
       end
       Y[irows] .= obs
+      Icfg[irows] .= icfg
       # ------ Weights --------
       # modify the weights from extra information in the dat structure
       W[irows] .= _get_weights(configweights[ct],
@@ -96,7 +98,7 @@ function collect_observations(db::LsqDB,
                                weighthook(obskey, dat),
                                dat, obskey, obs)
    end
-   return Y, W
+   return Y, W, Icfg
 end
 
 
@@ -170,16 +172,22 @@ E0, Ibasis`.
 
    # get the observations vector and the weights vector
    # the Vref potential is subtracted from the observations
-   Y, W = collect_observations(db, configweights, obsweights, Vref)
+   Y, W, Icfg = collect_observations(db, configweights, obsweights, Vref)
 
    # check for NaNs
    any(isnan, Y) && @error("NaN detected in observations vector")
    any(isnan, W) && @error("NaN detected in weights vector")
 
-   # get the slice of the big fat huge enourmous LSQ matrix
+
+   # convert : into a vector or list
    if Itrain == : ; Itrain = 1:length(Y); end
-   Irows = intersect(findall(W .!= 0) |> sort, Itrain)
+
+   # get the right slice of the big fat huge enourmous LSQ matrix
+   # the columns are just the basis functions
    Icols = Ibasis
+   # the rows are those which have (a) a non-zero weight
+   # and (b) the configuration index is part of the training set
+   Irows = intersect(findall(W .!= 0) |> sort, findall(in.(Icfg, Ref(Itrain))))
 
    # we can't keep this a view since we need to multiply by weights
    Ψ = db.Ψ[Irows, Icols]
@@ -315,7 +323,7 @@ to display these as tables and `rmse, mae` to access individual errors.
    Jbasis = ((Ibasis == Colon()) ? (1:length(db.basis)) : Ibasis)
 
    verbose && @info("assemble lsq system")
-   Ψ, Y = get_lsq_system(db; verbose=verbose, Vref=Vref, Ibasis=Ibasis,
+   Ψ, Y = get_lsq_system(db; verbose=verbose, Vref=Vref, Ibasis=Ibasis, Itrain = Itrain,
                              configweights = configweights,
                              obsweights = obsweights,
                              regularisers = regularisers,

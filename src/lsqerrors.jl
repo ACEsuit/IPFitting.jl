@@ -208,7 +208,8 @@ end
       lengths[ct] = Dict{String, Int}()
    end
 
-   for (okey, dat, _) in observations(db, Icfg)
+   for (okey, dat, icfg) in observations(db, Icfg)
+
       ct = configtype(dat)
       if !(ct in cfgtypes)
          continue
