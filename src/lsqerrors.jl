@@ -93,8 +93,23 @@ function truncate_string(s, n)
    return "$(s[1:n1])..$(s[end-n2+1:end])"
 end
 
-_relerr(relerrs, ct, ot) = haskey(relerrs[ct], ot) ? 100*relerrs[ct][ot] : NaN
-_err(errs, ct, ot) = haskey(errs[ct], ot) ? errs[ct][ot] : NaN
+function _relerr(relerrs, ct, ot)
+   if haskey(relerrs[ct], ot)
+      if relerrs[ct][ot] isa Number
+         return 100*relerrs[ct][ot]
+      end
+   end
+   return NaN
+end
+
+function _err(errs, ct, ot)
+   if  haskey(errs[ct], ot)
+      if errs[ct][ot] isa Number
+         return errs[ct][ot]
+      end
+   end
+   return NaN
+end
 
 function _err_table(errs, relerrs, title)
    lentitle = length(title)
