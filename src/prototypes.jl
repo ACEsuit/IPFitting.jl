@@ -125,7 +125,7 @@ create special weights for different observations, similar to
 for fitting
 """
 err_weighthook(::Val, d::Dat) = 1.0
-err_weighthook(s::String, d::Dat) = weighthook(Val(Symbol(s)), d)
+err_weighthook(s::String, d::Dat) = err_weighthook(Val(Symbol(s)), d)
 
 
 const BASIS = Val{:basis}
