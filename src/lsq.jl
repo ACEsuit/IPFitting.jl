@@ -371,7 +371,7 @@ end
 
 function asm_fitinfo(db, c, Ibasis, configweights, obsweights,
                      Vref, solver, E0, regularisers, verbose,
-                     Itrain, Itest)
+                     Itrain = :, Itest = nothing)
    if Ibasis isa Colon
       Jbasis = collect(1:length(db.basis))
    else
