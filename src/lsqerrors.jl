@@ -31,7 +31,8 @@ mae_table( data::AbstractVector{Dat}) =  mae_table( mae(data)...)
 rmse_table(D::Dict) = rmse_table(rmse(D)...)
 mae_table(D::Dict) =  mae_table( mae(D)...)
 
-rmse_table(errs::Dict, errs_rel::Dict) = _err_table(errs, errs_rel, "RMSE")
+rmse_table(errs::Dict, errs_rel::Dict; configtypes=:) =
+   _err_table(errs, errs_rel, "RMSE", configtypes)
 mae_table(errs::Dict, errs_rel::Dict) = _err_table(errs, errs_rel, "MAE")
 
 
@@ -111,7 +112,7 @@ function _err(errs, ct, ot)
    return NaN
 end
 
-function _err_table(errs, relerrs, title)
+function _err_table(errs, relerrs, title, configtypes=:)
    lentitle = length(title)
    print("┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n")
    print("┃ "); printstyled(title; bold=true);
@@ -121,6 +122,12 @@ function _err_table(errs, relerrs, title)
    print("┠──────────────╂────────┬────────┼────────┬────────┼────────┬────────┨\n")
    s_set = ""
    for ct in keys(errs)  # ct in configtypes
+      if (configtypes != :)
+         if !(ct in configtypes)
+            continue
+         end
+      end 
+
       s = @sprintf("┃ %12s ┃ %6.4f ┊ %5.2f%% │ %6.3f ┊ %5.2f%% │ %6.3f ┊ %5.2f%% ┃\n",
          truncate_string(ct, 12),
          _err(errs, ct, "E"), _relerr(relerrs, ct, "E"),
