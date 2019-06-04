@@ -380,11 +380,14 @@ function asm_fitinfo(db, c, Ibasis, configweights, obsweights,
    # compute errors TODO: still need to fix this!
    verbose && @info("Assemble errors table")
    @warn("new error implementation... redo this part please ")
+   if Vref == nothing
+      Vref=OneBody(E0)
+   end
    errs = Err.lsqerrors(db, c, Jbasis;
-            cfgtypes=keys(configweights), Vref=OneBody(E0), Icfg=Itrain)
+            cfgtypes=keys(configweights), Vref=Vref, Icfg=Itrain)
    if Itest != nothing
       errtest = Err.lsqerrors(db, c, Jbasis;
-               cfgtypes=keys(configweights), Vref=OneBody(E0), Icfg=Itest)
+               cfgtypes=keys(configweights), Vref=Vref, Icfg=Itest)
    else
       errtest = Dict()
    end
