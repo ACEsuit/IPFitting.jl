@@ -41,20 +41,8 @@ export lsqfit, onb
 
 
 
-function _random_subset(db::LsqDB, configtype::AbstractString, p::Real)
-   @assert 0 <= p <= 1
-   # number of configurations in db for this configtype
-   nconfigs = _nconfigs(db, configtype)
-   # number of samples we want
-   nsamples = ceil(Int, p * nconfigs)
-   # draw a random subset
-   return StatsBase.sample(1:nconfigs, nsamples, replace = false, ordered = true)
-end
-
-
-
 """
-`observations(db::LsqDB, configweights::Dict, obsweights::Dict, Vref) -> Vector{Float64}`
+`collect_observations(db::LsqDB, configweights::Dict, obsweights::Dict, Vref) -> Vector{Float64}`
 
 construct a vector of observations from the database `db`, specifically from
 `db.data`. Only those configurations are considered whose config_type is
@@ -71,14 +59,12 @@ function collect_observations(db::LsqDB,
    W = zeros(Float64, nrows)
    Icfg = zeros(Int, nrows)
    for (obskey, dat, icfg) in observations(db)  # obskey ∈ {"E","F",...}; d::Dat
-      if !haskey(obsweights, obskey)
-         continue
-      end
+      # check that we want to fit this observation
+      if !haskey(obsweights, obskey); continue; end
+      if !haskey(configweights, configtype(dat)); continue; end
+
       irows = matrows(dat, obskey)
       ct = configtype(dat)
-      if !haskey(configweights, ct) #check that we want to fit this configuration
-         continue
-      end
 
       # ----- Observation ------
       obs = observation(obskey, dat)
