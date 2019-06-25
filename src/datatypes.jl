@@ -53,12 +53,21 @@ const _IV = [1,5,9,6,3,2]
 const _IVst = SVector(1,5,9,6,3,2)
 const VIRIAL = "V"
 const ValV = Val{:V}
-vec_obs(::ValV, v::AbstractVector) = (@assert length(v) == 6; collect(v))
+vec_obs(::ValV, v::AbstractVector{<: Real}) = (@assert length(v) == 6; collect(v))
 vec_obs(::ValV, V::AbstractMatrix) = (@assert size(V) == (3,3); V[_IV])
 devec_obs(::ValV, x::AbstractVector) =
    SMatrix{3,3}(x[1], x[6], x[5], x[6], x[2], x[4], x[5], x[4], x[3])
 eval_obs(::ValV, B, at) = virial(B, at)
 weighthook(::ValV, d::Dat) = 1.0 / length(d.at)
 err_weighthook(::ValV, d::Dat) = 1.0 / length(d.at)
+
+function vec_obs(valV::ValV, V::AbstractVector{<: AbstractMatrix})
+   nbasis = length(V)
+   Vmat = zeros(6, nbasis)
+   for ib = 1:nbasis
+      Vmat[:, ib] .= vec_obs(valV, V[ib])
+   end
+   return Vmat
+end
 
 end
