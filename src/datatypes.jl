@@ -23,6 +23,8 @@ eval_obs(::ValE, B, at) = energy(B, at)
 weighthook(::ValE, d::Dat) = 1.0 / length(d.at)
 err_weighthook(::ValE, d::Dat) = 1.0 / length(d.at)
 
+vec_obs(::ValE, E::Vector{<: Real}) = E
+
 # ------------------- FORCES ------------------
 
 const FORCES = "F"
@@ -31,6 +33,16 @@ vec_obs(v::ValF, F::AbstractVector{<:JVec}) = vec_obs(v, mat(F))
 vec_obs(::ValF, F::AbstractMatrix) = vec(F)
 devec_obs(::ValF, x::AbstractVector) = vecs(reshape(x, 3, :))
 eval_obs(::ValF, B, at) = forces(B, at)
+
+function vec_obs(valF::ValF, F::Vector{<: Vector})
+   nbasis = length(F)
+   nat = length(F[1])
+   Fmat = zeros(3*nat, nbasis)
+   for ib = 1:nbasis
+      Fmat[:, ib] .= vec_obs(valF, F[ib])
+   end
+   return Fmat
+end
 
 # ------------------- VIRIAL ------------------
 # using Voigt convention for vectorising  symmetric 3 x 3 matrix

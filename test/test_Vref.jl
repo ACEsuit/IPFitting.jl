@@ -1,3 +1,4 @@
+# TODO: review and rewrite this!
 
 using NBodyIPs, JuLIP, Test, IPFitting, DataFrames
 using JuLIP.Potentials: evaluate_d

@@ -1,3 +1,4 @@
+# TODO: review and rewrite this
 
 using NBodyIPs, JuLIP, Test, IPFitting
 using JuLIP.Potentials: evaluate_d

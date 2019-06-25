@@ -48,6 +48,7 @@ using Base.Threads:          SpinLock, nthreads
 using StaticArrays:          SVector
 using JuLIP:                 AbstractCalculator, AbstractAtoms, Atoms,
                              save_json, load_json, decode_dict
+using JuLIP.MLIPs:           IPBasis
 using IPFitting:        Dat, LsqDB, basis, eval_obs, observations,
                              observation, vec_obs, devec_obs,
                              tfor_observations
@@ -102,7 +103,7 @@ function save_info(dbpath::String, db)
    _backupfile(infofile(dbpath))
    save_json(infofile(dbpath),
              Dict("version" => VERSION,
-                  "basis" => Dict.(db.basis),
+                  "basis" => Dict(db.basis),
                   "configs" => Dict.(db.configs))
             )
    return nothing
@@ -235,7 +236,7 @@ function safe_append!(db::LsqDB, db_lock, cfg, okey)
    irows = matrows(cfg, okey)
    # but writing them into the DB must be done in a threadsafe way
    lock(db_lock)
-   db.Ψ[irows, :] .= vec_lsqrow
+   db.Ψ[irows, :] = vec_lsqrow
    unlock(db_lock)
    return nothing
 end

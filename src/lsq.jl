@@ -117,7 +117,8 @@ end
 
 
 function _regularise!(Ψ::Matrix{T}, Y::Vector{T}, basis, regularisers;
-                      verbose=false) where {T}
+                      verbose=false, Ibasis = :) where {T}
+   # TODO: incorporate Ibasis again !
    # assemble the regularisers
    Ψreg = Matrix{Float64}(undef, 0, size(Ψ, 2))
    Yreg = Float64[]
@@ -198,8 +199,8 @@ E0, Ibasis`.
    lmul!(Diagonal(W), Ψ)
 
    # regularise
-   if regularisers != nothing
-      Ψ, Y = _regularise!(Ψ, Y, db.basis[Ibasis], regularisers; verbose=verbose)
+   if !isempty(regularisers)
+      Ψ, Y = _regularise!(Ψ, Y, db.basis, regularisers; verbose=verbose, Ibasis=Ibasis)
    end
 
    # this should be it ...
@@ -340,22 +341,20 @@ to display these as tables and `rmse, mae` to access individual errors.
       @info("Relative RMSE on training set: $rel_rms")
    end
 
-   infodict = asm_fitinfo(db, c, Ibasis, configweights, obsweights,
+   IP = JuLIP.MLIPs.combine(db.basis, c)
+   if (Vref != nothing) && (Vref != OneBody(0.0))
+      IP = SumIP(Vref, IP)
+   end
+
+   infodict = asm_fitinfo(db, IP, c, Ibasis, configweights, obsweights,
                           Vref, solver, E0, regularisers, verbose,
                           Itrain, Itest)
 
-   if Vref != nothing
-      basis = [ Vref; db.basis[Ibasis] ]
-      c = [1.0; c]
-   else
-      basis = db.basis[Ibasis]
-   end
-
-   return combineIP(basis, c), infodict
+   return IP, infodict
 end
 
 
-function asm_fitinfo(db, c, Ibasis, configweights, obsweights,
+function asm_fitinfo(db, IP, c, Ibasis, configweights, obsweights,
                      Vref, solver, E0, regularisers, verbose,
                      Itrain = :, Itest = nothing)
    if Ibasis isa Colon
@@ -373,13 +372,6 @@ function asm_fitinfo(db, c, Ibasis, configweights, obsweights,
                cfgtypes=keys(configweights), Vref=OneBody(E0), Icfg=Itest)
    else
       errtest = Dict()
-   end
-
-   if Vref != nothing
-      basis = [ Vref; db.basis[Jbasis] ]
-      c = [1.0; c]
-   else
-      basis = db.basis[Jbasis]
    end
 
    # --------------------------------------------------------------------
