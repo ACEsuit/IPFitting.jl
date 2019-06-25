@@ -26,6 +26,7 @@ import JuLIP, IPFitting, StatsBase
 using StaticArrays
 using JuLIP: AbstractCalculator, Atoms
 using JuLIP.Potentials: OneBody
+using JuLIP.MLIPs: SumIP
 using IPFitting: Dat, LsqDB, weighthook, observations,
                       observation, hasobservation, eval_obs, vec_obs
 using IPFitting.Data: configtype
