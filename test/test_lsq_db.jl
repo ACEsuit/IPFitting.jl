@@ -17,8 +17,8 @@ end
 
 ##
 println("Double-Check (de-)dictionisation of basis: ")
-basis1 = SHIPBasis(2, 15, 2.0, PolyTransform(2, 1.3), 2, 0.5, 3.0)
-basis2 = SHIPBasis(3, 13, 2.0, PolyTransform(3, 1.0), 2, 0.5, 3.0)
+basis1 = SHIPBasis(TotalDegree(15, 2.0), 2, PolyTransform(2, 1.3), 2, 0.5, 3.0)
+basis2 = SHIPBasis(TotalDegree(13, 2.0), 3, PolyTransform(3, 1.0), 2, 0.5, 3.0)
 B = IPSuperBasis(basis1, basis2)
 println(@test decode_dict( Dict( basis1 ) ) == basis1)
 println(@test decode_dict( Dict( basis2 ) ) == basis2)

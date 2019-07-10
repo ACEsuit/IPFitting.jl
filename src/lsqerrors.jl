@@ -126,7 +126,7 @@ function _err_table(errs, relerrs, title, configtypes=:)
          if !(ct in configtypes)
             continue
          end
-      end 
+      end
 
       s = @sprintf("┃ %12s ┃ %6.4f ┊ %5.2f%% │ %6.3f ┊ %5.2f%% │ %6.3f ┊ %5.2f%% ┃\n",
          truncate_string(ct, 12),
