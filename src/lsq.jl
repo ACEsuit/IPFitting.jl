@@ -322,6 +322,7 @@ to display these as tables and `rmse, mae` to access individual errors.
       qrΨ = qr(Ψ)
       verbose && @info("cond(R) = $(cond(qrΨ.R))")
       c = qrΨ \ Y
+      qrΨ = nothing; GC.gc(); 
 
    elseif solver[1] == :svd
       verbose && @info("solve $(size(Ψ)) LSQ system using SVD factorisation")
@@ -341,6 +342,8 @@ to display these as tables and `rmse, mae` to access individual errors.
       rel_rms = norm(Ψ * c - Y) / norm(Y)
       @info("Relative RMSE on training set: $rel_rms")
    end
+
+   Ψ = nothing; GC.gc()
 
    IP = JuLIP.MLIPs.combine(db.basis, c)
    if (Vref != nothing) && (Vref != OneBody(0.0))
