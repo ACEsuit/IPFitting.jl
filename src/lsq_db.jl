@@ -281,7 +281,7 @@ configtypes(db::LsqDB) = unique(configtype.(db.configs))
 _nconfigs(db::LsqDB, ct::AbstractString) =
    length(find(configtype.(db.configs) .== ct))
 
-
+# TODO: rewrite this!
 function info(db::LsqDB)
    # config names, how many
    all_cts = configtype.(db.configs)

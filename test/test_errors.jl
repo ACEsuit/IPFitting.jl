@@ -32,7 +32,7 @@ data = [data1; data2]
 @info("generate a 3B fit to SW")
 b3basis(deg) = IPSuperBasis(
       PairBasis(deg, PolyTransform(2, r0), 2, cutoff(calc)),
-      SHIPBasis(2, deg, 1.5, PolyTransform(3, r0), 2, 0.5*r0, cutoff(calc))
+      SHIPBasis(TotalDegree(deg, 1.5), 2, PolyTransform(3, r0), 2, 0.5*r0, cutoff(calc))
    )
 B = b3basis(10)
 @show length(B)
