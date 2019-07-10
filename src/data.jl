@@ -29,7 +29,7 @@ ase_io = ASE.ase_io
 
 export configtype, weight, load_data
 
-Atoms(d) = d.at
+Atoms(d::Dat) = d.at
 length(d::Dat) = length(d.at)
 configtype(d::Dat) = d.configtype
 energy(d::Dat) = haskey(d.D, ENERGY) ? devec_obs(Val(:E), d.D[ENERGY]) : nothing
