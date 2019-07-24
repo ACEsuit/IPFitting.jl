@@ -24,11 +24,8 @@ StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 
 [compat]
-ASE = "≥0.3"
-JuLIP = "≥0.6"
-NeighbourLists = "≥0.3"
-PyCall = "≥1.90"
-julia = "≥0.7"
+ASE = "≥ 0.5"
+julia = "1"
 
 [extras]
 # NBodyIPs = "091ff95d-640b-5850-a1f5-612e1cfea893"

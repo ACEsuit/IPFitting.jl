@@ -26,10 +26,9 @@ calc = StillingerWeber()
 data = generate_data(:Si, 2, 0.33*r0, 100, calc)
 
 # 2 stands for 2 neighbours i.e. body-order 3
-b3basis(deg) = IPSuperBasis(
-      PairBasis(deg, PolyTransform(2, r0), 2, cutoff(calc)),
-      SHIPBasis(TotalDegree(deg, 1.5), 2, PolyTransform(3, r0), 2, 0.5*r0, cutoff(calc))
-   )
+b3basis(deg) = SHIPBasis(TotalDegree(deg, 1.5), 2,
+                         PolyTransform(2, r0),
+                         PolyCutoff1s(2, cutoff(calc)))
 
 ##
 err_erms = Float64[]

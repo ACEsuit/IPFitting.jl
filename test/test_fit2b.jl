@@ -30,8 +30,11 @@ data = generate_data(:Cu, 3, 0.25*r0, 70, calc)
 rcut2 = cutoff(calc)
 
 trans = PolyTransform(3, r0)
-pairbasis(deg) = PairBasis(deg, trans, 2, rcut2)
+fcut = PolyCutoff1s(2, rcut2)
+# pairbasis(deg) = PairBasis(deg, trans, fcut)
+pairbasis(deg) = SHIPBasis( TotalDegree(deg, 1.0), 1, trans, fcut)
 
+pairbasis(10)
 
 ##
 degrees = [4, 7, 10, 13, 16, 19]
@@ -74,9 +77,10 @@ for solve_met in [(:qr,), (:rrqr, 1e-12)]
       Err.rmse_table(rmse(errs)...)
       @info("Test Errors")
       Err.rmse_table(rmse(errs_test)...)
-      V2 = IP # .components[2]
+      V2 = r -> JuLIP.Potentials.evaluate(IP, [r*JVec(1.0,0.0,0.0)])
+      dV2 = r -> JuLIP.Potentials.evaluate_d(IP, [r*JVec(1.0,0.0,0.0)])[1]
       ev2 = norm(V2.(rr) - 0.5 * calc.(rr), Inf)
-      dev2 = norm(evaluate_d.(Ref(V2), rr) - 0.5 * evaluate_d.(Ref(calc), rr), Inf)
+      dev2 = norm(dV2.(rr) - 0.5 * evaluate_d.(Ref(calc), rr), Inf)
       println("   V2 - uniform error = ", ev2, " | ", dev2)
       push!(err_eunif, ev2)
       push!(err_funif, dev2)
