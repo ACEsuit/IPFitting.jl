@@ -23,21 +23,21 @@ end
 
 Random.seed!(1)
 r0 = rnn(:Cu)
+z0 = atomic_number(:Cu)
 calc = let r0=r0
    LennardJones(r0=r0) * C2Shift(2.5*r0)
 end
 data = generate_data(:Cu, 3, 0.25*r0, 70, calc)
 rcut2 = cutoff(calc)
 
-trans = PolyTransform(3, r0)
-fcut = PolyCutoff1s(2, rcut2)
-# pairbasis(deg) = PairBasis(deg, trans, fcut)
-pairbasis(deg) = SHIPBasis( TotalDegree(deg, 1.0), 1, trans, fcut)
-
-pairbasis(10)
+trans = PolyTransform(1, r0)
+fcut = PolyCutoff2s(2, 0.5*r0, rcut2)
+pairbasis(deg) = SHIPBasis( SparseSHIP(1, :Cu, deg, 1.0), trans, fcut)
 
 ##
 degrees = [4, 7, 10, 13, 16, 19]
+
+IPt = nothing
 
 for solve_met in [(:qr,), (:rrqr, 1e-12)]
    global err_eunif = Float64[]
@@ -48,7 +48,7 @@ for solve_met in [(:qr,), (:rrqr, 1e-12)]
    ptrain = 0.8
 
    for d in degrees
-      rr = range(0.9*r0, stop=cutoff(calc), length=200)
+      rr = range(0.9*r0, cutoff(calc), length=200)
       global err_eunif
       global err_funif
       global err_erms
@@ -77,8 +77,8 @@ for solve_met in [(:qr,), (:rrqr, 1e-12)]
       Err.rmse_table(rmse(errs)...)
       @info("Test Errors")
       Err.rmse_table(rmse(errs_test)...)
-      V2 = r -> JuLIP.Potentials.evaluate(IP, [r*JVec(1.0,0.0,0.0)])
-      dV2 = r -> JuLIP.Potentials.evaluate_d(IP, [r*JVec(1.0,0.0,0.0)])[1]
+      V2 = r -> JuLIP.Potentials.evaluate(IP, [r*JVec(1.0,0.0,0.0)], [z0,], z0)
+      dV2 = r -> JuLIP.Potentials.evaluate_d(IP, [r*JVec(1.0,0.0,0.0)], [z0,], z0)[1][1]
       ev2 = norm(V2.(rr) - 0.5 * calc.(rr), Inf)
       dev2 = norm(dV2.(rr) - 0.5 * evaluate_d.(Ref(calc), rr), Inf)
       println("   V2 - uniform error = ", ev2, " | ", dev2)
@@ -88,7 +88,6 @@ for solve_met in [(:qr,), (:rrqr, 1e-12)]
       push!(err_frms, errs["rmse"]["rand"]["F"])
    end
 
-
    df = DataFrame( :degrees => degrees,
                           :unif_E => err_eunif,
                           :unif_F => err_funif,
@@ -96,26 +95,8 @@ for solve_met in [(:qr,), (:rrqr, 1e-12)]
                           :rms_F => err_frms )
 
    display(df)
-   (@test minimum(err_erms) < 1e-4) |> println
-   (@test minimum(err_frms) < 1e-3) |> println
-   (@test minimum(err_eunif) < 1e-3) |> println
-   (@test minimum(err_funif) < 1e-3) |> println
+   (@test minimum(err_erms) < 1e-6) |> println
+   (@test minimum(err_frms) < 2e-4) |> println
+   (@test minimum(err_eunif) < 2e-5) |> println
+   (@test minimum(err_funif) < 1e-4) |> println
 end
-
-
-## OLD DEBUGGING CODE
-
-# B2 = pairbasis(10)
-# @show length(B2)
-# db = LsqDB("", B2, data)
-# Itrain, Itest = splittraintest(db)
-# @test isempty(intersect(Itrain, Itest))
-# @test sort(union(Itrain, Itest)) == 1:length(db.configs)
-#
-# IP, fitinfo = Lsq.lsqfit(db, E0 = 0.0,
-#                          Itrain = Itrain,
-#                          Itest = Itest,
-#                          configweights = Dict("rand" => 1.0),
-#                          obsweights   = Dict("E" => 100.0, "F" => 1.0)
-#           )
-#

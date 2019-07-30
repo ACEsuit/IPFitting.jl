@@ -30,10 +30,10 @@ data = [data1; data2]
 
 ##
 @info("generate a 3B fit to SW")
-b3basis(deg) = IPSuperBasis(
-      PairBasis(deg, PolyTransform(2, r0), 2, cutoff(calc)),
-      SHIPBasis(TotalDegree(deg, 1.5), 2, PolyTransform(3, r0), 2, 0.5*r0, cutoff(calc))
-   )
+b3basis(deg) = SHIPBasis( SparseSHIP(2, :Si, deg, 1.5),
+                          PolyTransform(2, r0),
+                          PolyCutoff2s(2, 0.5*r0, cutoff(calc))
+                        )
 B = b3basis(10)
 @show length(B)
 db = LsqDB("", B, data)
@@ -42,7 +42,7 @@ IP, fitinfo = lsqfit( db,
                    configweights = Dict("rand1" => 1.0, "rand2" => 0.5),
                    obsweights   = Dict("E" => 100.0, "F" => 1.0),
                    verbose=true,
-                   solver = (:rrqr, 1e-7) )
+                   solver = (:rrqr, 1e-5) )
 # note we are using RRQR here to make sure the fit is well-conditioned!
 
 # IPf = fast(IP)

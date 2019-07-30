@@ -26,9 +26,9 @@ calc = StillingerWeber()
 data = generate_data(:Si, 2, 0.33*r0, 100, calc)
 
 # 2 stands for 2 neighbours i.e. body-order 3
-b3basis(deg) = SHIPBasis(TotalDegree(deg, 1.5), 2,
+b3basis(deg) = SHIPBasis(SparseSHIP(2, :Si, deg, 1.5),
                          PolyTransform(2, r0),
-                         PolyCutoff1s(2, cutoff(calc)))
+                         PolyCutoff2s(2, 0.5*r0, cutoff(calc)))
 
 ##
 err_erms = Float64[]
@@ -53,5 +53,5 @@ df = DataFrame( :degrees => degrees,
                 :relrms_F => err_frms )
 display(df)
 
-(@test minimum(err_erms) < 1e-4) |> println
-(@test minimum(err_frms) < 1e-2) |> println
+(@test minimum(err_erms) < 2e-5) |> println
+(@test minimum(err_frms) < 5e-3) |> println

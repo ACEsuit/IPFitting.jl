@@ -322,7 +322,7 @@ to display these as tables and `rmse, mae` to access individual errors.
       qrΨ = qr(Ψ)
       verbose && @info("cond(R) = $(cond(qrΨ.R))")
       c = qrΨ \ Y
-      qrΨ = nothing; GC.gc(); 
+      qrΨ = nothing; GC.gc();
 
    elseif solver[1] == :svd
       verbose && @info("solve $(size(Ψ)) LSQ system using SVD factorisation")

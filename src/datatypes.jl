@@ -20,7 +20,7 @@ const ValE = Val{:E}
 vec_obs(::ValE, E::Real) = [E]
 devec_obs(::ValE, x::AbstractVector) = ((@assert length(x) == 1); x[1])
 eval_obs(::ValE, B, at) = energy(B, at)
-weighthook(::ValE, d::Dat) = 1.0 / length(d.at)
+weighthook(::ValE, d::Dat) = 1.0 / sqrt(length(d.at))
 err_weighthook(::ValE, d::Dat) = 1.0 / length(d.at)
 
 vec_obs(::ValE, E::Vector{<: Real}) = E
@@ -58,7 +58,7 @@ vec_obs(::ValV, V::AbstractMatrix) = (@assert size(V) == (3,3); V[_IV])
 devec_obs(::ValV, x::AbstractVector) =
    SMatrix{3,3}(x[1], x[6], x[5], x[6], x[2], x[4], x[5], x[4], x[3])
 eval_obs(::ValV, B, at) = virial(B, at)
-weighthook(::ValV, d::Dat) = 1.0 / length(d.at)
+weighthook(::ValV, d::Dat) = 1.0 / sqrt(length(d.at))
 err_weighthook(::ValV, d::Dat) = 1.0 / length(d.at)
 
 function vec_obs(valV::ValV, V::AbstractVector{<: AbstractMatrix})
