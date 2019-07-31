@@ -41,5 +41,6 @@ include("lsq.jl")
 # include("weights.jl")
 # @reexport using IPFitting.Weights
 
+include("aux.jl")
 
 end # module
