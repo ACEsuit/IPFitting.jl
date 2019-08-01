@@ -128,7 +128,7 @@ function _err_table(errs, relerrs, title, configtypes=:)
          end
       end
 
-      s = @sprintf("┃ %12s ┃ %6.1f ┊ %5.3f%% │ %6.3f ┊ %5.2f%% │ %6.1f ┊ %5.2f%% ┃\n",
+      s = @sprintf("┃ %12s ┃ %6.2f ┊ %5.3f%% │ %6.3f ┊ %5.2f%% │ %6.1f ┊ %5.2f%% ┃\n",
          truncate_string(ct, 12),
          _err(errs, ct, "E")*1000, _relerr(relerrs, ct, "E"),
          _err(errs, ct, "F"), _relerr(relerrs, ct, "F"),
