@@ -59,7 +59,7 @@ function add_fits!(IP, configs::Vector{Dat}; fitkey = "fit")
    end
    tfor_observations( configs,
          (n, okey, cfg, lck) -> begin
-            obs = vec_obs(okey, eval_obs(okey, IP, cfg.at))
+            obs = vec_obs(okey, eval_obs(okey, IP, cfg))
             lock(lck)
             cfg.info[fitkey][okey] = obs
             unlock(lck)
@@ -76,7 +76,7 @@ function add_fits_serial!(IP, configs::Vector{Dat}; fitkey = "fit")
       cfg.info[fitkey] = Dict{String, Vector{Float64}}()
    end
    for (okey, cfg, _) in observations(configs)
-      obs = vec_obs(okey, eval_obs(okey, IP, cfg.at))
+      obs = vec_obs(okey, eval_obs(okey, IP, cfg))
       cfg.info[fitkey][okey] = obs
    end
    return nothing
@@ -259,7 +259,7 @@ end
       o = observation(dat, okey)
       # correct the observation if we are fitting from a reference potential
       if Vref != nothing
-         o -= vec_obs(okey, eval_obs(okey, Vref, dat.at))
+         o -= vec_obs(okey, eval_obs(okey, Vref, dat))
       end
       append!(y, o)
       # get the lsq block

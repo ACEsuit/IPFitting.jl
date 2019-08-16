@@ -74,7 +74,7 @@ function collect_observations(db::LsqDB,
       if haskey(dat.info, "Vref")
          obs = obs - dat.info["Vref"][obskey]
       elseif Vref != nothing
-         obs = obs - vec_obs(obskey, eval_obs(obskey, Vref, Atoms(dat)))
+         obs = obs - vec_obs(obskey, eval_obs(obskey, Vref, dat))
       end
       Y[irows] .= obs
       Icfg[irows] .= icfg

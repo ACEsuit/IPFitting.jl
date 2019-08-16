@@ -13,17 +13,22 @@ devec_obs(s::AbstractString, args...) = devec_obs(Val(Symbol(s)), args...)
 eval_obs(s::AbstractString, args...) = eval_obs(Val(Symbol(s)), args...)
 weighthook(s::AbstractString, args...) = weighthook(Val(Symbol(s)), args...)
 
+# ------------------- DEFAULTS ------------------
+
+vec_obs(::Val, x::AbstractVector{<: AbstractFloat}) = collect(x)
+devec_obs(::Val,  x::AbstractVector) = x
+
 # ------------------- ENERGY ------------------
 
 const ENERGY = "E"
 const ValE = Val{:E}
 vec_obs(::ValE, E::Real) = [E]
+vec_obs(::ValE, E::Vector{<: Real}) = E
 devec_obs(::ValE, x::AbstractVector) = ((@assert length(x) == 1); x[1])
-eval_obs(::ValE, B, at) = energy(B, at)
+eval_obs(::ValE, B, dat::Dat) = energy(B, dat.at)
 weighthook(::ValE, d::Dat) = 1.0 / sqrt(length(d.at))
 err_weighthook(::ValE, d::Dat) = 1.0 / length(d.at)
 
-vec_obs(::ValE, E::Vector{<: Real}) = E
 
 # ------------------- FORCES ------------------
 
@@ -32,7 +37,7 @@ const ValF = Val{:F}
 vec_obs(v::ValF, F::AbstractVector{<:JVec}) = vec_obs(v, mat(F))
 vec_obs(::ValF, F::AbstractMatrix) = vec(F)
 devec_obs(::ValF, x::AbstractVector) = vecs(reshape(x, 3, :))
-eval_obs(::ValF, B, at) = forces(B, at)
+eval_obs(::ValF, B, dat::Dat) = forces(B, dat.at)
 
 function vec_obs(valF::ValF, F::Vector{<: Vector})
    nbasis = length(F)
@@ -57,7 +62,7 @@ vec_obs(::ValV, v::AbstractVector{<: Real}) = (@assert length(v) == 6; collect(v
 vec_obs(::ValV, V::AbstractMatrix) = (@assert size(V) == (3,3); V[_IV])
 devec_obs(::ValV, x::AbstractVector) =
    SMatrix{3,3}(x[1], x[6], x[5], x[6], x[2], x[4], x[5], x[4], x[3])
-eval_obs(::ValV, B, at) = virial(B, at)
+eval_obs(::ValV, B, dat::Dat) = virial(B, dat.at)
 weighthook(::ValV, d::Dat) = 1.0 / sqrt(length(d.at))
 err_weighthook(::ValV, d::Dat) = 1.0 / length(d.at)
 
@@ -69,5 +74,7 @@ function vec_obs(valV::ValV, V::AbstractVector{<: AbstractMatrix})
    end
    return Vmat
 end
+
+
 
 end
