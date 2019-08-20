@@ -177,8 +177,8 @@ E0, Ibasis`.
    # and (b) the configuration index is part of the training set
    Irows = intersect(findall(W .!= 0) |> sort, findall(in.(Icfg, Ref(Itrain))))
 
-   # we can't keep this a view since we need to multiply by weights
-   Ψ = db.Ψ[Irows, Icols]
+   # we make this a view but make sure to copy it before applying the weights
+   Ψ = @view db.Ψ[Irows, Icols]
    Y = Y[Irows]
    W = W[Irows]
 
@@ -193,53 +193,57 @@ E0, Ibasis`.
       @error("discovered NaNs in LSQ system matrix")
    end
 
-   # now rescale Y and Ψ according to W => Y_W, Ψ_W; then the two systems
-   #   \| Y_W - Ψ_W c \| -> min  and \| W (Y - Ψ*c)^T \| -> min
-   # are equivalent
-   @. Y = Y * W
-   lmul!(Diagonal(W), Ψ)
-
    # regularise
    if !isempty(regularisers)
       Ψ, Y = _regularise!(Ψ, Y, db.basis, regularisers; verbose=verbose, Ibasis=Ibasis)
+      # adjust the weight-vector to the new system size
+      append!(W, ones(length(Y)-length(W)))
+   else
+      Ψ = collect(Ψ)
    end
+
+   # now rescale Y and Ψ according to W => Y_W, Ψ_W; then the two systems
+   #   \| Y_W - Ψ_W c \| -> min  and \| W (Y - Ψ*c)^T \| -> min
+   # are equivalent
+   Y .= Y .* W
+   lmul!(Diagonal(W), Ψ)
 
    # this should be it ...
    return Ψ, Y
 end
 
 
-@noinline function onb(db::LsqDB;
-                         solver=(:qr, ), verbose=true,
-                         Ibasis = :,
-                         Itrain = :,
-                         E0 = nothing,
-                         Vref = OneBody(E0),
-                         configweights = nothing,
-                         obsweights = nothing,
-                         regularisers = [],
-                         combineIP = nothing,
-                         kwargs...)
-
-   verbose && @info("assemble lsq system")
-   Ψ, _ = get_lsq_system(db; verbose=verbose, Vref=Vref,
-                             Ibasis=Ibasis, Itrain=Itrain,
-                             configweights = configweights,
-                             obsweights = obsweights,
-                             regularisers = regularisers,
-                             kwargs...)
-   @assert solver[1] == :qr
-   verbose && @info("QR-factorize Ψ, size=$(size(Ψ))")
-   qrΨ = qr(Ψ)
-   verbose && @info("cond(R) = $(cond(qrΨ.R))")
-   Rinv = pinv(qrΨ.R)
-   basis = db.basis[Ibasis]
-   onb = []
-   for n = 1:size(Rinv, 2)
-      push!(onb, combineIP(basis, Rinv[:,n]))
-   end
-   return [b for b in onb]
-end
+# @noinline function onb(db::LsqDB;
+#                          solver=(:qr, ), verbose=true,
+#                          Ibasis = :,
+#                          Itrain = :,
+#                          E0 = nothing,
+#                          Vref = OneBody(E0),
+#                          configweights = nothing,
+#                          obsweights = nothing,
+#                          regularisers = [],
+#                          combineIP = nothing,
+#                          kwargs...)
+#
+#    verbose && @info("assemble lsq system")
+#    Ψ, _ = get_lsq_system(db; verbose=verbose, Vref=Vref,
+#                              Ibasis=Ibasis, Itrain=Itrain,
+#                              configweights = configweights,
+#                              obsweights = obsweights,
+#                              regularisers = regularisers,
+#                              kwargs...)
+#    @assert solver[1] == :qr
+#    verbose && @info("QR-factorize Ψ, size=$(size(Ψ))")
+#    qrΨ = qr(Ψ)
+#    verbose && @info("cond(R) = $(cond(qrΨ.R))")
+#    Rinv = pinv(qrΨ.R)
+#    basis = db.basis[Ibasis]
+#    onb = []
+#    for n = 1:size(Rinv, 2)
+#       push!(onb, combineIP(basis, Rinv[:,n]))
+#    end
+#    return [b for b in onb]
+# end
 
 
 """
@@ -306,23 +310,36 @@ to display these as tables and `rmse, mae` to access individual errors.
                 obsweights = nothing,
                 regularisers = [],
                 combineIP = nothing,
+                deldb = false,
+                asmerrs = false,
                 kwargs...)
 
    Jbasis = ((Ibasis == Colon()) ? (1:length(db.basis)) : Ibasis)
 
    verbose && @info("assemble lsq system")
+   @show Sys.free_memory()*1e-9
    Ψ, Y = get_lsq_system(db; verbose=verbose, Vref=Vref, Ibasis=Ibasis, Itrain = Itrain,
                              configweights = configweights,
                              obsweights = obsweights,
                              regularisers = regularisers,
                              kwargs...)
+   @show Sys.free_memory()*1e-9
+   if deldb
+      @info("Deleting database - `db` can no longer be saved to disk")
+      db.Ψ = Matrix{Float64}(undef, 0,0)
+      db.dbpath = ""
+   end
+   GC.gc()
+   @show Sys.free_memory()*1e-9
 
    if (solver[1] == :qr) || (solver == :qr)
       verbose && @info("solve $(size(Ψ)) LSQ system using QR factorisation")
       qrΨ = qr(Ψ)
+      GC.gc();
       verbose && @info("cond(R) = $(cond(qrΨ.R))")
       c = qrΨ \ Y
-      qrΨ = nothing; GC.gc();
+      qrΨ = nothing
+      GC.gc()
 
    elseif solver[1] == :svd
       verbose && @info("solve $(size(Ψ)) LSQ system using SVD factorisation")
@@ -338,12 +355,16 @@ to display these as tables and `rmse, mae` to access individual errors.
       error("unknown `solver` in `lsqfit`")
    end
 
+   @show Sys.free_memory()*1e-9
+
    if verbose
       rel_rms = norm(Ψ * c - Y) / norm(Y)
       @info("Relative RMSE on training set: $rel_rms")
    end
 
-   Ψ = nothing; GC.gc()
+   # delete the lsq system and gc again
+   Ψ = nothing
+   GC.gc()
 
    IP = JuLIP.MLIPs.combine(db.basis, c)
    if (Vref != nothing) && (Vref != OneBody(0.0))
@@ -352,32 +373,33 @@ to display these as tables and `rmse, mae` to access individual errors.
 
    infodict = asm_fitinfo(db, IP, c, Ibasis, configweights, obsweights,
                           Vref, solver, E0, regularisers, verbose,
-                          Itrain, Itest)
-
+                          Itrain, Itest, asmerrs)
+   GC.gc()
    return IP, infodict
 end
 
 
 function asm_fitinfo(db, IP, c, Ibasis, configweights, obsweights,
                      Vref, solver, E0, regularisers, verbose,
-                     Itrain = :, Itest = nothing)
+                     Itrain = :, Itest = nothing, asmerrs=true)
    if Ibasis isa Colon
       Jbasis = collect(1:length(db.basis))
    else
       Jbasis = Ibasis
    end
    # compute errors TODO: still need to fix this!
-   verbose && @info("Assemble errors table")
-   @warn("new error implementation... redo this part please ")
-   errs = Err.lsqerrors(db, c, Jbasis;
-            cfgtypes=keys(configweights), Vref=OneBody(E0), Icfg=Itrain)
-   if Itest != nothing
-      errtest = Err.lsqerrors(db, c, Jbasis;
-               cfgtypes=keys(configweights), Vref=OneBody(E0), Icfg=Itest)
-   else
-      errtest = Dict()
+   if asmerrs
+      verbose && @info("Assemble errors table")
+      @warn("new error implementation... redo this part please ")
+      errs = Err.lsqerrors(db, c, Jbasis;
+               cfgtypes=keys(configweights), Vref=OneBody(E0), Icfg=Itrain)
+      if Itest != nothing
+         errtest = Err.lsqerrors(db, c, Jbasis;
+                  cfgtypes=keys(configweights), Vref=OneBody(E0), Icfg=Itest)
+      else
+         errtest = Dict()
+      end
    end
-
    # --------------------------------------------------------------------
    # ASSEMBLE INFO DICT
    # --------------------------------------------------------------------
@@ -388,9 +410,7 @@ function asm_fitinfo(db, IP, c, Ibasis, configweights, obsweights,
    versioninfo(iob)
    juliainfo = String(take!(iob))
 
-   infodict = Dict("errors" => errs,
-                   "errtest" => errtest,
-                   "solver" => String(solver[1]),
+   infodict = Dict("solver" => String(solver[1]),
                    "E0"     => E0,
                    "Ibasis" => Vector{Int}(Jbasis),
                    "c"      => c,
@@ -402,6 +422,11 @@ function asm_fitinfo(db, IP, c, Ibasis, configweights, obsweights,
                    "juliaversion"  => juliainfo,
                    "IPFitting_version" => get_pkg_info("IPFitting"),
                   )
+
+   if asmerrs
+      infodict["errors"] = errs
+      infodict["errtest"] = errtest
+   end
    # --------------------------------------------------------------------
    return infodict
 end

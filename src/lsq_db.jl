@@ -137,7 +137,7 @@ load_kron(dbpath::String; mmap=false) = _loadmath5(kronfile(dbpath))
 
 load_kron(db::LsqDB; mmap=false) = load_kron(dbpath(db); mmap=mmap)
 
-function LsqDB(dbpath::AbstractString; mmap=false)
+function LsqDB(dbpath::AbstractString; mmap=true)
    basis, configs = load_info(dbpath)
    Ψ = load_kron(dbpath; mmap=mmap)
    return LsqDB(basis, configs, Ψ, dbpath)

@@ -269,17 +269,17 @@ end
       e = block * c - y
       # compute the various errors for this ct/okey combination
       w = err_weighthook(okey, dat)
-      errs["rmse"][ct][okey] += w^2 * norm(e)^2
-      errs["nrm2"][ct][okey] += w^2 * norm(y)^2
-      errs["mae"][ct][okey]  += w * norm(e, 1)
-      errs["nrm1"][ct][okey] += w * norm(y, 1)
+      errs["rmse"][ct][okey] += norm(w .* e)^2
+      errs["nrm2"][ct][okey] += norm(w .* y)^2
+      errs["mae"][ct][okey]  += norm(w .* e, 1)
+      errs["nrm1"][ct][okey] += norm(w .* y, 1)
       errs["maxe"][ct][okey] = max(errs["maxe"][ct][okey], norm(e, Inf))
       errs["nrminf"][ct][okey] = max(errs["nrminf"][ct][okey], norm(y, Inf))
       lengths[ct][okey] += length(y)
-      errs["rmse"]["set"][okey] += w^2 * norm(e)^2
-      errs["nrm2"]["set"][okey] += w^2 * norm(y)^2
-      errs["mae"]["set"][okey]  += w * norm(e, 1)
-      errs["nrm1"]["set"][okey] += w * norm(y, 1)
+      errs["rmse"]["set"][okey] += norm(w .* e)^2
+      errs["nrm2"]["set"][okey] += norm(w .* y)^2
+      errs["mae"]["set"][okey]  += norm(w .* e, 1)
+      errs["nrm1"]["set"][okey] += norm(w .* y, 1)
       errs["maxe"]["set"][okey] = max(errs["maxe"]["set"][okey], norm(e, Inf))
       errs["nrminf"]["set"][okey] = max(errs["nrminf"]["set"][okey], norm(y, Inf))
       lengths["set"][okey] += length(y)
