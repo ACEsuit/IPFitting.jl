@@ -332,9 +332,11 @@ to display these as tables and `rmse, mae` to access individual errors.
    GC.gc()
    @show Sys.free_memory()*1e-9
 
+   κ = 0.0
    if (solver[1] == :qr) || (solver == :qr)
       verbose && @info("solve $(size(Ψ)) LSQ system using QR factorisation")
       qrΨ = qr(Ψ)
+      κ = cond(qrΨ.R)
       GC.gc();
       verbose && @info("cond(R) = $(cond(qrΨ.R))")
       c = qrΨ \ Y
@@ -374,6 +376,7 @@ to display these as tables and `rmse, mae` to access individual errors.
    infodict = asm_fitinfo(db, IP, c, Ibasis, configweights, obsweights,
                           Vref, solver, E0, regularisers, verbose,
                           Itrain, Itest, asmerrs)
+   infodict["kappa"] = κ
    GC.gc()
    return IP, infodict
 end
