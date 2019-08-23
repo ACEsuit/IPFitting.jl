@@ -26,7 +26,7 @@ calc = StillingerWeber()
 data = generate_data(:Si, 2, 0.33*r0, 100, calc)
 
 # 2 stands for 2 neighbours i.e. body-order 3
-b3basis(deg) = SHIPBasis(SparseSHIP(2, :Si, deg, 1.5),
+b3basis(deg) = SHIPBasis(SparseSHIP(:Si, 2, deg, wL=1.5),
                          PolyTransform(2, r0),
                          PolyCutoff2s(2, 0.5*r0, cutoff(calc)))
 
@@ -41,7 +41,8 @@ for deg in degrees
    IP, fitinfo = Lsq.lsqfit( db,
                          E0 = 0.0,
                          configweights = Dict("rand" => 1.0),
-                         obsweights   = Dict("E" => 100.0, "F" => 1.0) )
+                         obsweights   = Dict("E" => 100.0, "F" => 1.0),
+                         asmerrs = true )
    push!(err_erms, fitinfo["errors"]["relrmse"]["set"]["E"])
    push!(err_frms, fitinfo["errors"]["relrmse"]["set"]["F"])
 end

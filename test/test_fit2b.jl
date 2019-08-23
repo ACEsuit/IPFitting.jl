@@ -32,7 +32,7 @@ rcut2 = cutoff(calc)
 
 trans = PolyTransform(1, r0)
 fcut = PolyCutoff2s(2, 0.5*r0, rcut2)
-pairbasis(deg) = SHIPBasis( SparseSHIP(1, :Cu, deg, 1.0), trans, fcut)
+pairbasis(deg) = SHIPBasis( SparseSHIP(:Cu, 1, deg), trans, fcut)
 
 ##
 degrees = [4, 7, 10, 13, 16, 19]
@@ -68,7 +68,8 @@ for solve_met in [(:qr,), (:rrqr, 1e-12)]
                                Itest = Itest,
                                configweights = Dict("rand" => 1.0),
                                obsweights   = Dict("E" => 100.0, "F" => 1.0),
-                               solver = solve_met )
+                               solver = solve_met,
+                               asmerrs = true )
       @info("done fitting...")
       errs = fitinfo["errors"]
       errs_test = fitinfo["errtest"]
@@ -89,10 +90,10 @@ for solve_met in [(:qr,), (:rrqr, 1e-12)]
    end
 
    df = DataFrame( :degrees => degrees,
-                          :unif_E => err_eunif,
-                          :unif_F => err_funif,
-                          :rms_E => err_erms,
-                          :rms_F => err_frms )
+                   :unif_E => err_eunif,
+                   :unif_F => err_funif,
+                   :rms_E => err_erms,
+                   :rms_F => err_frms )
 
    display(df)
    (@test minimum(err_erms) < 1e-6) |> println

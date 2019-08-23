@@ -347,7 +347,6 @@ to display these as tables and `rmse, mae` to access individual errors.
          saveqr["Q"] = qrΨ.Q
          saveqr["R"] = qrΨ.R
          saveqr["Y"] = Y
-         saveqr["c"]
       end
 
       qrΨ = nothing
