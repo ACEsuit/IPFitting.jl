@@ -32,7 +32,7 @@ using IPFitting: Dat, LsqDB, weighthook, observations,
 using IPFitting.Data: configtype
 using IPFitting.DB: dbpath, _nconfigs, matrows
 
-using LinearAlgebra: lmul!, Diagonal, qr, cond, norm, svd
+using LinearAlgebra: lmul!, Diagonal, qr, qr!, cond, norm, svd
 using InteractiveUtils: versioninfo
 using LowRankApprox
 
@@ -312,6 +312,7 @@ to display these as tables and `rmse, mae` to access individual errors.
                 combineIP = nothing,
                 deldb = false,
                 asmerrs = false,
+                saveqr = nothing,
                 kwargs...)
 
    Jbasis = ((Ibasis == Colon()) ? (1:length(db.basis)) : Ibasis)
@@ -335,38 +336,48 @@ to display these as tables and `rmse, mae` to access individual errors.
    κ = 0.0
    if (solver[1] == :qr) || (solver == :qr)
       verbose && @info("solve $(size(Ψ)) LSQ system using QR factorisation")
-      qrΨ = qr(Ψ)
+      qrΨ = qr!(Ψ)
       κ = cond(qrΨ.R)
       GC.gc();
       verbose && @info("cond(R) = $(cond(qrΨ.R))")
       c = qrΨ \ Y
+      rel_rms = norm(qrΨ.Q * (qrΨ.R * c) - Y) / norm(Y)
+
+      if saveqr isa Dict
+         saveqr["Q"] = qrΨ.Q
+         saveqr["R"] = qrΨ.R
+         saveqr["Y"] = Y
+         saveqr["c"]
+      end
+
       qrΨ = nothing
-      GC.gc()
 
    elseif solver[1] == :svd
       verbose && @info("solve $(size(Ψ)) LSQ system using SVD factorisation")
       ndiscard = solver[2]
       F = svd(Ψ)
       c = F.V[:,1:(end-ndiscard)] * (Diagonal(F.S[1:(end-ndiscard)]) \ (F.U' * Y)[1:(end-ndiscard)])
+      rel_rms = norm(Ψ * c - Y) / norm(Y)
+
    elseif solver[1] == :rrqr
-       verbose && @info("solve $(size(Ψ)) LSQ system using Rank-Revealing QR factorisation")
-       qrΨ = pqrfact(Ψ, rtol=solver[2])
-       verbose && @info("cond(R) = $(cond(qrΨ.R))")
-       c = qrΨ \ Y
+      verbose && @info("solve $(size(Ψ)) LSQ system using Rank-Revealing QR factorisation")
+      qrΨ = pqrfact(Ψ, rtol=solver[2])
+      verbose && @info("cond(R) = $(cond(qrΨ.R))")
+      c = qrΨ \ Y
+      rel_rms = norm(Ψ * c - Y) / norm(Y)
+
    else
       error("unknown `solver` in `lsqfit`")
-   end
-
-   @show Sys.free_memory()*1e-9
-
-   if verbose
-      rel_rms = norm(Ψ * c - Y) / norm(Y)
-      @info("Relative RMSE on training set: $rel_rms")
    end
 
    # delete the lsq system and gc again
    Ψ = nothing
    GC.gc()
+   @show Sys.free_memory()*1e-9
+
+   if verbose
+      @info("Relative RMSE on training set: $rel_rms")
+   end
 
    IP = JuLIP.MLIPs.combine(db.basis, c)
    if (Vref != nothing) && (Vref != OneBody(0.0))
