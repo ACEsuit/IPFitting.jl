@@ -38,11 +38,11 @@ B = b3basis(10)
 @show length(B)
 db = LsqDB("", B, data)
 IP, fitinfo = lsqfit( db,
-                   E0 = 0.0,
-                   configweights = Dict("rand1" => 1.0, "rand2" => 0.5),
-                   obsweights   = Dict("E" => 100.0, "F" => 1.0),
-                   verbose=true,
-                   solver = (:rrqr, 1e-5) )
+                      E0 = 0.0,
+                      weights = Dict("default" => Dict("E"=>100.0, "F"=>1.0),
+                                       "rand2" => Dict("E"=>50.0, "F"=>0.5) )
+                      verbose=true,
+                      solver = (:rrqr, 1e-5) )
 # note we are using RRQR here to make sure the fit is well-conditioned!
 
 # IPf = fast(IP)

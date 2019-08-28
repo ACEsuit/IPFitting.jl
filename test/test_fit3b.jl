@@ -40,8 +40,7 @@ for deg in degrees
    db = LsqDB("", B, data)
    IP, fitinfo = Lsq.lsqfit( db,
                          E0 = 0.0,
-                         configweights = Dict("rand" => 1.0),
-                         obsweights   = Dict("E" => 100.0, "F" => 1.0),
+             weights = Dict("default" => Dict("E" => 100.0, "F" => 1.0)),
                          asmerrs = true )
    push!(err_erms, fitinfo["errors"]["relrmse"]["set"]["E"])
    push!(err_frms, fitinfo["errors"]["relrmse"]["set"]["F"])

@@ -66,8 +66,7 @@ for solve_met in [(:qr,), (:rrqr, 1e-12)]
       IP, fitinfo = Lsq.lsqfit(db, E0 = 0.0,
                                Itrain = Itrain,
                                Itest = Itest,
-                               configweights = Dict("rand" => 1.0),
-                               obsweights   = Dict("E" => 100.0, "F" => 1.0),
+                weights = Dict("default" => Dict("E" => 100.0, "F" => 1.0)),
                                solver = solve_met,
                                asmerrs = true )
       @info("done fitting...")
