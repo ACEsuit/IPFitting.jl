@@ -59,7 +59,7 @@ function add_fits!(IP, configs::Vector{Dat}; fitkey = "fit")
    end
    tfor_observations( configs,
          (n, okey, cfg, lck) -> begin
-            obs = vec_obs(okey, eval_obs(okey, IP, cfg.at))
+            obs = vec_obs(okey, eval_obs(okey, IP, cfg))
             lock(lck)
             cfg.info[fitkey][okey] = obs
             unlock(lck)
@@ -76,7 +76,7 @@ function add_fits_serial!(IP, configs::Vector{Dat}; fitkey = "fit")
       cfg.info[fitkey] = Dict{String, Vector{Float64}}()
    end
    for (okey, cfg, _) in observations(configs)
-      obs = vec_obs(okey, eval_obs(okey, IP, cfg.at))
+      obs = vec_obs(okey, eval_obs(okey, IP, cfg))
       cfg.info[fitkey][okey] = obs
    end
    return nothing
@@ -118,7 +118,7 @@ function _err_table(errs, relerrs, title, configtypes=:)
    print("┃ "); printstyled(title; bold=true);
    print(repeat(' ', 70-3-lentitle)); print("┃\n")
    print("┣━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━┯━━━━━━━━━━━━━━━━━┯━━━━━━━━━━━━━━━━━┫\n")
-   print("┃ config type  ┃      E [eV]     │     F [eV/A]    │     V [eV/A]    ┃\n")
+   print("┃ config type  ┃     E [meV]     │     F [eV/A]    │     V [meV]     ┃\n")
    print("┠──────────────╂────────┬────────┼────────┬────────┼────────┬────────┨\n")
    s_set = ""
    for ct in keys(errs)  # ct in configtypes
@@ -126,13 +126,13 @@ function _err_table(errs, relerrs, title, configtypes=:)
          if !(ct in configtypes)
             continue
          end
-      end 
+      end
 
-      s = @sprintf("┃ %12s ┃ %6.4f ┊ %5.2f%% │ %6.3f ┊ %5.2f%% │ %6.3f ┊ %5.2f%% ┃\n",
+      s = @sprintf("┃ %12s ┃ %6.2f ┊ %5.3f%% │ %6.3f ┊ %5.2f%% │ %6.1f ┊ %5.2f%% ┃\n",
          truncate_string(ct, 12),
-         _err(errs, ct, "E"), _relerr(relerrs, ct, "E"),
+         _err(errs, ct, "E")*1000, _relerr(relerrs, ct, "E"),
          _err(errs, ct, "F"), _relerr(relerrs, ct, "F"),
-         _err(errs, ct, "V"), _relerr(relerrs, ct, "V") )
+         _err(errs, ct, "V")*1000, _relerr(relerrs, ct, "V") )
       if ct == "set"
          s_set = s
       else
@@ -259,7 +259,7 @@ end
       o = observation(dat, okey)
       # correct the observation if we are fitting from a reference potential
       if Vref != nothing
-         o -= vec_obs(okey, eval_obs(okey, Vref, dat.at))
+         o -= vec_obs(okey, eval_obs(okey, Vref, dat))
       end
       append!(y, o)
       # get the lsq block
@@ -269,17 +269,17 @@ end
       e = block * c - y
       # compute the various errors for this ct/okey combination
       w = err_weighthook(okey, dat)
-      errs["rmse"][ct][okey] += w^2 * norm(e)^2
-      errs["nrm2"][ct][okey] += w^2 * norm(y)^2
-      errs["mae"][ct][okey]  += w * norm(e, 1)
-      errs["nrm1"][ct][okey] += w * norm(y, 1)
+      errs["rmse"][ct][okey] += norm(w .* e)^2
+      errs["nrm2"][ct][okey] += norm(w .* y)^2
+      errs["mae"][ct][okey]  += norm(w .* e, 1)
+      errs["nrm1"][ct][okey] += norm(w .* y, 1)
       errs["maxe"][ct][okey] = max(errs["maxe"][ct][okey], norm(e, Inf))
       errs["nrminf"][ct][okey] = max(errs["nrminf"][ct][okey], norm(y, Inf))
       lengths[ct][okey] += length(y)
-      errs["rmse"]["set"][okey] += w^2 * norm(e)^2
-      errs["nrm2"]["set"][okey] += w^2 * norm(y)^2
-      errs["mae"]["set"][okey]  += w * norm(e, 1)
-      errs["nrm1"]["set"][okey] += w * norm(y, 1)
+      errs["rmse"]["set"][okey] += norm(w .* e)^2
+      errs["nrm2"]["set"][okey] += norm(w .* y)^2
+      errs["mae"]["set"][okey]  += norm(w .* e, 1)
+      errs["nrm1"]["set"][okey] += norm(w .* y, 1)
       errs["maxe"]["set"][okey] = max(errs["maxe"]["set"][okey], norm(e, Inf))
       errs["nrminf"]["set"][okey] = max(errs["nrminf"]["set"][okey], norm(y, Inf))
       lengths["set"][okey] += length(y)

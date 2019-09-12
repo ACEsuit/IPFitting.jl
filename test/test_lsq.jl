@@ -1,3 +1,4 @@
+# TODO: review and rewrite this
 
 using NBodyIPs, JuLIP, Test, IPFitting
 using JuLIP.Potentials: evaluate_d
@@ -52,8 +53,7 @@ end
 Ψ_man, Y_man = Ψ, Y
 Ψ, Y = IPFitting.Lsq.get_lsq_system( db,
                E0 = 0.0,
-               configweights = Dict("rand" => 1.0),
-               obsweights = Dict("E" => 1.345, "F" => 2.987)
+               weights = Dict("default" => Dict("E" => 1.345, "F" => 2.987)),
             )
 
 ##

@@ -1,3 +1,4 @@
+# TODO: review and rewrite this!
 
 using NBodyIPs, JuLIP, Test, IPFitting, DataFrames
 using JuLIP.Potentials: evaluate_d
@@ -42,16 +43,14 @@ Ib3 = findall(b -> bodyorder(b) == 3, db.basis)
 
 IP2, _ = Lsq.lsqfit( db,
                      E0 = 0.0,
-                     configweights = Dict("rand" => 1.0),
-                     obsweights   = Dict("E" => 30.0, "F" => 1.0),
+               weights = Dict("default" => Dict("E" => 30.0, "F" => 1.0)),
                      combineIP = NBodyIP,
                      Ibasis = Ib2 )
 
 # IP3a is the standard fit with Vref which is evaluated during Lsq assembly
 IP3a, _ = Lsq.lsqfit( db,
                       Vref = IP2,
-                      configweights = Dict("rand" => 1.0),
-                      obsweights   = Dict("E" => 30.0, "F" => 1.0),
+               weights = Dict("default" => Dict("E" => 30.0, "F" => 1.0)),
                       combineIP = NBodyIP,
                       Ibasis = Ib3 )
 
@@ -66,8 +65,7 @@ Err.add_fits!(IP2f, db.configs, fitkey = "Vref")
 # observations from the `add_fits!` line are used.
 IP3b, _ = Lsq.lsqfit( db,
                       Vref = IP2,
-                      configweights = Dict("rand" => 1.0),
-                      obsweights   = Dict("E" => 30.0, "F" => 1.0),
+               weights = Dict("default" => Dict("E" => 30.0, "F" => 1.0)),
                       combineIP = NBodyIP,
                       Ibasis = Ib3 )
 

@@ -1,7 +1,7 @@
 
-using JuLIP, NBodyIPs, IPFitting
+using JuLIP, IPFitting, SHIPs, Printf
 using IPFitting: Dat, LsqDB
-using NBodyIPs: bodyorder, degree
+using JuLIP.MLIPs: IPSuperBasis
 using Test
 using LinearAlgebra: norm
 
@@ -15,8 +15,8 @@ function generate_data(species, L, rmax, N, calc; cn="rand")
       rattle!(at, rand() * rmax)
       E = energy(calc, at)
       F = forces(calc, at)
-      V = virial(calc, at)
-      push!(data, Dat(at, cn; E = E, F = F, V = V))
+      # V = virial(calc, at)
+      push!(data, Dat(at, cn; E = E, F = F)) # , V = V))
    end
    return data
 end
@@ -30,23 +30,23 @@ data = [data1; data2]
 
 ##
 @info("generate a 3B fit to SW")
-TRANSFORM = "exp( - 2 * (r/$r0 - 1.5) )"
-rcut2 = cutoff(calc)*1.4
-rcut3 = cutoff(calc)*1.9
-CUTOFF2 = "(:cos, $(rcut2-1), $rcut2)"
-CUTOFF3 = "(:cos, $(rcut3-1), $rcut3)"
-D2 = BondLengthDesc(TRANSFORM, CUTOFF2)
-D3 = BondLengthDesc(TRANSFORM, CUTOFF3)
-B = [nbpolys(2, D3, 8); nbpolys(3, D3, 6)]
+b3basis(deg) = SHIPBasis( SparseSHIP(2, :Si, deg, 1.5),
+                          PolyTransform(2, r0),
+                          PolyCutoff2s(2, 0.5*r0, cutoff(calc))
+                        )
+B = b3basis(10)
 @show length(B)
 db = LsqDB("", B, data)
 IP, fitinfo = lsqfit( db,
-                   E0 = 0.0,
-                   configweights = Dict("rand1" => 1.0, "rand2" => 0.5),
-                   obsweights   = Dict("E" => 100.0, "F" => 1.0),
-                   combineIP = NBodyIP
-                   )
-IPf = fast(IP)
+                      E0 = 0.0,
+                      weights = Dict("default" => Dict("E"=>100.0, "F"=>1.0),
+                                       "rand2" => Dict("E"=>50.0, "F"=>0.5) )
+                      verbose=true,
+                      solver = (:rrqr, 1e-5) )
+# note we are using RRQR here to make sure the fit is well-conditioned!
+
+# IPf = fast(IP)
+IPf = IP
 
 ##
 @info("Checking that the two rmse computations agree")
@@ -58,8 +58,14 @@ rmse_table(errs, errsrel)
 olderrs = fitinfo["errors"]
 rmse_table(rmse(olderrs)...)
 
+# @printf(" cfgtype obstype | abs errs            |  rel errs \n")
+# @printf("                 |    new        old   |    new        old   \n")
 for cn in keys(errs)
    for ot in keys(errs[cn])
+      # @printf(" %6s %5s    | %.3e %.3e | %.3e %.3e \n",
+      #          cn, ot,
+      #          errs[cn][ot], olderrs["rmse"][cn][ot],
+      #          errsrel[cn][ot], olderrs["relrmse"][cn][ot] )
       println(@test errs[cn][ot] ≈ olderrs["rmse"][cn][ot])
       println(@test errsrel[cn][ot] ≈ olderrs["relrmse"][cn][ot])
    end

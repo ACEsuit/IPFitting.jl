@@ -2,8 +2,10 @@
 import Base: ==, convert, vec
 
 import JuLIP
-using JuLIP: Atoms, JVec, JMat, JVecs, AbstractCalculator, mat, vecs,
+using JuLIP: Atoms, JVec, JMat, AbstractCalculator, mat, vecs,
              numbers, positions, cell, pbc
+
+using JuLIP.MLIPs: IPBasis
 
 export LsqDB, Dat, basis, configs, config
 
@@ -74,7 +76,7 @@ A representation of a least-squares system stored on disk, which can
 be extended by adding data, or basis functions
 """
 mutable struct LsqDB
-   basis::Vector{AbstractCalculator}
+   basis::IPBasis
    configs::Vector{Dat}
    Ψ::Matrix{Float64}
    dbpath::String
@@ -126,6 +128,3 @@ for fitting
 """
 err_weighthook(::Val, d::Dat) = 1.0
 err_weighthook(s::String, d::Dat) = err_weighthook(Val(Symbol(s)), d)
-
-
-const BASIS = Val{:basis}

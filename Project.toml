@@ -1,5 +1,6 @@
 name = "IPFitting"
 uuid = "3002bd4c-79e4-52ce-b924-91256dde4e52"
+version = "0.3.0"
 
 [deps]
 ASE = "51974c44-a7ed-5088-b8be-3e78c8ba416c"
@@ -24,15 +25,12 @@ StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 
 [compat]
-ASE = "≥0.3"
-JuLIP = "≥0.6"
-NeighbourLists = "≥0.3"
-PyCall = "≥1.90"
-julia = "≥0.7"
+ASE = "≥ 0.5"
+julia = "1"
 
 [extras]
-NBodyIPs = "091ff95d-640b-5850-a1f5-612e1cfea893"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+SHIPs = "07029e18-8f70-11e9-35ce-2d4df590abdc"
 
 [targets]
-test = ["Test", "NBodyIPs"]
+test = ["Test", "SHIPs"]

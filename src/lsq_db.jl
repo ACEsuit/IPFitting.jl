@@ -48,6 +48,7 @@ using Base.Threads:          SpinLock, nthreads
 using StaticArrays:          SVector
 using JuLIP:                 AbstractCalculator, AbstractAtoms, Atoms,
                              save_json, load_json, decode_dict
+using JuLIP.MLIPs:           IPBasis
 using IPFitting:        Dat, LsqDB, basis, eval_obs, observations,
                              observation, vec_obs, devec_obs,
                              tfor_observations
@@ -58,6 +59,7 @@ import Base: flush, append!, union
 
 export LsqDB, info, configtypes
 
+const VERSION = 2
 const KRONFILE = "_kron.h5"
 const INFOFILE = "_info.json"
 
@@ -85,7 +87,14 @@ end
 
 function load_info(dbpath::String)
    dbinfo = load_json(infofile(dbpath))
-   basis = decode_dict.(dbinfo["basis"])
+   if !haskey(dbinfo, "version")
+      @error("This LsqDB was produced with an older version of IPFitting.")
+   end
+   version = dbinfo["version"]
+   if version < VERSION
+      @error("This LsqDB was produced with an older version of IPFitting.")
+   end
+   basis = decode_dict(dbinfo["basis"])
    configs = Dat.(dbinfo["configs"])   # here we already know the type
    return basis, configs
 end
@@ -93,7 +102,8 @@ end
 function save_info(dbpath::String, db)
    _backupfile(infofile(dbpath))
    save_json(infofile(dbpath),
-             Dict("basis" => Dict.(db.basis),
+             Dict("version" => VERSION,
+                  "basis" => Dict(db.basis),
                   "configs" => Dict.(db.configs))
             )
    return nothing
@@ -127,7 +137,7 @@ load_kron(dbpath::String; mmap=false) = _loadmath5(kronfile(dbpath))
 
 load_kron(db::LsqDB; mmap=false) = load_kron(dbpath(db); mmap=mmap)
 
-function LsqDB(dbpath::AbstractString; mmap=false)
+function LsqDB(dbpath::AbstractString; mmap=true)
    basis, configs = load_info(dbpath)
    Ψ = load_kron(dbpath; mmap=mmap)
    return LsqDB(basis, configs, Ψ, dbpath)
@@ -151,7 +161,7 @@ function initdb(dbpath)
    @assert !isfile(infofile(dbpath))
    @assert !isfile(kronfile(dbpath))
    # check that we can actually create and delete this file
-   save_json(infofile(dbpath), Dict("basis" => [], "data" => []))
+   save_json(infofile(dbpath), Dict("version" => VERSION, "basis" => [], "data" => []))
    rm(infofile(dbpath))
    _savemath5(rand(5,5), kronfile(dbpath))
    rm(kronfile(dbpath))
@@ -165,7 +175,7 @@ function flush(db::LsqDB)
 end
 
 function LsqDB(dbpath::AbstractString,
-               basis::AbstractVector{<: AbstractCalculator},
+               basis::IPBasis,
                configs::AbstractVector{Dat};
                verbose=true,
                maxnthreads=nthreads())
@@ -221,131 +231,49 @@ end
 
 function safe_append!(db::LsqDB, db_lock, cfg, okey)
    # computing the lsq blocks ("rows") can be done in parallel,
-   lsqrow = evallsq(cfg, basis(db), okey)
+   lsqrow = eval_obs(okey, basis(db), cfg)
+   vec_lsqrow = vec_obs(okey, lsqrow)
    irows = matrows(cfg, okey)
    # but writing them into the DB must be done in a threadsafe way
    lock(db_lock)
-   db.Ψ[irows, :] .= lsqrow
+   db.Ψ[irows, :] = vec_lsqrow
    unlock(db_lock)
    return nothing
 end
 
 
-
 # ------------------- Evaluating LSQ Blocks -----------------
 
 
-"""
-Take a basis and split it into individual basis groups.
-"""
-function split_basis(basis; splitfun = b -> hash(Val{:basis}(), b))
-   # get some basis hashs of the individual basis functions
-   tps = splitfun.(basis)
-   Iord = Vector{Int}[]
-   Bord = Any[]
-   for tp in unique(tps)
-      # find which elements of basis have type `tp`
-      I = findall( [tp == t  for t in tps] )
-      push!(Iord, I)
-      push!(Bord, [b for b in basis[I]])
-   end
-   return Bord, Iord
-end
+# TODO: SOMETHING LIKE THIS IS STILL NEEDED...
+# """
+# evaluate one specific kind of datum, such as energy, forces, etc
+# for one Dat across a large section of the basis; implicitly this will
+# normally be done via `evaluate_many` or similar. The line
+# ```
+# vals = eval_obs(vDT, B, at)
+# ```
+# should likely be the bottleneck of `evallsq`
+# """
+# function _evallsq(vDT::Val,
+#                   B::AbstractVector{<:AbstractCalculator},
+#                   at::AbstractAtoms)
+#    # vals will be a vector containing multiple evaluations
+#    vals = eval_obs(vDT, B, at)
+#    # vectorise the first so we know the length of the observation
+#    vec1 = vec_obs(vDT, vals[1])
+#    # create a multi-D array to reshape these into
+#    A = Array{Float64}(undef, length(vec1), length(B))
+#    A[:, 1] = vec1
+#    for n = 2:length(B)
+#       A[:, n] = vec_obs(vDT, vals[n])
+#    end
+#    return A
+# end
 
-
-
-# fill the LSQ system, i.e. evaluate basis at data points
-function evallsq(d::Dat, B::AbstractVector{TB}, okey) where {TB <: AbstractCalculator}
-   B1 = [b for b in B]
-   if !(isconcretetype(eltype(B1)))
-      return evallsq_split(d, B1, okey)
-   end
-   # TB is a leaf-type so we can use "evaluate_many"
-   return _evallsq(Val(Symbol(okey)), B1, Atoms(d))
-end
-
-"""
-evaluate one specific kind of datum, such as energy, forces, etc
-for one Dat across a large section of the basis; implicitly this will
-normally be done via `evaluate_many` or similar. The line
-```
-vals = eval_obs(vDT, B, at)
-```
-should likely be the bottleneck of `evallsq`
-"""
-function _evallsq(vDT::Val,
-                  B::AbstractVector{<:AbstractCalculator},
-                  at::AbstractAtoms)
-   # vals will be a vector containing multiple evaluations
-   vals = eval_obs(vDT, B, at)
-   # vectorise the first so we know the length of the observation
-   vec1 = vec_obs(vDT, vals[1])
-   # create a multi-D array to reshape these into
-   A = Array{Float64}(undef, length(vec1), length(B))
-   A[:, 1] = vec1
-   for n = 2:length(B)
-      A[:, n] = vec_obs(vDT, vals[n])
-   end
-   return A
-end
-
-"""
-split the Basis `B` into subsets of identical types and evaluate
-those independently (fast).
-"""
-function evallsq_split(d, basis, okey)
-   # TB is not a leaf-type so we should split the basis to be able to
-   # evaluate_many & co
-   Bord, Iord = split_basis(basis)
-   lenobs = length(d.D[okey])
-   lsqrow = zeros(lenobs, length(basis))
-   for (B, IB) in zip(Bord, Iord)
-      lsqrow[:, IB] = evallsq(d, B, okey)
-   end
-   return lsqrow
-end
 
 
 # =========================== Convenience =================================
-
-
-# TODO: THIS NEEDS TO BE REWRITTEN! => ALSO WRITE TESTS!
-# function union(db1::LsqDB,db2::LsqDB; dbpath = (db1.dbpath * "_u"))
-#    @info("Warning: the union implies that the data in the two databases are the same")
-#    configtypes = collect(keys(db1.data_groups))
-#    basis = cat(1, db1.basis, db2.basis)
-#    data_groups = db1.data_groups
-#
-#    kron_groups1 = db1.kron_groups
-#    kron_groups2 = db2.kron_groups
-#
-#    kron_groups = Dict{String, KronGroup}()
-#    for k in configtypes
-#       kron_groups[k] = KronGroup()
-#       @assert haskey(db2.data_groups, k)
-#       for ot in ["E", "F", "V"]
-#          if !haskey(data_groups[k][1].D, ot)
-#             continue
-#          end
-#          kron_groups[k][ot] = cat(3,kron_groups1[k][ot],kron_groups2[k][ot])
-#       end
-#    end
-#    db = LsqDB(basis, data_groups, kron_groups, dbpath)
-#    flush(db)
-#    return db
-# end
-
-# function union(db1::LsqDB,db2::LsqDB, dbpath = (db1.dbpath * "_u"))
-#    basis = [basis(db1), basis(db2)]
-#    data_groups::Dict{String, DataGroup}
-#       kron_groups::Dict{String, KronGroup}
-#       dbpath::String
-#    end
-#
-#    basis(db::LsqDB) = db.basis
-#    basis(db::LsqDB, i::Integer) = db.basis[i]
-#    data(db::LsqDB) = db.data
-# end
 
 
 configtypes(db::LsqDB) = unique(configtype.(db.configs))
@@ -353,7 +281,7 @@ configtypes(db::LsqDB) = unique(configtype.(db.configs))
 _nconfigs(db::LsqDB, ct::AbstractString) =
    length(find(configtype.(db.configs) .== ct))
 
-
+# TODO: rewrite this!
 function info(db::LsqDB)
    # config names, how many
    all_cts = configtype.(db.configs)

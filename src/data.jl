@@ -25,11 +25,12 @@ import Base: length, Dict
 
 import ASE     # use ASE since this will have already figured out how to
                # load `ase` without problems
+using ASE: ASEAtoms
 ase_io = ASE.ase_io
 
 export configtype, weight, load_data
 
-Atoms(d) = d.at
+Atoms(d::Dat) = d.at
 length(d::Dat) = length(d.at)
 configtype(d::Dat) = d.configtype
 energy(d::Dat) = haskey(d.D, ENERGY) ? devec_obs(Val(:E), d.D[ENERGY]) : nothing
@@ -84,12 +85,7 @@ function read_configtype(atpy)
    return nothing
 end
 
-read_Atoms(atpy) = Atoms( vecs(atpy.get_positions()'),
-                          vecs(atpy.get_momenta()'),
-                          atpy.get_masses(),
-                          atpy.get_atomic_numbers(),
-                          atpy.get_cell(),
-                          tuple(atpy.get_pbc()...) )
+read_Atoms(atpy) = Atoms(ASEAtoms( atpy ))
 
 """
 ```

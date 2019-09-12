@@ -29,9 +29,6 @@ include("data.jl")
 include("lsq_db.jl")
 @reexport using IPFitting.DB
 
-include("filtering.jl")
-@reexport using IPFitting.Filtering
-
 include("lsqerrors.jl")
 @reexport using IPFitting.Errors
 
@@ -41,5 +38,6 @@ include("lsq.jl")
 # include("weights.jl")
 # @reexport using IPFitting.Weights
 
+include("aux.jl")
 
 end # module
