@@ -25,6 +25,7 @@ end
 # should D.info also be compared?
 ==(d1::Dat, d2::Dat) = (
       (d1.configtype == d2.configtype) && (d1.D == d2.D) &&
+      (d1.info == d2.info) &&
       all( f(d1.at) == f(d2.at) for f in (positions, numbers, cell, pbc) )
    )
 
@@ -56,7 +57,7 @@ function Dat(D::Dict)
               D["configtype"],
               Dict{String, Any}(D["D"]),
               Dict{String, Any}(D["rows"]),
-              Dict{String, Any}())
+              Dict{String, Any}(D["info"]))
 end
 
 convert(::Val{Symbol("IPFitting.Dat")}, D::Dict) = Dat(D)
