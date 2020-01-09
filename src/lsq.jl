@@ -24,6 +24,7 @@ module Lsq
 import JuLIP, IPFitting, StatsBase
 
 using StaticArrays
+using JuLIP: vecs
 using JuLIP: AbstractCalculator, Atoms
 using JuLIP.Potentials: OneBody
 using JuLIP.MLIPs: SumIP
@@ -70,7 +71,7 @@ in this case the re-weighting via the `weighthook` is ignored as well.
 """
 function collect_observations(db::LsqDB,
                               weights::Dict,
-                              Vref )
+                              Vref, fmag_wgs )
 
    nrows = size(db.Ψ, 1)  # total number of observations if we collect
                           # everything in the database
@@ -100,7 +101,7 @@ function collect_observations(db::LsqDB,
       # modify the weights from extra information in the dat structure
       W[irows] .= _get_weights(weights,
                                weighthook(obskey, dat),
-                               dat, obskey, obs)
+                               dat, obskey, obs, fmag_wgs)
    end
    return Y, W, Icfg
 end
@@ -108,7 +109,7 @@ end
 """
 see documentation in `collect_observations`
 """
-function _get_weights(weights, wh, dat, obskey, o)
+function _get_weights(weights, wh, dat, obskey, o, fmag_wgs, fmag_wgs_mx)
    # initialise the weight to 0.0. If this isn't overwritten then it means
    # we will ignore this observation.
    w = 0.0
@@ -139,16 +140,42 @@ function _get_weights(weights, wh, dat, obskey, o)
       end
    end
 
-   # transform the weights into a vector (if necessary) and return
-   if length(w) == 1
-      return w * ones(length(o))
-   elseif length(w) == length(o)
-      return w
+   if fmag_wgs && obskey == "F"
+      fmags =  [norm(i) for i in collect(o |> vecs)]
+      fwghts = vcat([(1/i) * [weights[cfgkey][obskey] for j in 1:3] for i in fmags]...)
+      if !any(isinf, fwghts)
+         fwghts = map(_scale_wghts, fwghts)
+         @show fwghts
+         return fwghts
+      else
+         return w * ones(length(o))
+      end
+   else
+      if length(w) == 1
+         return w * ones(length(o))
+      elseif length(w) == length(o)
+         return w
+      end
    end
+
+   # transform the weights into a vector (if necessary) and return
+   #if length(w) == 1
+   #   return w * ones(length(o))
+   #elseif length(w) == length(o)
+   #   return w
+   #end
    error("_get_weights: length(w) is neither 1 nor length(o)?!?!?")
 end
 
-
+function _scale_wghts(fwghts)
+        if fwghts > 1000
+                return 1000
+        elseif fwghts < 1
+                return 1
+        else
+                return fwghts
+        end
+end
 
 
 function _regularise!(Ψ::Matrix{T}, Y::Vector{T}, basis, regularisers;
@@ -189,12 +216,13 @@ E0, Vref, Ibasis, Itrain, regularisers`.
                                   E0 = nothing,
                                   Vref = OneBody(E0),
                                   weights = nothing,
+                                  fmag_wgs = false,
                                   regularisers = [])
    weights = _fix_weights!(weights)
 
    # get the observations vector and the weights vector
    # the Vref potential is subtracted from the observations
-   Y, W, Icfg = collect_observations(db, weights, Vref)
+   Y, W, Icfg = collect_observations(db, weights, Vref, fmag_wgs)
 
    # check for NaNs
    any(isnan, Y) && error("NaN detected in observations vector")
@@ -298,6 +326,7 @@ function
                 deldb = false,
                 asmerrs = false,
                 saveqr = nothing,
+                fmag_wgs = false,
                 kwargs...)
    weights = _fix_weights!(weights)
    Jbasis = ((Ibasis == Colon()) ? (1:length(db.basis)) : Ibasis)
@@ -307,7 +336,8 @@ function
    Ψ, Y = get_lsq_system(db; verbose=verbose, Vref=Vref,
                              Ibasis=Ibasis, Itrain = Itrain,
                              weights = weights,
-                             regularisers = regularisers)
+                             regularisers = regularisers,
+                             fmag_wgs = fmag_wgs)
    verbose && _show_free_mem()
    if deldb
       @info("Deleting database - `db` can no longer be saved to disk")
