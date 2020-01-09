@@ -109,7 +109,7 @@ end
 """
 see documentation in `collect_observations`
 """
-function _get_weights(weights, wh, dat, obskey, o, fmag_wgs, fmag_wgs_mx)
+function _get_weights(weights, wh, dat, obskey, o, fmag_wgs)
    # initialise the weight to 0.0. If this isn't overwritten then it means
    # we will ignore this observation.
    w = 0.0
