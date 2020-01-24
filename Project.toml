@@ -1,5 +1,6 @@
 name = "IPFitting"
 uuid = "3002bd4c-79e4-52ce-b924-91256dde4e52"
+version = "0.0.6"
 
 [deps]
 ASE = "51974c44-a7ed-5088-b8be-3e78c8ba416c"
@@ -12,6 +13,7 @@ JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
 JuLIP = "945c410c-986d-556a-acb1-167a618e0462"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 LowRankApprox = "898213cb-b102-5a47-900c-97e73b919f73"
+NeighbourLists = "2fcf5ba9-9ed4-57cf-b73f-ff513e316b9c"
 Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"

@@ -328,7 +328,7 @@ to display these as tables and `rmse, mae` to access individual errors.
                              obsweights = obsweights,
                              regularisers = regularisers,
                              kwargs...)
-
+                      
    if (solver[1] == :qr) || (solver == :qr)
       verbose && @info("solve $(size(Ψ)) LSQ system using QR factorisation")
       qrΨ = qr(Ψ)
