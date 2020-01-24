@@ -34,7 +34,7 @@ julia = "≥0.7"
 [extras]
 # NBodyIPs = "091ff95d-640b-5850-a1f5-612e1cfea893"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
-SHIPs = "07029e18-8f70-11e9-35ce-2d4df590abdc"
+# SHIPs = "07029e18-8f70-11e9-35ce-2d4df590abdc"
 
 [targets]
-test = ["Test", "SHIPs"]
+test = ["Test"]
