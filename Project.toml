@@ -13,16 +13,17 @@ JSON = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
 JuLIP = "945c410c-986d-556a-acb1-167a618e0462"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 LowRankApprox = "898213cb-b102-5a47-900c-97e73b919f73"
+NeighbourLists = "2fcf5ba9-9ed4-57cf-b73f-ff513e316b9c"
 Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
 PyCall = "438e738f-606a-5dbb-bf0a-cddfbfd45ab0"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
 Sobol = "ed01d8cd-4d21-5b2a-85b4-cc3bdc58bad4"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
-Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 
 [compat]
 ASE = "≥0.3"
@@ -32,9 +33,7 @@ PyCall = "≥1.90"
 julia = "≥0.7"
 
 [extras]
-# NBodyIPs = "091ff95d-640b-5850-a1f5-612e1cfea893"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
-# SHIPs = "07029e18-8f70-11e9-35ce-2d4df590abdc"
 
 [targets]
 test = ["Test"]
