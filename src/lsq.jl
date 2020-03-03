@@ -141,11 +141,28 @@ function _get_weights(weights, wh, dat, obskey, o, fmag_wgs)
    end
 
    if fmag_wgs && obskey == "F"
-      fmags =  [norm(i) for i in collect(o |> vecs)]
-      fwghts = vcat([(1/i) * [weights[cfgkey][obskey] for j in 1:3] for i in fmags]...)
-      if !any(isinf, fwghts)
+      fwghts = []
+
+      if endswith(cfgkey, "ph")
+         @show cfgkey
+         if cfgkey == "Ti_hcp_ph"
+            rel = 3
+         else
+            rel = 1
+         end
+         for fmag in abs.(o)
+            @show rel
+            if fmag > 1E-20
+               push!(fwghts, rel*5E1*(1/(fmag^0.3)))
+            else
+               push!(fwghts, 1)
+            end
+         end
+
          fwghts = map(_scale_wghts, fwghts)
          @show fwghts
+         @show findmax(fwghts)
+         @show findmin(fwghts)
          return fwghts
       else
          return w * ones(length(o))
@@ -168,8 +185,8 @@ function _get_weights(weights, wh, dat, obskey, o, fmag_wgs)
 end
 
 function _scale_wghts(fwghts)
-        if fwghts > 1000
-                return 1000
+        if fwghts > 1000000000
+                return 1000000000
         elseif fwghts < 1
                 return 1
         else
