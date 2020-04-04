@@ -140,26 +140,19 @@ function _get_weights(weights, wh, dat, obskey, o, fmag_wgs)
       end
    end
 
-   if fmag_wgs && obskey == "F"
+   if obskey == "F"
       fwghts = []
 
-      if endswith(cfgkey, "ph")
-         @show cfgkey
-         if cfgkey == "Ti_hcp_scell2_0_1_ph"
-            rel = 10
-         else
-            rel = 1
-         end
+      if cfgkey in keys(fmag_wgs)
          for fmag in abs.(o)
-            if fmag > 1E-20
-               push!(fwghts, 5E1*rel*(1/(fmag^0.2)))
-            else
-               push!(fwghts, 1)
-            end
+            push!(fwghts, fmag_wgs[cfgkey]["C"]*(1/(fmag^fmag_wgs[cfgkey]["σ"])))
          end
 
-         fwghts = map(_scale_wghts, fwghts)
-         @show fwghts
+         fwghts[fwghts .>= fmag_wgs[cfgkey]["fwmax"]] .= fmag_wgs[cfgkey]["fwmax"]
+         fwghts[fwghts .<= fmag_wgs[cfgkey]["fwmin"]] .= fmag_wgs[cfgkey]["fwmin"]
+
+         @show cfgkey, fwghts
+
          return fwghts
       else
          return w * ones(length(o))
@@ -180,17 +173,6 @@ function _get_weights(weights, wh, dat, obskey, o, fmag_wgs)
    #end
    error("_get_weights: length(w) is neither 1 nor length(o)?!?!?")
 end
-
-function _scale_wghts(fwghts)
-        if fwghts > 10000
-                return 10000
-        elseif fwghts < 1
-                return 1
-        else
-                return fwghts
-        end
-end
-
 
 function _regularise!(Ψ::Matrix{T}, Y::Vector{T}, basis, regularisers;
                       verbose=false, Ibasis = :) where {T}
