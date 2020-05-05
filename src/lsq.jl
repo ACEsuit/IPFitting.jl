@@ -36,6 +36,8 @@ using IPFitting.DB: dbpath, _nconfigs, matrows
 using LinearAlgebra: lmul!, Diagonal, qr, qr!, cond, norm, svd
 using InteractiveUtils: versioninfo
 using LowRankApprox
+using JuLIP.Utils
+using JuLIP: JVecF
 
 const Err = IPFitting.Errors
 
@@ -144,16 +146,47 @@ function _get_weights(weights, wh, dat, obskey, o, fmag_wgs)
       fwghts = []
 
       if cfgkey in keys(fmag_wgs)
-         for fmag in abs.(o)
-            push!(fwghts, fmag_wgs[cfgkey]["C"]*(1/(fmag^fmag_wgs[cfgkey]["σ"])))
+
+         @show obskey, length(o)
+
+         Rs = [norm(JuLIP.Utils.project_min(dat.at, JVecF(i))) for i in dat.at.X]
+         #Rs = [norm(i - dat.at.X[1]) for i in dat.at.X]
+
+         Rsl  = []
+
+         for j in Rs
+            for i in 1:3
+               push!(Rsl, j^fmag_wgs[cfgkey]["σ"])
+            end
          end
+
+         fwghts = fmag_wgs[cfgkey]["C"]/maximum(dat.D["F"]) .* Rsl
 
          fwghts[fwghts .>= fmag_wgs[cfgkey]["fwmax"]] .= fmag_wgs[cfgkey]["fwmax"]
          fwghts[fwghts .<= fmag_wgs[cfgkey]["fwmin"]] .= fmag_wgs[cfgkey]["fwmin"]
 
-         @show cfgkey, fwghts
+         @show fwghts
 
          return fwghts
+
+
+
+         #return fmag_wgs[cfgkey]["C"]/maximum(dat.D["F"]) .* Rsl
+
+         ##w * ones(length(o))
+
+         # for fmag in abs.(o)
+         #    push!(fwghts, fmag_wgs[cfgkey]["C"]*(1/(fmag^fmag_wgs[cfgkey]["σ"])))
+         # end
+         #
+         # fwghts[fwghts .>= fmag_wgs[cfgkey]["fwmax"]] .= fmag_wgs[cfgkey]["fwmax"]
+         # fwghts[fwghts .<= fmag_wgs[cfgkey]["fwmin"]] .= fmag_wgs[cfgkey]["fwmin"]
+         #
+         # #@show cfgkey, fwghts
+         #
+         # return fwghts
+
+         #return w * ones(length(o))
       else
          return w * ones(length(o))
       end
@@ -444,7 +477,7 @@ function asm_fitinfo(db, IP, c, Ibasis, weights,
                    "weights" => weights,
                    "regularisers"  => Dict.(regularisers),
                    "juliaversion"  => juliainfo,
-                   "IPFitting_version" => get_pkg_info("IPFitting"),
+                   #"IPFitting_version" => get_pkg_info("IPFitting"),
                   )
 
    if asmerrs
@@ -457,18 +490,18 @@ end
 
 import Pkg
 
-function get_pkg_info(pkg::AbstractString)
-    pkgs = [Pkg.API.check_package_name(pkg)]
-    ctx = Pkg.Types.Context()
-    Pkg.API.project_resolve!(ctx.env, pkgs)
-    Pkg.API.project_deps_resolve!(ctx.env, pkgs)
-    Pkg.API.manifest_resolve!(ctx.env, pkgs)
-    Pkg.API.ensure_resolved(ctx.env, pkgs)
-    i = Pkg.Display.status(ctx, pkgs)[1]
-    return Dict("name" => i.name,
-                "uuid" => string(i.uuid),
-                "ver" => string(i.new.ver))
-end
+# function get_pkg_info(pkg::AbstractString)
+#     pkgs = [Pkg.API.check_package_name(pkg)]
+#     ctx = Pkg.Types.Context()
+#     Pkg.API.project_resolve!(ctx.env, pkgs)
+#     Pkg.API.project_deps_resolve!(ctx.env, pkgs)
+#     Pkg.API.manifest_resolve!(ctx.env, pkgs)
+#     Pkg.API.ensure_resolved(ctx.env, pkgs)
+#     i = Pkg.Display.status(ctx, pkgs)[1]
+#     return Dict("name" => i.name,
+#                 "uuid" => string(i.uuid),
+#                 "ver" => string(i.new.ver))
+# end
 
 
 _fix_weights!(::Nothing) = _fix_weights!(Dict{String, Any}())
