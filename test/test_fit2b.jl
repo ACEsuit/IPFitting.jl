@@ -21,6 +21,8 @@ function generate_data(species, L, rmax, N, calc)
    return data
 end
 
+##
+
 Random.seed!(1)
 r0 = rnn(:Cu)
 z0 = atomic_number(:Cu)
@@ -30,9 +32,8 @@ end
 data = generate_data(:Cu, 3, 0.25*r0, 70, calc)
 rcut2 = cutoff(calc)
 
-trans = PolyTransform(1, r0)
-fcut = PolyCutoff2s(2, 0.5*r0, rcut2)
-pairbasis(deg) = SHIPBasis( SparseSHIP(:Cu, 1, deg), trans, fcut)
+pairbasis(deg) = rpi_basis(species = :Cu, N = 1, maxdeg = deg,
+                           r0 = r0, rcut = rcut2, rin = r0/2)
 
 ##
 degrees = [4, 7, 10, 13, 16, 19]

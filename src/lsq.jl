@@ -291,8 +291,8 @@ function
                 Ibasis = :,
                 Itrain = :,
                 Itest = nothing,
-                E0 = nothing,
-                Vref = OneBody(E0),
+                E0 = 0.0,
+                Vref = nothing, # OneBody(E0),
                 weights = nothing,
                 regularisers = [],
                 deldb = false,
@@ -392,10 +392,10 @@ function asm_fitinfo(db, IP, c, Ibasis, weights,
       verbose && @info("Assemble errors table")
       @warn("new error implementation... redo this part please ")
       errs = Err.lsqerrors(db, c, Jbasis;
-               cfgtypes=cfgtypes, Vref=OneBody(E0), Icfg=Itrain)
+               cfgtypes=cfgtypes, Vref=Vref, Icfg=Itrain)
       if Itest != nothing
          errtest = Err.lsqerrors(db, c, Jbasis;
-                  cfgtypes=cfgtypes, Vref=OneBody(E0), Icfg=Itest)
+                  cfgtypes=cfgtypes, Vref=Vref, Icfg=Itest)
       else
          errtest = Dict()
       end
@@ -418,8 +418,9 @@ function asm_fitinfo(db, IP, c, Ibasis, weights,
                    "weights" => weights,
                    "regularisers"  => Dict.(regularisers),
                    "juliaversion"  => juliainfo,
-                   "IPFitting_version" => get_pkg_info("IPFitting"),
+                   "IPFitting_version" => "na", # get_pkg_info("IPFitting"),
                   )
+   # TODO: fix IPFitting_version retrieval
 
    if asmerrs
       infodict["errors"] = errs

@@ -1,11 +1,14 @@
 
 using Test
 using IPFitting, ProgressMeter, JuLIP, SHIPs
-using JuLIP: decode_dict
+using JuLIP: read_dict
+using JuLIP.Testing: test_fio
 using JuLIP.MLIPs: IPSuperBasis
 Fit = IPFitting
 DB = IPFitting.DB
 Data = Fit.Data
+
+##
 
 function rand_data(sym, N, configtype="rand")
    cubic = (N == 1)
@@ -17,25 +20,22 @@ end
 
 ##
 println("Double-Check (de-)dictionisation of basis: ")
-basis1 = SHIPBasis(SparseSHIP(:Ti, 2, 8, wL=1.5),
-                   PolyTransform(2, 1.3), PolyCutoff2s(2, 0.5, 3.0))
-basis2 = SHIPBasis(SparseSHIP(:Ti, 3, 6, wL=2.0),
-                   PolyTransform(3, 1.0), PolyCutoff2s(2, 0.5, 3.0))
+basis1 = rpi_basis(species = :Ti, N = 2, maxdeg = 8)
+basis2 = rpi_basis(species = :Ti, N = 3, maxdeg = 6)
 B = IPSuperBasis(basis1, basis2)
-println(@test decode_dict( Dict( basis1 ) ) == basis1)
-println(@test decode_dict( Dict( basis2 ) ) == basis2)
-println(@test decode_dict( Dict( B ) ) == B)
+println(@test all(test_fio(basis1)))
+println(@test all(test_fio(basis2)))
+println(@test all(test_fio(B)))
 
 println("Double-Check (de-)dictionisation of Dat: ")
 data1 = [ rand_data(:Ti, 3, "md") for n = 1:10 ]
 data2 = [ rand_data(:Ti, 1, "cell") for n = 1:10 ]
-println(@test Dat.(Dict.(data1)) == data1)
-println(@test Dat.(Dict.(data2)) == data2)
+println(@test read_dict.(write_dict.(data1)) == data1)
+println(@test read_dict.(write_dict.(data2)) == data2)
 
 ##
 println("Create a temporary database.")
-tmpdir = mktempdir()
-dbpath = joinpath(tmpdir, "temp")
+dbpath = tempname()
 data = [data1; data2]
 db = nothing
 
@@ -68,7 +68,3 @@ println(@test DB.dbpath(db2) == dbpath)
 println(@test db2.basis == db.basis)
 println(@test db2.configs == db.configs)
 println(@test db2.Ψ == db.Ψ)
-
-##
-println("Delete the temporary database")
-rm(tmpdir; force=true, recursive=true)

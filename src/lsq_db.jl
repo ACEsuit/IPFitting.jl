@@ -47,7 +47,7 @@ module DB
 using Base.Threads:          SpinLock, nthreads
 using StaticArrays:          SVector
 using JuLIP:                 AbstractCalculator, AbstractAtoms, Atoms,
-                             save_json, load_json, decode_dict
+                             save_dict, load_dict, read_dict, write_dict
 using JuLIP.MLIPs:           IPBasis
 using IPFitting:        Dat, LsqDB, basis, eval_obs, observations,
                              observation, vec_obs, devec_obs,
@@ -86,7 +86,7 @@ function _backupfile(fname)
 end
 
 function load_info(dbpath::String)
-   dbinfo = load_json(infofile(dbpath))
+   dbinfo = load_dict(infofile(dbpath))
    if !haskey(dbinfo, "version")
       @error("This LsqDB was produced with an older version of IPFitting.")
    end
@@ -94,17 +94,17 @@ function load_info(dbpath::String)
    if version < VERSION
       @error("This LsqDB was produced with an older version of IPFitting.")
    end
-   basis = decode_dict(dbinfo["basis"])
+   basis = read_dict(dbinfo["basis"])
    configs = Dat.(dbinfo["configs"])   # here we already know the type
    return basis, configs
 end
 
 function save_info(dbpath::String, db)
    _backupfile(infofile(dbpath))
-   save_json(infofile(dbpath),
+   save_dict(infofile(dbpath),
              Dict("version" => VERSION,
-                  "basis" => Dict(db.basis),
-                  "configs" => Dict.(db.configs))
+                  "basis" => write_dict(db.basis),
+                  "configs" => write_dict.(db.configs))
             )
    return nothing
 end
@@ -161,7 +161,7 @@ function initdb(dbpath)
    @assert !isfile(infofile(dbpath))
    @assert !isfile(kronfile(dbpath))
    # check that we can actually create and delete this file
-   save_json(infofile(dbpath), Dict("version" => VERSION, "basis" => [], "data" => []))
+   save_dict(infofile(dbpath), Dict("version" => VERSION, "basis" => [], "data" => []))
    rm(infofile(dbpath))
    _savemath5(rand(5,5), kronfile(dbpath))
    rm(kronfile(dbpath))

@@ -3,11 +3,11 @@ using Test, JuLIP
 using IPFitting
 using IPFitting: Dat
 using IPFitting.Data: configtype
+using JuLIP: write_dict, read_dict
 
 ##
 
-println("===================================")
-println("Testing Dat:")
+@info("Testing Dat:")
 println("  * Dat constructor")
 println("  * vec, devec")
 println("  * energy(dat), forces(dat), virial(dat)")
@@ -24,10 +24,7 @@ println(@test(energy(dat) == energy(lj, at)))
 println(@test(forces(dat) == forces(lj, at)))
 println(@test(virial(dat) ≈ virial(lj, at)))
 
-D = Dict(dat)
-dat1 = Dat(D)
-println(@test(dat == dat1))
-dat2 = convert(Val(Symbol("IPFitting.Dat")), D)
-println(@test(dat == dat2))
+##
 
-println("===================================")
+@info("Test (de-)serialisation of det")
+println(@test all(JuLIP.Testing.test_fio(dat)))

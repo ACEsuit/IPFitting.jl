@@ -21,14 +21,17 @@ function generate_data(species, L, rmax, N, calc)
    return data
 end
 
+##
+
+Random.seed!(1)
 r0 = rnn(:Si)
 calc = StillingerWeber()
 data = generate_data(:Si, 2, 0.33*r0, 100, calc)
 
 # 2 stands for 2 neighbours i.e. body-order 3
-b3basis(deg) = SHIPBasis(SparseSHIP(:Si, 2, deg, wL=1.5),
-                         PolyTransform(2, r0),
-                         PolyCutoff2s(2, 0.5*r0, cutoff(calc)))
+b3basis(deg) = rpi_basis(species = :Si, N = 2, maxdeg = deg,
+                         r0 = r0, rcut = cutoff(calc), rin = 0.5*r0,
+                         pin = 2)
 
 ##
 err_erms = Float64[]

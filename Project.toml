@@ -1,6 +1,6 @@
 name = "IPFitting"
 uuid = "3002bd4c-79e4-52ce-b924-91256dde4e52"
-version = "0.3.2"
+version = "0.4.0-pre"
 
 [deps]
 ASE = "51974c44-a7ed-5088-b8be-3e78c8ba416c"
@@ -17,20 +17,20 @@ Pkg = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
 Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
 PyCall = "438e738f-606a-5dbb-bf0a-cddfbfd45ab0"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 Reexport = "189a3867-3050-52da-a836-e630ba90ab69"
-Sobol = "ed01d8cd-4d21-5b2a-85b4-cc3bdc58bad4"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
-Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 
 [compat]
-ASE = "≥ 0.5"
+ASE = "≥ 0.5.2"
+JuLIP = "≥ 0.9.2"
 julia = "1"
 
 [extras]
-Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 SHIPs = "07029e18-8f70-11e9-35ce-2d4df590abdc"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
 test = ["Test", "SHIPs"]
