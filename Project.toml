@@ -1,6 +1,6 @@
 name = "IPFitting"
 uuid = "3002bd4c-79e4-52ce-b924-91256dde4e52"
-version = "0.4.0-pre"
+version = "0.4.0"
 
 [deps]
 ASE = "51974c44-a7ed-5088-b8be-3e78c8ba416c"
@@ -25,7 +25,7 @@ StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 
 [compat]
 ASE = "≥ 0.5.2"
-JuLIP = "≥ 0.9.2"
+JuLIP = "≥ 0.9.3"
 julia = "1"
 
 [extras]
