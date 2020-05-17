@@ -363,7 +363,7 @@ function
    end
 
    IP = JuLIP.MLIPs.combine(db.basis, c)
-   if (Vref != nothing) && (Vref != OneBody(0.0))
+   if Vref != nothing
       IP = SumIP(Vref, IP)
    end
 
