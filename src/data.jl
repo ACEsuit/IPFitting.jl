@@ -20,6 +20,7 @@ module Data
 using JuLIP, ProgressMeter, FileIO
 using IPFitting: Dat, vec_obs, devec_obs, observation, hasobservation
 using IPFitting.DataTypes
+using StringDistances
 import JuLIP: Atoms, energy, forces, virial
 import Base: length, Dict
 
@@ -40,47 +41,42 @@ virial(d::Dat) = haskey(d.D, VIRIAL) ? devec_obs(Val(:V), d.D[VIRIAL]) : nothing
 
 function read_energy(atpy)
    for key in keys(atpy.info)
-      if lowercase(key) == "dft_energy"
+      if compare(lowercase(key), "energy", Levenshtein()) > 0.8
          return atpy.info[key]
       end
-   end
-   try
-      return atpy.get_potential_energy()
-   catch
    end
    return nothing
 end
 
 function read_forces(atpy)
    for key in keys(atpy.arrays)
-      if lowercase(key) == "dft_force"
+      if compare(lowercase(key), "forces", Levenshtein()) > 0.8
          return atpy.arrays[key]' |> vecs
       end
-   end
-   try
-      return atpy.get_array("force")' |> vecs
-   catch
    end
    return nothing
 end
 
 function read_virial(atpy)
    for key in keys(atpy.info)
-      if lowercase(key) == "dft_virial"
+      if compare(lowercase(key), "virial", Levenshtein()) > 0.8
          return JMat(atpy.info[key]...)
       end
    end
-   if haskey(atpy.info, "virial")
-      return JMat(atpy.info["virial"]...)
+   for key in keys(atpy.info)
+      if compare(lowercase(key), "stress", Levenshtein()) > 0.8
+         @info("No virial key found: converting stress to virial!")
+         return -1.0 * JMat(atpy.info[key]...) * atpy.get_volume()
+      end
    end
    return nothing
 end
 
 function read_configtype(atpy)
-   if haskey(atpy.info, "config_type")
-      return atpy.info["config_type"]
-   elseif haskey(atpy.info, "configtype")
-      return atpy.info["configtype"]
+   for key in keys(atpy.info)
+      if compare(lowercase(key), "config_type", Levenshtein()) > 0.8
+         return atpy.info[key]
+      end
    end
    return nothing
 end
