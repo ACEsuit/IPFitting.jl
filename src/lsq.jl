@@ -24,6 +24,7 @@ module Lsq
 import JuLIP, IPFitting, StatsBase
 
 using StaticArrays
+using JuLIP: vecs
 using JuLIP: AbstractCalculator, Atoms
 using JuLIP.Potentials: OneBody
 using JuLIP.MLIPs: SumIP
@@ -35,6 +36,8 @@ using IPFitting.DB: dbpath, _nconfigs, matrows
 using LinearAlgebra: lmul!, Diagonal, qr, qr!, cond, norm, svd
 using InteractiveUtils: versioninfo
 using LowRankApprox
+using JuLIP.Utils
+using JuLIP: JVecF
 
 const Err = IPFitting.Errors
 
@@ -70,7 +73,7 @@ in this case the re-weighting via the `weighthook` is ignored as well.
 """
 function collect_observations(db::LsqDB,
                               weights::Dict,
-                              Vref )
+                              Vref, scal_wgs = false )
 
    nrows = size(db.Ψ, 1)  # total number of observations if we collect
                           # everything in the database
@@ -100,7 +103,7 @@ function collect_observations(db::LsqDB,
       # modify the weights from extra information in the dat structure
       W[irows] .= _get_weights(weights,
                                weighthook(obskey, dat),
-                               dat, obskey, obs)
+                               dat, obskey, obs, scal_wgs)
    end
    return Y, W, Icfg
 end
@@ -108,7 +111,7 @@ end
 """
 see documentation in `collect_observations`
 """
-function _get_weights(weights, wh, dat, obskey, o)
+function _get_weights(weights, wh, dat, obskey, o, scal_wgs)
    # initialise the weight to 0.0. If this isn't overwritten then it means
    # we will ignore this observation.
    w = 0.0
@@ -139,17 +142,44 @@ function _get_weights(weights, wh, dat, obskey, o)
       end
    end
 
-   # transform the weights into a vector (if necessary) and return
-   if length(w) == 1
-      return w * ones(length(o))
-   elseif length(w) == length(o)
-      return w
+   if obskey == "F"
+      fwghts = []
+
+      if cfgkey in keys(scal_wgs)
+         Rs = [norm(JuLIP.Utils.project_min(dat.at, JVecF(i))) for i in dat.at.X]
+
+         Rsl  = [j^scal_wgs[cfgkey]["σ"] for i in 1:3 for j in Rs]
+
+         fwghts = (scal_wgs[cfgkey]["C"]/maximum(dat.D["F"])) .* Rsl
+
+         fwghts[fwghts .>= scal_wgs[cfgkey]["fwmax"]] .= scal_wgs[cfgkey]["fwmax"]
+         fwghts[fwghts .<= scal_wgs[cfgkey]["fwmin"]] .= scal_wgs[cfgkey]["fwmin"]
+
+         @show obskey, length(o)
+         @show cfgkey
+         @show fwghts
+
+         return fwghts
+
+      else
+         return w * ones(length(o))
+      end
+   else
+      if length(w) == 1
+         return w * ones(length(o))
+      elseif length(w) == length(o)
+         return w
+      end
    end
+
+   # transform the weights into a vector (if necessary) and return
+   #if length(w) == 1
+   #   return w * ones(length(o))
+   #elseif length(w) == length(o)
+   #   return w
+   #end
    error("_get_weights: length(w) is neither 1 nor length(o)?!?!?")
 end
-
-
-
 
 function _regularise!(Ψ::Matrix{T}, Y::Vector{T}, basis, regularisers;
                       verbose=false, Ibasis = :) where {T}
@@ -189,12 +219,13 @@ E0, Vref, Ibasis, Itrain, regularisers`.
                                   E0 = nothing,
                                   Vref = OneBody(E0),
                                   weights = nothing,
+                                  scal_wgs = false,
                                   regularisers = [])
    weights = _fix_weights!(weights)
 
    # get the observations vector and the weights vector
    # the Vref potential is subtracted from the observations
-   Y, W, Icfg = collect_observations(db, weights, Vref)
+   Y, W, Icfg = collect_observations(db, weights, Vref, scal_wgs)
 
    # check for NaNs
    any(isnan, Y) && error("NaN detected in observations vector")
@@ -298,6 +329,7 @@ function
                 deldb = false,
                 asmerrs = false,
                 saveqr = nothing,
+                scal_wgs = false,
                 kwargs...)
    weights = _fix_weights!(weights)
    Jbasis = ((Ibasis == Colon()) ? (1:length(db.basis)) : Ibasis)
@@ -307,7 +339,8 @@ function
    Ψ, Y = get_lsq_system(db; verbose=verbose, Vref=Vref,
                              Ibasis=Ibasis, Itrain = Itrain,
                              weights = weights,
-                             regularisers = regularisers)
+                             regularisers = regularisers,
+                             scal_wgs = scal_wgs)
    verbose && _show_free_mem()
    if deldb
       @info("Deleting database - `db` can no longer be saved to disk")
@@ -418,7 +451,11 @@ function asm_fitinfo(db, IP, c, Ibasis, weights,
                    "weights" => weights,
                    "regularisers"  => Dict.(regularisers),
                    "juliaversion"  => juliainfo,
+<<<<<<< HEAD
                    "IPFitting_version" => "na", # get_pkg_info("IPFitting"),
+=======
+                   #"IPFitting_version" => get_pkg_info("IPFitting"),
+>>>>>>> ae0b13433d4790e59149307d2fe033c2dbff8cde
                   )
    # TODO: fix IPFitting_version retrieval
 
@@ -432,18 +469,18 @@ end
 
 import Pkg
 
-function get_pkg_info(pkg::AbstractString)
-    pkgs = [Pkg.API.check_package_name(pkg)]
-    ctx = Pkg.Types.Context()
-    Pkg.API.project_resolve!(ctx.env, pkgs)
-    Pkg.API.project_deps_resolve!(ctx.env, pkgs)
-    Pkg.API.manifest_resolve!(ctx.env, pkgs)
-    Pkg.API.ensure_resolved(ctx.env, pkgs)
-    i = Pkg.Display.status(ctx, pkgs)[1]
-    return Dict("name" => i.name,
-                "uuid" => string(i.uuid),
-                "ver" => string(i.new.ver))
-end
+# function get_pkg_info(pkg::AbstractString)
+#     pkgs = [Pkg.API.check_package_name(pkg)]
+#     ctx = Pkg.Types.Context()
+#     Pkg.API.project_resolve!(ctx.env, pkgs)
+#     Pkg.API.project_deps_resolve!(ctx.env, pkgs)
+#     Pkg.API.manifest_resolve!(ctx.env, pkgs)
+#     Pkg.API.ensure_resolved(ctx.env, pkgs)
+#     i = Pkg.Display.status(ctx, pkgs)[1]
+#     return Dict("name" => i.name,
+#                 "uuid" => string(i.uuid),
+#                 "ver" => string(i.new.ver))
+# end
 
 
 _fix_weights!(::Nothing) = _fix_weights!(Dict{String, Any}())
