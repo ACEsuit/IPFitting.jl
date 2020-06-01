@@ -451,11 +451,7 @@ function asm_fitinfo(db, IP, c, Ibasis, weights,
                    "weights" => weights,
                    "regularisers"  => Dict.(regularisers),
                    "juliaversion"  => juliainfo,
-<<<<<<< HEAD
                    "IPFitting_version" => "na", # get_pkg_info("IPFitting"),
-=======
-                   #"IPFitting_version" => get_pkg_info("IPFitting"),
->>>>>>> ae0b13433d4790e59149307d2fe033c2dbff8cde
                   )
    # TODO: fix IPFitting_version retrieval
 
