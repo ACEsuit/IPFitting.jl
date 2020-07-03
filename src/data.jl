@@ -17,10 +17,9 @@ loaded information.
 """
 module Data
 
-using JuLIP, ProgressMeter, FileIO
+using JuLIP, ProgressMeter, FileIO, Printf
 using IPFitting: Dat, vec_obs, devec_obs, observation, hasobservation
 using IPFitting.DataTypes
-using StringDistances
 import JuLIP: Atoms, energy, forces, virial
 import Base: length, Dict
 
@@ -39,42 +38,42 @@ forces(d::Dat) = haskey(d.D, FORCES) ? devec_obs(Val(:F), d.D[FORCES]) : nothing
 virial(d::Dat) = haskey(d.D, VIRIAL) ? devec_obs(Val(:V), d.D[VIRIAL]) : nothing
 
 
-function read_energy(atpy)
+function read_energy(atpy, energy_key)
    for key in keys(atpy.info)
-      if compare(lowercase(key), "energy", Levenshtein()) > 0.8
+      if lowercase(key) == energy_key
          return atpy.info[key]
       end
    end
    return nothing
 end
 
-function read_forces(atpy)
+function read_forces(atpy, force_key)
    for key in keys(atpy.arrays)
-      if compare(lowercase(key), "forces", Levenshtein()) > 0.8
+      if lowercase(key) == force_key
          return atpy.arrays[key]' |> vecs
       end
    end
    return nothing
 end
 
-function read_virial(atpy)
+function read_virial(atpy, virial_key)
    for key in keys(atpy.info)
-      if compare(lowercase(key), "virial", Levenshtein()) > 0.8
+      if lowercase(key) == virial_key
          return JMat(atpy.info[key]...)
       end
    end
-   for key in keys(atpy.info)
-      if compare(lowercase(key), "stress", Levenshtein()) > 0.8
-         @info("No virial key found: converting stress to virial!")
-         return -1.0 * JMat(atpy.info[key]...) * atpy.get_volume()
-      end
-   end
+   # for key in keys(atpy.info)
+   #    if compare(lowercase(key), "stress", Levenshtein()) > 0.8
+   #       @info("No virial key found: converting stress to virial!")
+   #       return -1.0 * JMat(atpy.info[key]...) * atpy.get_volume()
+   #    end
+   # end
    return nothing
 end
 
 function read_configtype(atpy)
    for key in keys(atpy.info)
-      if compare(lowercase(key), "config_type", Levenshtein()) > 0.8
+      if lowercase(key) == "config_type"
          return atpy.info[key]
       end
    end
@@ -91,7 +90,7 @@ function read_xyz(fname; verbose=true, index = ":",
 Loads the atoms objects contained in an xyz file, attempts to read the
 DFT data stored inside and returns a `Vector{Dat}`.
 """
-function read_xyz(fname; verbose=true, index = ":",
+function read_xyz(fname; energy_key = "", force_key = "", virial_key = "", verbose=true, index = ":",
                          include = nothing, exclude = nothing)
    if verbose
       println("Reading in $fname ...")
@@ -103,8 +102,17 @@ function read_xyz(fname; verbose=true, index = ":",
       println("Processing data ...")
       # tic()
    end
+
+   #E_f, F_f, V_f count the # of energy/force/virial components found
+
+   E_f = 0
+   F_f = 0
+   V_f = 0
+
+   config_dict = Dict()
+
    dt = verbose ? 1.0 : 0.0
-   @showprogress dt for atpy in at_list
+   @showprogress dt for (i,atpy) in enumerate(at_list)
 
       # get the config type and decide whether to keep or skip this config
       config_type = read_configtype(atpy)
@@ -123,11 +131,36 @@ function read_xyz(fname; verbose=true, index = ":",
          end
       end
 
+      if config_type in keys(config_dict)
+         config_dict[config_type] .+= [1,length(atpy)]
+      else
+         config_dict[config_type] = [1,length(atpy)]
+      end
+
       idx += 1
       at = read_Atoms(atpy)
-      E = read_energy(atpy)
-      F = read_forces(atpy)
-      V = read_virial(atpy)
+      E = read_energy(atpy, energy_key)
+      F = read_forces(atpy, force_key)
+      V = read_virial(atpy, virial_key)
+
+      if E != nothing
+         E_f += length(hcat(E...))
+      else
+         @warn("Energy not found for config: " * string(i))
+      end
+
+      if F != nothing
+         F_f += length(hcat(F...))
+      else
+         @warn("Force not found for config: " * string(i))
+      end
+
+      if V != nothing
+         V_f += length(hcat(V...))
+      else
+         @warn("Virial not found for config: " * string(i))
+      end
+
       EFV = ""
       (E != nothing) && (EFV *= "E")
       (F != nothing) && (EFV *= "F")
@@ -138,6 +171,20 @@ function read_xyz(fname; verbose=true, index = ":",
                        E = E, F = F, V = V )
    end
    # verbose && toc()
+   print("┏━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━┓\n")
+   print("┃ config type  ┃  # cfgs  ┃  # envs  ┃\n")
+   print("┠──────────────╂──────────╂──────────┨\n")
+   for config_type in sort(collect(keys(config_dict)))
+      s = @sprintf("┃ %12s ┃ %8s ┃ %8s ┃\n", config_type, config_dict[config_type][1], config_dict[config_type][2])
+      print(s)
+   end
+   print("┗━━━━━━━━━━━━━━┻━━━━━━━━━━┻━━━━━━━━━━┛\n")
+
+   @info("Configurations found in .xyz file: " * string(length(at_list)))
+   @info("Energies found [key: \"" * energy_key * "\"]: " * string(E_f))
+   @info("Forces found [key: \"" * force_key * "\"]: " * string(F_f))
+   @info("Virials found [key: \"" * virial_key * "\"]: " * string(V_f))
+
    return data[1:idx]
 end
 
