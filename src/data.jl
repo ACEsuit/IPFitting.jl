@@ -131,34 +131,34 @@ function read_xyz(fname; energy_key = "", force_key = "", virial_key = "", verbo
          end
       end
 
-      if config_type in keys(config_dict)
-         config_dict[config_type] .+= [1,length(atpy)]
-      else
-         config_dict[config_type] = [1,length(atpy)]
-      end
-
       idx += 1
       at = read_Atoms(atpy)
       E = read_energy(atpy, energy_key)
       F = read_forces(atpy, force_key)
       V = read_virial(atpy, virial_key)
 
-      if E != nothing
-         E_f += length(hcat(E...))
+      if E == nothing
+         E_c = 0
       else
-         @warn("Energy not found for config: " * string(i))
+         E_c = length(hcat(E...))
       end
 
-      if F != nothing
-         F_f += length(hcat(F...))
+      if F == nothing
+         F_c = 0
       else
-         @warn("Force not found for config: " * string(i))
+         F_c = length(hcat(F...))
       end
 
-      if V != nothing
-         V_f += length(hcat(V...))
+      if V == nothing
+         V_c = 0
       else
-         @warn("Virial not found for config: " * string(i))
+         V_c = length(hcat(V...))
+      end
+
+      if config_type in keys(config_dict)
+         config_dict[config_type] .+= [1, length(atpy), E_c, F_c, V_c]
+      else
+         config_dict[config_type] = [1, length(atpy), E_c, F_c, V_c]
       end
 
       EFV = ""
@@ -171,19 +171,15 @@ function read_xyz(fname; energy_key = "", force_key = "", virial_key = "", verbo
                        E = E, F = F, V = V )
    end
    # verbose && toc()
-   print("┏━━━━━━━━━━━━━━┳━━━━━━━━━━┳━━━━━━━━━━┓\n")
-   print("┃ config type  ┃  # cfgs  ┃  # envs  ┃\n")
-   print("┠──────────────╂──────────╂──────────┨\n")
+   print("┏━━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┓\n")
+   print("┃ config type  ┃ #cfgs ┃ #envs ┃   #E   ┃   #F   ┃   #V   ┃\n")
+   print("┠──────────────╂───────╂───────╂────────╂────────╂────────┨\n")
    for config_type in sort(collect(keys(config_dict)))
-      s = @sprintf("┃ %12s ┃ %8s ┃ %8s ┃\n", config_type, config_dict[config_type][1], config_dict[config_type][2])
+      s = @sprintf("┃ %12s ┃ %5s ┃ %5s ┃ %6s ┃ %6s ┃ %6s ┃\n", config_type, config_dict[config_type][1], config_dict[config_type][2],
+            config_dict[config_type][3], config_dict[config_type][4], config_dict[config_type][5])
       print(s)
    end
-   print("┗━━━━━━━━━━━━━━┻━━━━━━━━━━┻━━━━━━━━━━┛\n")
-
-   @info("Configurations found in .xyz file: " * string(length(at_list)))
-   @info("Energies found [key: \"" * energy_key * "\"]: " * string(E_f))
-   @info("Forces found [key: \"" * force_key * "\"]: " * string(F_f))
-   @info("Virials found [key: \"" * virial_key * "\"]: " * string(V_f))
+   print("┗━━━━━━━━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━━┻━━━━━━━━┻━━━━━━━━┛\n")
 
    return data[1:idx]
 end
