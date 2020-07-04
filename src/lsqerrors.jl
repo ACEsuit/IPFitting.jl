@@ -4,7 +4,7 @@ module Errors
 using JuLIP: Atoms, energy, forces, virial
 using IPFitting: LsqDB, Dat, configtype, err_weighthook, eval_obs,
                       observation, hasobservation, observations,
-                      vec_obs, tfor_observations
+                      vec_obs, tfor_observations, truncate_string
 using IPFitting.DB: matrows
 using FileIO, Printf, Base.Threads
 
@@ -87,18 +87,6 @@ function add_fits_serial!(IP, configs::Vector{Dat}; fitkey = "fit")
       cfg.info[fitkey][okey] = obs
    end
    return nothing
-end
-
-
-function truncate_string(s, n)
-   if length(s) <= n
-      return s
-   end
-   n1 = n2 = (n-2) ÷ 2
-   if n1 + n2 + 2 < n
-      n1 += 1
-   end
-   return "$(s[1:n1])..$(s[end-n2+1:end])"
 end
 
 function _relerr(relerrs, ct, ot)

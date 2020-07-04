@@ -28,7 +28,7 @@ import ASE     # use ASE since this will have already figured out how to
 using ASE: ASEAtoms
 ase_io = ASE.ase_io
 
-export configtype, weight, load_data
+export configtype, weight, load_data, truncate_string
 
 Atoms(d::Dat) = d.at
 length(d::Dat) = length(d.at)
@@ -80,6 +80,25 @@ function read_configtype(atpy)
    return nothing
 end
 
+function truncate_string(s, n)
+   if length(s) <= n
+      return s
+   end
+   n1 = n2 = (n-2) ÷ 2
+   if n1 + n2 + 2 < n
+      n1 += 1
+   end
+   return "$(s[1:n1])..$(s[end-n2+1:end])"
+end
+
+function count_scalars(obs)
+   if obs == nothing
+      return 0
+   else
+      return length(hcat(obs...))
+   end
+end
+
 read_Atoms(atpy) = Atoms(ASEAtoms( atpy ))
 
 """
@@ -109,24 +128,24 @@ function read_xyz(fname; energy_key = "", force_key = "", virial_key = "", verbo
    F_f = 0
    V_f = 0
 
-   config_dict = Dict()
+   ct_dict = Dict()
 
    dt = verbose ? 1.0 : 0.0
    @showprogress dt for (i,atpy) in enumerate(at_list)
 
       # get the config type and decide whether to keep or skip this config
-      config_type = read_configtype(atpy)
-      if config_type == nothing
+      ct = read_configtype(atpy)
+      if ct == nothing
          verbose && @warn("$(idx+1) has no config_type")
-         config_type = "nothing"
+         ct = "nothing"
       end
       if exclude != nothing
-         if config_type in exclude
+         if ct in exclude
             continue
          end
       end
       if include != nothing
-         if !(config_type in include)
+         if !(ct in include)
             continue
          end
       end
@@ -137,28 +156,14 @@ function read_xyz(fname; energy_key = "", force_key = "", virial_key = "", verbo
       F = read_forces(atpy, force_key)
       V = read_virial(atpy, virial_key)
 
-      if E == nothing
-         E_c = 0
-      else
-         E_c = length(hcat(E...))
-      end
+      E_c = count_scalars(E)
+      F_c = count_scalars(F)
+      V_c = count_scalars(V)
 
-      if F == nothing
-         F_c = 0
+      if ct in keys(ct_dict)
+         ct_dict[ct] .+= [1, length(atpy), E_c, F_c, V_c]
       else
-         F_c = length(hcat(F...))
-      end
-
-      if V == nothing
-         V_c = 0
-      else
-         V_c = length(hcat(V...))
-      end
-
-      if config_type in keys(config_dict)
-         config_dict[config_type] .+= [1, length(atpy), E_c, F_c, V_c]
-      else
-         config_dict[config_type] = [1, length(atpy), E_c, F_c, V_c]
+         ct_dict[ct] = [1, length(atpy), E_c, F_c, V_c]
       end
 
       EFV = ""
@@ -167,19 +172,33 @@ function read_xyz(fname; energy_key = "", force_key = "", virial_key = "", verbo
       (V != nothing) && (EFV *= "V")
 
       data[idx] = Dat( at,
-                       config_type;
+                       ct;
                        E = E, F = F, V = V )
    end
    # verbose && toc()
-   print("┏━━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━┳━━━━━━━━┳━━━━━━━━┳━━━━━━━━┓\n")
-   print("┃ config type  ┃ #cfgs ┃ #envs ┃   #E   ┃   #F   ┃   #V   ┃\n")
-   print("┠──────────────╂───────╂───────╂────────╂────────╂────────┨\n")
-   for config_type in sort(collect(keys(config_dict)))
-      s = @sprintf("┃ %12s ┃ %5s ┃ %5s ┃ %6s ┃ %6s ┃ %6s ┃\n", config_type, config_dict[config_type][1], config_dict[config_type][2],
-            config_dict[config_type][3], config_dict[config_type][4], config_dict[config_type][5])
+   print("┏━━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┓\n")
+   print("┃ config type  ┃ #cfgs ┃ #envs  ┃      #E      ┃      #F      ┃      #V      ┃\n")
+   print("┠──────────────╂───────╂────────╂──────────────╂──────────────╂──────────────┨\n")
+
+   totals = [0,0,0,0,0]
+
+   for ct in sort(collect(keys(ct_dict)))
+      s = @sprintf("┃ %12s ┃ %5s ┃ %6s ┃ %6s [%4s]┃ %6s [%4s]┃ %6s [%4s]┃\n",
+         truncate_string(ct, 12), ct_dict[ct][1], ct_dict[ct][2],
+            ct_dict[ct][3], abs(ct_dict[ct][3] - ct_dict[ct][1]),
+            ct_dict[ct][4], abs(ct_dict[ct][4] - 3*ct_dict[ct][2]),
+            ct_dict[ct][5], abs(ct_dict[ct][5] - 9*ct_dict[ct][1]))
       print(s)
+      for i in 1:5
+         totals[i] += ct_dict[ct][i]
+      end
    end
-   print("┗━━━━━━━━━━━━━━┻━━━━━━━┻━━━━━━━┻━━━━━━━━┻━━━━━━━━┻━━━━━━━━┛\n")
+
+   print("┠──────────────╂───────╂────────╂──────────────╂──────────────╂──────────────┨\n")
+   s = @sprintf("┃    totals    ┃ %5s ┃ %6s ┃ %12s ┃ %12s ┃ %12s ┃\n",
+            totals[1], totals[2], totals[3], totals[4], totals[5])
+   print(s)
+   print("┗━━━━━━━━━━━━━━┻━━━━━━━┻━━━━━━━━┻━━━━━━━━━━━━━━┻━━━━━━━━━━━━━━┻━━━━━━━━━━━━━━┛\n")
 
    return data[1:idx]
 end
