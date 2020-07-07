@@ -17,9 +17,10 @@ loaded information.
 """
 module Data
 
-using JuLIP, ProgressMeter, FileIO, Printf
+using JuLIP, ProgressMeter, FileIO, Printf, StatsBase
 using IPFitting: Dat, vec_obs, devec_obs, observation, hasobservation
 using IPFitting.DataTypes
+using StringDistances
 import JuLIP: Atoms, energy, forces, virial
 import Base: length, Dict
 
@@ -99,6 +100,15 @@ function count_scalars(obs)
    end
 end
 
+function keys_info(key_dict)
+   s = "keys found: "
+   for key in sort(collect(keys(key_dict)))
+      n = key_dict[key]
+      s *= "\"$(key)\" [$n], "
+   end
+   return s[1:end-2]
+end
+
 read_Atoms(atpy) = Atoms(ASEAtoms( atpy ))
 
 """
@@ -109,7 +119,7 @@ function read_xyz(fname; verbose=true, index = ":",
 Loads the atoms objects contained in an xyz file, attempts to read the
 DFT data stored inside and returns a `Vector{Dat}`.
 """
-function read_xyz(fname; energy_key = "", force_key = "", virial_key = "", verbose=true, index = ":",
+function read_xyz(fname; energy_key = "dft_energy", force_key = "dft_force", virial_key = "dft_virial", auto=false, verbose=true, index = ":",
                          include = nothing, exclude = nothing)
    if verbose
       println("Reading in $fname ...")
@@ -122,11 +132,22 @@ function read_xyz(fname; energy_key = "", force_key = "", virial_key = "", verbo
       # tic()
    end
 
-   #E_f, F_f, V_f count the # of energy/force/virial components found
+   info_dict = countmap(collect(Iterators.flatten([collect(keys(at.info)) for at in at_list])))
+   array_dict = countmap(collect(Iterators.flatten([collect(keys(at.arrays)) for at in at_list])))
 
-   E_f = 0
-   F_f = 0
-   V_f = 0
+   if auto
+      energy_key = findmax([[compare(energy_key, key, Levenshtein()), key] for key in keys(info_dict)])[1][2]
+      force_key = findmax([[compare(force_key, key, Levenshtein()), key] for key in keys(array_dict)])[1][2]
+      virial_key = findmax([[compare(virial_key, key, Levenshtein()), key] for key in keys(info_dict)])[1][2]
+   end
+
+   @info("Keys used: E => \"$(energy_key)\", F => \"$(force_key)\", V => \"$(virial_key)\"")
+
+   if verbose
+      for (key,val) in Dict("Info " => info_dict, "Array " => array_dict)
+         @info(key * keys_info(val))
+      end
+   end
 
    ct_dict = Dict()
 
@@ -176,12 +197,12 @@ function read_xyz(fname; energy_key = "", force_key = "", virial_key = "", verbo
                        E = E, F = F, V = V )
    end
    # verbose && toc()
-   print("┏━━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┓\n")
-   print("┃ config type  ┃ #cfgs ┃ #envs  ┃      #E      ┃      #F      ┃      #V      ┃\n")
-   print("┠──────────────╂───────╂────────╂──────────────╂──────────────╂──────────────┨\n")
 
    totals = [0,0,0,0,0]
 
+   print("┏━━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┓\n")
+   print("┃ config type  ┃ #cfgs ┃ #envs  ┃      #E      ┃      #F      ┃      #V      ┃\n")
+   print("┠──────────────╂───────╂────────╂──────────────╂──────────────╂──────────────┨\n")
    for ct in sort(collect(keys(ct_dict)))
       s = @sprintf("┃ %12s ┃ %5s ┃ %6s ┃ %6s [%4s]┃ %6s [%4s]┃ %6s [%4s]┃\n",
          truncate_string(ct, 12), ct_dict[ct][1], ct_dict[ct][2],
