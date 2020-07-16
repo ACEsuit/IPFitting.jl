@@ -23,6 +23,8 @@ StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 StringDistances = "88034a9c-02f8-509d-84a9-84ec65e18404"
+PrettyTables = "08abe8d2-0d0c-5749-adfa-8a2ac140af0d"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 
 [compat]
 ASE = "≥ 0.5.2"

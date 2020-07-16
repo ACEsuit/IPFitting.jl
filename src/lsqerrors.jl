@@ -10,7 +10,7 @@ using FileIO, Printf, Base.Threads
 
 using Statistics: quantile
 using LinearAlgebra: norm
-using ProgressMeter
+using ProgressMeter, DataFrames, PrettyTables
 using Random: shuffle!
 
 export add_fits!, add_fits_serial!, rmse, mae, rmse_table, rmse_table_wg, mae_table,
@@ -107,78 +107,98 @@ function _err(errs, ct, ot)
    return NaN
 end
 
-function _err_table_wg(errs, relerrs, title, weights, configtypes=:)
-   lentitle = length(title)
-   print("┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n")
-   print("┃ "); printstyled(title; bold=true);
-   print(repeat(' ', 70-3-lentitle)); print("┃\n")
-   print("┣━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━┯━━━━━━━━━━━━━━━━━┯━━━━━━━━━━━━━━━━━┫\n")
-   print("┃ config type  ┃     E [meV]     │     F [eV/A]    │     V [meV]     ┃\n")
-   print("┠──────────────╂────────┬────────┼────────┬────────┼────────┬────────┨\n")
-   s_set = ""
-   for ct in keys(errs)  # ct in configtypes
-      if (configtypes != :)
-         if !(ct in configtypes)
-            continue
-         end
-      end
-
-      if haskey(weights, ct)
-         w = weights[ct]
-      else
-         w = weights["default"]
-      end
-
-      s = @sprintf("┃ %12s ┃ %6.2f ┊ %5.3f%% │ %6.3f ┊ %5.2f%% │ %6.1f ┊ %5.2f%% ┃\n",
-         truncate_string(ct, 12),
-         _err(errs, ct, "E")*1000 * w["E"], _relerr(relerrs, ct, "E") * w["E"],
-         _err(errs, ct, "F") * w["F"], _relerr(relerrs, ct, "F") * w["F"],
-         _err(errs, ct, "V")*1000 * w["V"], _relerr(relerrs, ct, "V") * w["V"])
-      if ct == "set"
-         s_set = s
-      else
-         print(s)
-      end
-   end
-   if s_set != ""
-      print("┠──────────────╂────────┼────────┼────────┼────────┼────────┼────────┨\n")
-      print(s_set)
-   end
-      print("┗━━━━━━━━━━━━━━┻━━━━━━━━┷━━━━━━━━┷━━━━━━━━┷━━━━━━━━┷━━━━━━━━┷━━━━━━━━┛\n")
-end
+# function _err_table_wg(errs, relerrs, title, weights, configtypes=:)
+#    lentitle = length(title)
+#    print("┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n")
+#    print("┃ "); printstyled(title; bold=true);
+#    print(repeat(' ', 70-3-lentitle)); print("┃\n")
+#    print("┣━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━┯━━━━━━━━━━━━━━━━━┯━━━━━━━━━━━━━━━━━┫\n")
+#    print("┃ config type  ┃     E [meV]     │     F [eV/A]    │     V [meV]     ┃\n")
+#    print("┠──────────────╂────────┬────────┼────────┬────────┼────────┬────────┨\n")
+#    s_set = ""
+#    for ct in keys(errs)  # ct in configtypes
+#       if (configtypes != :)
+#          if !(ct in configtypes)
+#             continue
+#          end
+#       end
+#
+#       if haskey(weights, ct)
+#          w = weights[ct]
+#       else
+#          w = weights["default"]
+#       end
+#
+#       s = @sprintf("┃ %12s ┃ %6.2f ┊ %5.3f%% │ %6.3f ┊ %5.2f%% │ %6.1f ┊ %5.2f%% ┃\n",
+#          truncate_string(ct, 12),
+#          _err(errs, ct, "E")*1000 * w["E"], _relerr(relerrs, ct, "E") * w["E"],
+#          _err(errs, ct, "F") * w["F"], _relerr(relerrs, ct, "F") * w["F"],
+#          _err(errs, ct, "V")*1000 * w["V"], _relerr(relerrs, ct, "V") * w["V"])
+#       if ct == "set"
+#          s_set = s
+#       else
+#          print(s)
+#       end
+#    end
+#    if s_set != ""
+#       print("┠──────────────╂────────┼────────┼────────┼────────┼────────┼────────┨\n")
+#       print(s_set)
+#    end
+#       print("┗━━━━━━━━━━━━━━┻━━━━━━━━┷━━━━━━━━┷━━━━━━━━┷━━━━━━━━┷━━━━━━━━┷━━━━━━━━┛\n")
+# end
 
 function _err_table(errs, relerrs, title, configtypes=:)
    lentitle = length(title)
-   print("┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n")
-   print("┃ "); printstyled(title; bold=true);
-   print(repeat(' ', 70-3-lentitle)); print("┃\n")
-   print("┣━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━┯━━━━━━━━━━━━━━━━━┯━━━━━━━━━━━━━━━━━┫\n")
-   print("┃ config type  ┃     E [meV]     │     F [eV/A]    │     V [meV]     ┃\n")
-   print("┠──────────────╂────────┬────────┼────────┬────────┼────────┬────────┨\n")
-   s_set = ""
-   for ct in keys(errs)  # ct in configtypes
-      if (configtypes != :)
-         if !(ct in configtypes)
-            continue
-         end
-      end
+   datf = DataFrame()
+   datf[!, Symbol("cf")] = Any[]
+   datf[!, Symbol("E")]= Any[]
+   datf[!, Symbol("F")]= Any[]
+   datf[!, Symbol("V")]= Any[]
 
-      s = @sprintf("┃ %12s ┃ %6.2f ┊ %5.3f%% │ %6.3f ┊ %5.2f%% │ %6.1f ┊ %5.2f%% ┃\n",
-         truncate_string(ct, 12),
-         _err(errs, ct, "E")*1000, _relerr(relerrs, ct, "E"),
-         _err(errs, ct, "F"), _relerr(relerrs, ct, "F"),
-         _err(errs, ct, "V")*1000, _relerr(relerrs, ct, "V"))
-      if ct == "set"
-         s_set = s
-      else
-         print(s)
+   #need to add relative errors!
+
+   for ct in sort(collect(keys(errs)))
+      if ct != "set"
+         push!(datf, [ct, _err(errs, ct, "E")*1000, _err(errs, ct, "F"),  _err(errs, ct, "V")*1000])
       end
    end
-   if s_set != ""
-      print("┠──────────────╂────────┼────────┼────────┼────────┼────────┼────────┨\n")
-      print(s_set)
-   end
-      print("┗━━━━━━━━━━━━━━┻━━━━━━━━┷━━━━━━━━┷━━━━━━━━┷━━━━━━━━┷━━━━━━━━┷━━━━━━━━┛\n")
+
+   push!(datf, ["set", _err(errs, "set", "E")*1000, _err(errs, "set", "F"),  _err(errs, "set", "V")*1000])
+
+   header = ["config type" "E [meV]" "F [eV/A]" "V[meV]"]
+
+   pretty_table(datf, header, formatters = ft_printf("%5.3f"), body_hlines = [length(datf[!, 1])-1])
+
+   # print("┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n")
+   # print("┃ "); printstyled(title; bold=true);
+   # print(repeat(' ', 70-3-lentitle)); print("┃\n")
+   # print("┣━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━┯━━━━━━━━━━━━━━━━━┯━━━━━━━━━━━━━━━━━┫\n")
+   # print("┃ config type  ┃     E [meV]     │     F [eV/A]    │     V [meV]     ┃\n")
+   # print("┠──────────────╂────────┬────────┼────────┬────────┼────────┬────────┨\n")
+   # s_set = ""
+   # for ct in keys(errs)  # ct in configtypes
+   #    if (configtypes != :)
+   #       if !(ct in configtypes)
+   #          continue
+   #       end
+   #    end
+   #
+   #    s = @sprintf("┃ %12s ┃ %6.2f ┊ %5.3f%% │ %6.3f ┊ %5.2f%% │ %6.1f ┊ %5.2f%% ┃\n",
+   #       truncate_string(ct, 12),
+   #       _err(errs, ct, "E")*1000, _relerr(relerrs, ct, "E"),
+   #       _err(errs, ct, "F"), _relerr(relerrs, ct, "F"),
+   #       _err(errs, ct, "V")*1000, _relerr(relerrs, ct, "V"))
+   #    if ct == "set"
+   #       s_set = s
+   #    else
+   #       print(s)
+   #    end
+   # end
+   # if s_set != ""
+   #    print("┠──────────────╂────────┼────────┼────────┼────────┼────────┼────────┨\n")
+   #    print(s_set)
+   # end
+   #    print("┗━━━━━━━━━━━━━━┻━━━━━━━━┷━━━━━━━━┷━━━━━━━━┷━━━━━━━━┷━━━━━━━━┷━━━━━━━━┛\n")
 end
 
 

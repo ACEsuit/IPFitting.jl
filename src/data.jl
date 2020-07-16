@@ -17,7 +17,7 @@ loaded information.
 """
 module Data
 
-using JuLIP, ProgressMeter, FileIO, Printf, StatsBase
+using JuLIP, ProgressMeter, FileIO, Printf, StatsBase, PrettyTables, DataFrames
 using IPFitting: Dat, vec_obs, devec_obs, observation, hasobservation
 using IPFitting.DataTypes
 using StringDistances
@@ -150,6 +150,7 @@ function read_xyz(fname; energy_key = "dft_energy", force_key = "dft_force", vir
    end
 
    ct_dict = Dict()
+   ct_datf = DataFrame()#A = Any[], B = Any[], C = Any[], D = Any[], E = Any[], F = Any[])
 
    dt = verbose ? 1.0 : 0.0
    @showprogress dt for (i,atpy) in enumerate(at_list)
@@ -181,10 +182,10 @@ function read_xyz(fname; energy_key = "dft_energy", force_key = "dft_force", vir
       F_c = count_scalars(F)
       V_c = count_scalars(V)
 
-      if ct in keys(ct_dict)
-         ct_dict[ct] .+= [1, length(atpy), E_c, F_c, V_c]
+      if ct in names(ct_datf)
+         ct_datf[!, Symbol(ct)] .+= [1, length(atpy), E_c, F_c, V_c]
       else
-         ct_dict[ct] = [1, length(atpy), E_c, F_c, V_c]
+         ct_datf[!, Symbol(ct)] = [1, length(atpy), E_c, F_c, V_c]
       end
 
       EFV = ""
@@ -198,28 +199,38 @@ function read_xyz(fname; energy_key = "dft_energy", force_key = "dft_force", vir
    end
    # verbose && toc()
 
-   totals = [0,0,0,0,0]
+   ct_datf_trans = DataFrame([[names(ct_datf)]; collect.(eachrow(ct_datf))], [:column; Symbol.(axes(ct_datf, 1))]) #apparently only "simple" way to take a dataframe transpose......
+   rename!(ct_datf_trans, Symbol.(["config_type", "#cfgs", "#envs", "#E", "#F", "#V"]))
 
-   print("┏━━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┓\n")
-   print("┃ config type  ┃ #cfgs ┃ #envs  ┃      #E      ┃      #F      ┃      #V      ┃\n")
-   print("┠──────────────╂───────╂────────╂──────────────╂──────────────╂──────────────┨\n")
-   for ct in sort(collect(keys(ct_dict)))
-      s = @sprintf("┃ %12s ┃ %5s ┃ %6s ┃ %6s [%4s]┃ %6s [%4s]┃ %6s [%4s]┃\n",
-         truncate_string(ct, 12), ct_dict[ct][1], ct_dict[ct][2],
-            ct_dict[ct][3], abs(ct_dict[ct][3] - ct_dict[ct][1]),
-            ct_dict[ct][4], abs(ct_dict[ct][4] - 3*ct_dict[ct][2]),
-            ct_dict[ct][5], abs(ct_dict[ct][5] - 9*ct_dict[ct][1]))
-      print(s)
-      for i in 1:5
-         totals[i] += ct_dict[ct][i]
-      end
-   end
+   totals = sum.(eachcol(ct_datf_trans[:, 2:end]))
+   missings = [0, 0, abs(totals[1] - totals[3]), abs(3*totals[2] - totals[4]), abs(9*totals[1] - totals[5])]
+   push!(ct_datf_trans, vcat(["total", totals]...))
+   push!(ct_datf_trans, vcat(["missing", missings]...))
 
-   print("┠──────────────╂───────╂────────╂──────────────╂──────────────╂──────────────┨\n")
-   s = @sprintf("┃    totals    ┃ %5s ┃ %6s ┃ %12s ┃ %12s ┃ %12s ┃\n",
-            totals[1], totals[2], totals[3], totals[4], totals[5])
-   print(s)
-   print("┗━━━━━━━━━━━━━━┻━━━━━━━┻━━━━━━━━┻━━━━━━━━━━━━━━┻━━━━━━━━━━━━━━┻━━━━━━━━━━━━━━┛\n")
+   pretty_table(ct_datf_trans, body_hlines = [length(ct_datf_trans[!, 1])-2])
+   #
+   # totals = [0,0,0,0,0]
+   #
+   # print("┏━━━━━━━━━━━━━━┳━━━━━━━┳━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━┓\n")
+   # print("┃ config type  ┃ #cfgs ┃ #envs  ┃      #E      ┃      #F      ┃      #V      ┃\n")
+   # print("┠──────────────╂───────╂────────╂──────────────╂──────────────╂──────────────┨\n")
+   # for ct in sort(collect(keys(ct_dict)))
+   #    s = @sprintf("┃ %12s ┃ %5s ┃ %6s ┃ %6s [%4s]┃ %6s [%4s]┃ %6s [%4s]┃\n",
+   #       truncate_string(ct, 12), ct_dict[ct][1], ct_dict[ct][2],
+   #          ct_dict[ct][3], abs(ct_dict[ct][3] - ct_dict[ct][1]),
+   #          ct_dict[ct][4], abs(ct_dict[ct][4] - 3*ct_dict[ct][2]),
+   #          ct_dict[ct][5], abs(ct_dict[ct][5] - 9*ct_dict[ct][1]))
+   #    print(s)
+   #    for i in 1:5
+   #       totals[i] += ct_dict[ct][i]
+   #    end
+   # end
+   #
+   # print("┠──────────────╂───────╂────────╂──────────────╂──────────────╂──────────────┨\n")
+   # s = @sprintf("┃    totals    ┃ %5s ┃ %6s ┃ %12s ┃ %12s ┃ %12s ┃\n",
+   #          totals[1], totals[2], totals[3], totals[4], totals[5])
+   # print(s)
+   # print("┗━━━━━━━━━━━━━━┻━━━━━━━┻━━━━━━━━┻━━━━━━━━━━━━━━┻━━━━━━━━━━━━━━┻━━━━━━━━━━━━━━┛\n")
 
    return data[1:idx]
 end
