@@ -78,11 +78,13 @@ observation(key::String, d::Dat) = d.D[key]
 A representation of a least-squares system stored on disk, which can
 be extended by adding data, or basis functions
 """
+
 mutable struct LsqDB
    basis::IPBasis
    configs::Vector{Dat}
    Ψ::Matrix{Float64}
    dbpath::String
+   QR::Dict
 end
 
 basis(db::LsqDB) = db.basis

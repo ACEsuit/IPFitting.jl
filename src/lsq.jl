@@ -73,7 +73,7 @@ in this case the re-weighting via the `weighthook` is ignored as well.
 """
 function collect_observations(db::LsqDB,
                               weights::Dict,
-                              Vref, scal_wgs = false )
+                              Vref)#, scal_wgs = false )
 
    nrows = size(db.Ψ, 1)  # total number of observations if we collect
                           # everything in the database
@@ -103,7 +103,7 @@ function collect_observations(db::LsqDB,
       # modify the weights from extra information in the dat structure
       W[irows] .= _get_weights(weights,
                                weighthook(obskey, dat),
-                               dat, obskey, obs, scal_wgs)
+                               dat, obskey, obs)#, scal_wgs)
    end
    return Y, W, Icfg
 end
@@ -111,7 +111,7 @@ end
 """
 see documentation in `collect_observations`
 """
-function _get_weights(weights, wh, dat, obskey, o, scal_wgs)
+function _get_weights(weights, wh, dat, obskey, o)#, scal_wgs)
    # initialise the weight to 0.0. If this isn't overwritten then it means
    # we will ignore this observation.
    w = 0.0
@@ -143,25 +143,25 @@ function _get_weights(weights, wh, dat, obskey, o, scal_wgs)
    end
 
    if obskey == "F"
-      fwghts = []
-
-      if cfgkey in keys(scal_wgs)
-         Rs = [norm(JuLIP.Utils.project_min(dat.at, JVecF(i))) for i in dat.at.X]
-
-         Rsl  = [j^scal_wgs[cfgkey]["σ"] for i in 1:3 for j in Rs]
-
-         fwghts = (scal_wgs[cfgkey]["C"]/maximum(dat.D["F"])) .* Rsl
-
-         fwghts[fwghts .>= scal_wgs[cfgkey]["fwmax"]] .= scal_wgs[cfgkey]["fwmax"]
-         fwghts[fwghts .<= scal_wgs[cfgkey]["fwmin"]] .= scal_wgs[cfgkey]["fwmin"]
-
-         @show obskey, length(o)
-         @show cfgkey
-         @show fwghts
-
-         return fwghts
-
-      else
+      # fwghts = []
+      #
+      # if cfgkey in keys(scal_wgs)
+      #    Rs = [norm(JuLIP.Utils.project_min(dat.at, JVecF(i))) for i in dat.at.X]
+      #
+      #    Rsl  = [j^scal_wgs[cfgkey]["σ"] for i in 1:3 for j in Rs]
+      #
+      #    fwghts = (scal_wgs[cfgkey]["C"]/maximum(dat.D["F"])) .* Rsl
+      #
+      #    fwghts[fwghts .>= scal_wgs[cfgkey]["fwmax"]] .= scal_wgs[cfgkey]["fwmax"]
+      #    fwghts[fwghts .<= scal_wgs[cfgkey]["fwmin"]] .= scal_wgs[cfgkey]["fwmin"]
+      #
+      #    @show obskey, length(o)
+      #    @show cfgkey
+      #    @show fwghts
+      #
+      #    return fwghts
+      #
+      # else
          return w * ones(length(o))
       end
    else
@@ -219,13 +219,13 @@ E0, Vref, Ibasis, Itrain, regularisers`.
                                   E0 = nothing,
                                   Vref = OneBody(E0),
                                   weights = nothing,
-                                  scal_wgs = false,
+                                  #scal_wgs = false,
                                   regularisers = [])
    weights = _fix_weights!(weights)
 
    # get the observations vector and the weights vector
    # the Vref potential is subtracted from the observations
-   Y, W, Icfg = collect_observations(db, weights, Vref, scal_wgs)
+   Y, W, Icfg = collect_observations(db, weights, Vref)#, scal_wgs)
 
    # check for NaNs
    any(isnan, Y) && error("NaN detected in observations vector")
@@ -329,7 +329,7 @@ function
                 deldb = false,
                 asmerrs = false,
                 saveqr = nothing,
-                scal_wgs = false,
+                #scal_wgs = false,
                 kwargs...)
    weights = _fix_weights!(weights)
    Jbasis = ((Ibasis == Colon()) ? (1:length(db.basis)) : Ibasis)
@@ -339,8 +339,8 @@ function
    Ψ, Y = get_lsq_system(db; verbose=verbose, Vref=Vref,
                              Ibasis=Ibasis, Itrain = Itrain,
                              weights = weights,
-                             regularisers = regularisers,
-                             scal_wgs = scal_wgs)
+                             regularisers = regularisers)
+                             #scal_wgs = scal_wgs)
    verbose && _show_free_mem()
    if deldb
       @info("Deleting database - `db` can no longer be saved to disk")

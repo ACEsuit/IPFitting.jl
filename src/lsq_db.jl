@@ -54,6 +54,7 @@ using IPFitting:        Dat, LsqDB, basis, eval_obs, observations,
                              tfor_observations
 using IPFitting.Data:   configtype
 using HDF5:                  h5open, read
+using LinearAlgebra: qr, qr!#, cond, norm, svd
 
 import Base: flush, append!, union
 
@@ -62,6 +63,7 @@ export LsqDB, info, configtypes
 const VERSION = 2
 const KRONFILE = "_kron.h5"
 const INFOFILE = "_info.json"
+const QRFILE = "_qr.h5"
 
 """
 `dbpath(db::LsqDB)` : return the absolute path to the database files, not
@@ -72,6 +74,8 @@ dbpath(db::LsqDB) = db.dbpath
 infofile(dbpath::AbstractString) = dbpath * INFOFILE
 
 kronfile(dbpath::AbstractString) = dbpath * KRONFILE
+
+qrfile(dbpath::AbstractString) = dbpath * QRFILE
 
 # ------------ Save and load the info file
 
@@ -120,6 +124,14 @@ _savemath5(A, fname) =
       nothing
    end
 
+"save QR single matrix to HDF5"
+_savematqrh5(Q,R, fname) =
+   h5open(fname, "w") do fid
+      fid["Q"] = Q
+      fid["R"] = R
+      nothing
+   end
+
 "load a single matrix from HDF5"
 _loadmath5(fname) =
    h5open(fname, "r") do fid
@@ -131,16 +143,26 @@ function save_kron(dbpath, db)
    _savemath5(db.Ψ, kronfile(dbpath))
 end
 
+function save_qr(dbpath, db)
+   _savematqrh5(db.QR["Q"][1],db.QR["R"][1], qrfile(dbpath))
+end
+
 save_kron(db) = save_kron(dbpath(db), db)
+
+save_qr(db) = save_qr(dbpath(db), db)
 
 load_kron(dbpath::String; mmap=false) = _loadmath5(kronfile(dbpath))
 
 load_kron(db::LsqDB; mmap=false) = load_kron(dbpath(db); mmap=mmap)
 
+LsqDB(basis::IPBasis, configs::Vector{Dat}, Ψ::Matrix{Float64}, dbpath::String) =
+   LsqDB(basis, configs, Ψ, dbpath, Dict())
+
 function LsqDB(dbpath::AbstractString; mmap=true)
    basis, configs = load_info(dbpath)
    Ψ = load_kron(dbpath; mmap=mmap)
-   return LsqDB(basis, configs, Ψ, dbpath)
+   #look for QR, if it's there's nothing, message and create with empty Dict?
+   return LsqDB(basis, configs, Ψ, dbpath, Dict())
 end
 
 
@@ -168,9 +190,12 @@ function initdb(dbpath)
    return nothing
 end
 
-function flush(db::LsqDB)
+function flush(db::LsqDB; qr=false)
    save_info(db)
    save_kron(db)
+   if qr
+      save_qr(db)
+   end
    return nothing
 end
 
@@ -178,11 +203,40 @@ function LsqDB(dbpath::AbstractString,
                basis::IPBasis,
                configs::AbstractVector{Dat};
                verbose=true,
+               assemble=true,
+               qr=false,
                maxnthreads=nthreads())
+
+   if assemble
+      db = assemble!(dbpath, basis, configs; verbose=verbose, maxnthreads=maxnthreads)
+   end
+   if qr
+      db = LsqDB(dbpath)
+      qrΨ = qr!(db.Ψ)
+
+      saveqr = Dict()
+      saveqr["Q"] = qrΨ.Q
+      saveqr["R"] = qrΨ.R
+
+      db = LsqDB(basis, configs, db.Ψ, dbpath, saveqr)
+
+      #try
+      flush(db, qr=true)
+      #catch
+      #   @warn("""something went wrong trying to save the db to disk, but the data
+      #         should be ok; if it is crucial to keep it, try to save manually.""")
+      #end
+   end
+   return db
+end
+
+function assemble!(dbpath::AbstractString,
+                  basis::IPBasis,
+                  configs::AbstractVector{Dat}; verbose=true, maxnthreads=nthreads())
    # assign indices, count observations and allocate a matrix
    Ψ = _alloc_lsq_matrix(configs, basis)
    # create the struct where everything is stored
-   db = LsqDB(basis, configs, Ψ, dbpath)
+   db = LsqDB(basis, configs, Ψ, dbpath, Dict())
    # parallel assembly of the LSQ matrix
    tfor_observations( configs,
       (n, okey, cfg, lck) -> safe_append!(db, lck, cfg, okey),
