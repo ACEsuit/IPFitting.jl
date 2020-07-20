@@ -53,7 +53,7 @@ using IPFitting:        Dat, LsqDB, basis, eval_obs, observations,
                              observation, vec_obs, devec_obs,
                              tfor_observations
 using IPFitting.Data:   configtype
-using HDF5:                  h5open, read
+using HDF5:                  h5open, read, h5write
 using LinearAlgebra: qr, qr!#, cond, norm, svd
 
 import Base: flush, append!, union
@@ -129,7 +129,6 @@ _savematqrh5(Q,R, fname) =
    h5open(fname, "w") do fid
       fid["Q"] = Q
       fid["R"] = R
-      nothing
    end
 
 "load a single matrix from HDF5"
@@ -137,6 +136,13 @@ _loadmath5(fname) =
    h5open(fname, "r") do fid
       read(fid["A"])
    end
+
+_loadmatqrh5(fname) =
+      h5open(fname, "r") do fid
+         Q = read(fid["Q"])
+         R = read(fid["R"])
+         return Q,R
+      end
 
 function save_kron(dbpath, db)
    _backupfile(kronfile(dbpath))
@@ -153,14 +159,19 @@ save_qr(db) = save_qr(dbpath(db), db)
 
 load_kron(dbpath::String; mmap=false) = _loadmath5(kronfile(dbpath))
 
+load_qr(dbpath::String; mmap=false) = _loadmatqrh5(qrfile(dbpath))
+
 load_kron(db::LsqDB; mmap=false) = load_kron(dbpath(db); mmap=mmap)
 
 LsqDB(basis::IPBasis, configs::Vector{Dat}, Ψ::Matrix{Float64}, dbpath::String) =
    LsqDB(basis, configs, Ψ, dbpath, Dict())
 
-function LsqDB(dbpath::AbstractString; mmap=true)
+function LsqDB(dbpath::AbstractString; mmap=true, qr=false)
    basis, configs = load_info(dbpath)
    Ψ = load_kron(dbpath; mmap=mmap)
+   if qr
+      Q,R = load_qr(dbpath)
+   end
    #look for QR, if it's there's nothing, message and create with empty Dict?
    return LsqDB(basis, configs, Ψ, dbpath, Dict())
 end
@@ -218,10 +229,17 @@ function LsqDB(dbpath::AbstractString,
       saveqr["Q"] = qrΨ.Q
       saveqr["R"] = qrΨ.R
 
+      #Q = zeros(length(basis), length(configs))
+      #@show size(Q)
+
       db = LsqDB(basis, configs, db.Ψ, dbpath, saveqr)
 
+      #@show db
+
+      #flush(db, qr=true)
+
       #try
-      flush(db, qr=true)
+      #flush(db, qr=true)
       #catch
       #   @warn("""something went wrong trying to save the db to disk, but the data
       #         should be ok; if it is crucial to keep it, try to save manually.""")

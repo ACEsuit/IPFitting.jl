@@ -33,11 +33,13 @@ using IPFitting: Dat, LsqDB, weighthook, observations,
 using IPFitting.Data: configtype
 using IPFitting.DB: dbpath, _nconfigs, matrows
 
-using LinearAlgebra: lmul!, Diagonal, qr, qr!, cond, norm, svd
+using LinearAlgebra: lmul!, Diagonal, qr, qr!, cond, norm, svd, I
 using InteractiveUtils: versioninfo
 using LowRankApprox
 using JuLIP.Utils
 using JuLIP: JVecF
+
+using SHIPs
 
 const Err = IPFitting.Errors
 
@@ -111,7 +113,7 @@ end
 """
 see documentation in `collect_observations`
 """
-function _get_weights(weights, wh, dat, obskey, o)#, scal_wgs)
+function _get_weights(weights, wh, dat, obskey, o)
    # initialise the weight to 0.0. If this isn't overwritten then it means
    # we will ignore this observation.
    w = 0.0
@@ -142,42 +144,12 @@ function _get_weights(weights, wh, dat, obskey, o)#, scal_wgs)
       end
    end
 
-   if obskey == "F"
-      # fwghts = []
-      #
-      # if cfgkey in keys(scal_wgs)
-      #    Rs = [norm(JuLIP.Utils.project_min(dat.at, JVecF(i))) for i in dat.at.X]
-      #
-      #    Rsl  = [j^scal_wgs[cfgkey]["σ"] for i in 1:3 for j in Rs]
-      #
-      #    fwghts = (scal_wgs[cfgkey]["C"]/maximum(dat.D["F"])) .* Rsl
-      #
-      #    fwghts[fwghts .>= scal_wgs[cfgkey]["fwmax"]] .= scal_wgs[cfgkey]["fwmax"]
-      #    fwghts[fwghts .<= scal_wgs[cfgkey]["fwmin"]] .= scal_wgs[cfgkey]["fwmin"]
-      #
-      #    @show obskey, length(o)
-      #    @show cfgkey
-      #    @show fwghts
-      #
-      #    return fwghts
-      #
-      # else
-         return w * ones(length(o))
-      end
-   else
-      if length(w) == 1
-         return w * ones(length(o))
-      elseif length(w) == length(o)
-         return w
-      end
-   end
-
    # transform the weights into a vector (if necessary) and return
-   #if length(w) == 1
-   #   return w * ones(length(o))
-   #elseif length(w) == length(o)
-   #   return w
-   #end
+   if length(w) == 1
+      return w * ones(length(o))
+   elseif length(w) == length(o)
+      return w
+   end
    error("_get_weights: length(w) is neither 1 nor length(o)?!?!?")
 end
 
@@ -382,6 +354,24 @@ function
       c = qrΨ \ Y
       rel_rms = norm(Ψ * c - Y) / norm(Y)
 
+   elseif solver[1] == :reglsq_tik
+      verbose && @info("solve $(size(Ψ)) LSQ system using reg lsq")
+      qrΨ = qr!(Ψ)
+      Nb = size(qrΨ.R, 1)
+      y = (Y' * qrΨ.Q)[1:Nb]
+      η0 = norm(Y - qrΨ.Q * y)
+
+      r = solver[2]
+      τ = r * η0
+      Γ = Matrix(I, Nb, Nb)
+
+      c = reglsq(Γ = Γ, R = qrΨ.R, y=y, τ= τ, η0 = η0 );
+
+      rel_rms = norm(Ψ * c - Y) / norm(Y)
+   elseif solver[1] == :reglsq_lap
+      s = SHIPs.scaling(Jbasis, 2)
+      Gamma = Diagonal(s)
+      @show Gamma
    else
       error("unknown `solver` in `lsqfit`")
    end
