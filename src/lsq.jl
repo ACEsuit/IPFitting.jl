@@ -31,7 +31,7 @@ using JuLIP.MLIPs: SumIP
 using IPFitting: Dat, LsqDB, weighthook, observations,
                       observation, hasobservation, eval_obs, vec_obs
 using IPFitting.Data: configtype
-using IPFitting.DB: dbpath, _nconfigs, matrows
+using IPFitting.DB: dbpath, _nconfigs, matrows, qrfile, load_qr, flush_qr
 
 using LinearAlgebra: lmul!, Diagonal, qr, qr!, cond, norm, svd, I
 using InteractiveUtils: versioninfo
@@ -289,6 +289,24 @@ function
 * `IP`: whatever `JuLIP.MLIPs.combine` returns
 * `fitinfo::Dict`: adds all sort of information about the fit
 """
+
+function do_qr!(db, Ψ, Y)
+   @info("Performing QR decomposition")
+   GC.gc();
+   qrΨ = qr!(Ψ)
+
+   saveqr = Dict()
+   saveqr["Q"] = Matrix(qrΨ.Q)
+   saveqr["R"] = Matrix(qrΨ.R)
+   saveqr["Y"] = Y
+
+   db = LsqDB(db.basis, db.configs, db.Ψ, db.dbpath, saveqr)
+
+   flush_qr(db)
+
+   return db
+end
+
 @noinline function lsqfit(db::LsqDB;
                 solver=(:qr, ), verbose=true,
                 Ibasis = :,
@@ -322,23 +340,29 @@ function
    GC.gc()
    verbose && _show_free_mem()
 
+   if !haskey(db.QR, "Q") && !haskey(db.QR, "R")
+      if isfile(qrfile(db.dbpath))
+         @info("Checking QR decomposition")
+         Q,R,Y_load = load_qr(db.dbpath)
+
+         if Y_load == Y ##WEIGHTS ARE IDENTICAL!
+            db = LsqDB(db.basis, db.configs, db.Ψ, db.dbpath, Dict("Q" => Q, "R" => R, "Y" => Y))
+         else
+            db = do_qr!(db, Ψ, Y)
+         end
+      else
+         db = do_qr!(db, Ψ, Y)
+      end
+   end
+
    κ = 0.0
    if (solver[1] == :qr) || (solver == :qr)
       verbose && @info("solve $(size(Ψ)) LSQ system using QR factorisation")
-      qrΨ = qr!(Ψ)
-      κ = cond(qrΨ.R)
-      GC.gc();
-      verbose && @info("cond(R) = $(cond(qrΨ.R))")
-      c = qrΨ \ Y
-      rel_rms = norm(qrΨ.Q * (qrΨ.R * c) - Y) / norm(Y)
-
-      if saveqr isa Dict
-         saveqr["Q"] = qrΨ.Q
-         saveqr["R"] = qrΨ.R
-         saveqr["Y"] = Y
-      end
-
-      qrΨ = nothing
+      # qrΨ = qr!(Ψ)
+      κ = cond(db.QR["R"])
+      verbose && @info("cond(R) = $(κ)")
+      c = inv(db.QR["R"]) * (Matrix(db.QR["Q"])' * Y)
+      rel_rms = norm(db.QR["Q"] * (db.QR["R"] * c) - Y) / norm(Y)
 
    elseif solver[1] == :svd
       verbose && @info("solve $(size(Ψ)) LSQ system using SVD factorisation")
@@ -348,30 +372,43 @@ function
       rel_rms = norm(Ψ * c - Y) / norm(Y)
 
    elseif solver[1] == :rrqr
-      verbose && @info("solve $(size(Ψ)) LSQ system using Rank-Revealing QR factorisation")
-      qrΨ = pqrfact(Ψ, rtol=solver[2])
+      rtol=solver[2]
+      verbose && @info("solve $(size(Ψ)) LSQ system using Rank-Revealing QR factorisation [rtol = $(rtol)]")
+      qrΨ = pqrfact(Ψ, rtol=rtol)
       verbose && @info("cond(R) = $(cond(qrΨ.R))")
       c = qrΨ \ Y
       rel_rms = norm(Ψ * c - Y) / norm(Y)
 
-   elseif solver[1] == :reglsq_tik
-      verbose && @info("solve $(size(Ψ)) LSQ system using reg lsq")
-      qrΨ = qr!(Ψ)
-      Nb = size(qrΨ.R, 1)
-      y = (Y' * qrΨ.Q)[1:Nb]
-      η0 = norm(Y - qrΨ.Q * y)
-
+   elseif solver[1] == :rid
       r = solver[2]
+      verbose && @info("solve $(size(Ψ)) LSQ system using Ridge Regression [r = $(r)] ")
+      Nb = size(db.QR["R"], 1)
+      y = (Y' * db.QR["Q"])[1:Nb]
+      η0 = norm(Y - db.QR["Q"] * y)
+
       τ = r * η0
       Γ = Matrix(I, Nb, Nb)
 
-      c = reglsq(Γ = Γ, R = qrΨ.R, y=y, τ= τ, η0 = η0 );
+      c = reglsq(Γ = Γ, R = db.QR["R"], y=y, τ= τ, η0 = η0 );
 
       rel_rms = norm(Ψ * c - Y) / norm(Y)
-   elseif solver[1] == :reglsq_lap
-      s = SHIPs.scaling(Jbasis, 2)
-      Gamma = Diagonal(s)
-      @show Gamma
+
+   elseif solver[1] == :lap
+      r = solver[2]
+      verbose && @info("solve $(size(Ψ)) LSQ system using Laplacian Regularisation [r = $(r)] ")
+      Nb = size(db.QR["R"], 1)
+      y = (Y' * db.QR["Q"])[1:Nb]
+      η0 = norm(Y - db.QR["Q"] * y)
+
+      τ = r * η0
+
+      #TO DO: ADD in SCALING for 2B!
+      s = SHIPs.scaling(db.basis, 2)
+      Γ = collect(Diagonal(s))
+
+      c = reglsq(Γ = Γ, R = db.QR["R"], y=y, τ= τ, η0 = η0 );
+
+      rel_rms = norm(Ψ * c - Y) / norm(Y)
    else
       error("unknown `solver` in `lsqfit`")
    end
