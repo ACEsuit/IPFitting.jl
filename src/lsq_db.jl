@@ -149,8 +149,8 @@ function save_kron(dbpath, db)
    _savemath5(db.Ψ, kronfile(dbpath))
 end
 
-function save_qr(dbpath, db)
-   _savematqrh5(db.QR["Q"][1],db.QR["R"][1], qrfile(dbpath))
+function saveqr(dbpath, db)
+   _savematqrh5(db.qr["Q"][1],db.qr["R"][1], qrfile(dbpath))
 end
 
 save_kron(db) = save_kron(dbpath(db), db)
