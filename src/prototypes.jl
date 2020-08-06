@@ -84,7 +84,6 @@ mutable struct LsqDB
    configs::Vector{Dat}
    Ψ::Matrix{Float64}
    dbpath::String
-   QR::Dict
 end
 
 basis(db::LsqDB) = db.basis
