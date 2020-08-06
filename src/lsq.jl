@@ -31,7 +31,7 @@ using JuLIP.MLIPs: SumIP
 using IPFitting: Dat, LsqDB, weighthook, observations,
                       observation, hasobservation, eval_obs, vec_obs
 using IPFitting.Data: configtype
-using IPFitting.DB: dbpath, _nconfigs, matrows, qrfile, load_qr, flush_qr
+using IPFitting.DB: dbpath, _nconfigs, matrows
 
 using LinearAlgebra: lmul!, Diagonal, qr, qr!, cond, norm, svd, I
 using InteractiveUtils: versioninfo
