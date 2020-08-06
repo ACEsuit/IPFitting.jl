@@ -1,35 +1,26 @@
 """
 `module DB`
-
 ## Overview
-
 This module implements a "database" for storing a precomputed LSQ system. This
 is useful for fitting e.g. NBodyIPs since it allows one to precompute the <basis,
 data> inner products which are very expensive, and then quickly construct LSQ
 systems from them using e.g., many variants of weighting and regularisation.
-
 A db called (e.g.) 'lsqdb' consists of two files:
  * `lsqdb_info.json` : this stores a list of basis functions and a list
  of configurations with attached observations (normally DFT data)
  * `lsqdb_kron.h5` : this stores all the inner products <basis, data>
  as a single large matrix. The observations and basis functions in
  `lsqdb_info` store the corresponding column and row indices.
-
 ## More details and remarks
-
 ### INFO
-
 * BASIS: The basis is (for the time being) simply represented as a list (Vector) of
 JuLIP.AbstractCalculator. These are stored as `INFO["basis"]`.
-
 * DATA: Each "datum" is an atomistic configuration, which must have a
 "configtype", stored as a `Dat`.
 Informally two pieces of data with the same configtype should represent
 "similar" kinds of configurations. `data = INFO["data"]` is a Dictionary
 where the keys are the configtypes.
-
 ### (De-)Vectorising Data
-
 Forces in `JuLIP` are represented as `Vector{SVector{...}}`, which is the
 same memory layout as a 3 x N matrix (`JuLIP.mat`), which can can then be
 vectorised (`[:]`), and this vectoriation is readily undone again.
@@ -53,17 +44,15 @@ using IPFitting:        Dat, LsqDB, basis, eval_obs, observations,
                              observation, vec_obs, devec_obs,
                              tfor_observations
 using IPFitting.Data:   configtype
-using HDF5:                  h5open, read, h5write
-using LinearAlgebra: qr, qr!#, cond, norm, svd
+using HDF5:                  h5open, read
 
 import Base: flush, append!, union
 
-export LsqDB, info, configtypes, qrfile, load_qr
+export LsqDB, info, configtypes
 
 const VERSION = 2
 const KRONFILE = "_kron.h5"
 const INFOFILE = "_info.json"
-const QRFILE = "_qr.h5"
 
 """
 `dbpath(db::LsqDB)` : return the absolute path to the database files, not
@@ -74,8 +63,6 @@ dbpath(db::LsqDB) = db.dbpath
 infofile(dbpath::AbstractString) = dbpath * INFOFILE
 
 kronfile(dbpath::AbstractString) = dbpath * KRONFILE
-
-qrfile(dbpath::AbstractString) = dbpath * QRFILE
 
 # ------------ Save and load the info file
 
@@ -124,62 +111,27 @@ _savemath5(A, fname) =
       nothing
    end
 
-"save QR single matrix to HDF5"
-_savematqrh5(Q,R,Y, fname) =
-   h5open(fname, "w") do fid
-      fid["Q"] = Q
-      fid["R"] = R
-      fid["Y"] = Y
-   end
-
 "load a single matrix from HDF5"
 _loadmath5(fname) =
    h5open(fname, "r") do fid
       read(fid["A"])
    end
 
-_loadmatqrh5(fname) =
-      h5open(fname, "r") do fid
-         Q = read(fid["Q"])
-         R = read(fid["R"])
-         Y = read(fid["Y"])
-         return Q,R,Y
-      end
-
 function save_kron(dbpath, db)
    _backupfile(kronfile(dbpath))
    _savemath5(db.Ψ, kronfile(dbpath))
 end
 
-function save_qr(dbpath, db)
-   _savematqrh5(db.QR["Q"],db.QR["R"],db.QR["Y"],qrfile(dbpath))
-end
-
 save_kron(db) = save_kron(dbpath(db), db)
-
-save_qr(db) = save_qr(dbpath(db), db)
 
 load_kron(dbpath::String; mmap=false) = _loadmath5(kronfile(dbpath))
 
-load_qr(dbpath::String; mmap=false) = _loadmatqrh5(qrfile(dbpath))
-
 load_kron(db::LsqDB; mmap=false) = load_kron(dbpath(db); mmap=mmap)
 
-LsqDB(basis::IPBasis, configs::Vector{Dat}, Ψ::Matrix{Float64}, dbpath::String) =
-   LsqDB(basis, configs, Ψ, dbpath, Dict())
-
-function LsqDB(dbpath::AbstractString; mmap=true, do_qr=false)
+function LsqDB(dbpath::AbstractString; mmap=true)
    basis, configs = load_info(dbpath)
    Ψ = load_kron(dbpath; mmap=mmap)
-   try
-      Q,R,Y = load_qr(dbpath)
-      @info("QR factorisation found!")
-      ## TODO: store everything in _data.h5!
-      return LsqDB(basis, configs, Ψ, dbpath, Dict("Q" => Q, "R" => R, "Y" => Y))
-   catch
-      @info("No QR factorisation found")
-      return LsqDB(basis, configs, Ψ, dbpath, Dict())
-   end
+   return LsqDB(basis, configs, Ψ, dbpath)
 end
 
 
@@ -213,50 +165,15 @@ function flush(db::LsqDB)
    return nothing
 end
 
-function flush_qr(db::LsqDB)
-   save_qr(db)
-end
-
 function LsqDB(dbpath::AbstractString,
                basis::IPBasis,
                configs::AbstractVector{Dat};
                verbose=true,
-               assemble=true,
-               do_qr=false,
                maxnthreads=nthreads())
-
-   if assemble
-      db = assemble!(dbpath, basis, configs; verbose=verbose, maxnthreads=maxnthreads)
-   end
-   # if do_qr
-   #    db = LsqDB(dbpath)
-   #    qrΨ = qr!(db.Ψ)
-   #
-   #    saveqr = Dict()
-   #    saveqr["Q"] = Matrix(qrΨ.Q)
-   #    saveqr["R"] = Matrix(qrΨ.R)
-   #
-   #    db = LsqDB(basis, configs, db.Ψ, dbpath, saveqr)
-   #
-   #    flush(db, do_qr=true)
-   #
-   #    #try
-   #    #flush(db, do_qr=true)
-   #    #catch
-   #    #   @warn("""something went wrong trying to save the db to disk, but the data
-   #    #         should be ok; if it is crucial to keep it, try to save manually.""")
-   #    #end
-   # end
-   return db
-end
-
-function assemble!(dbpath::AbstractString,
-                  basis::IPBasis,
-                  configs::AbstractVector{Dat}; verbose=true, maxnthreads=nthreads())
    # assign indices, count observations and allocate a matrix
    Ψ = _alloc_lsq_matrix(configs, basis)
    # create the struct where everything is stored
-   db = LsqDB(basis, configs, Ψ, dbpath, Dict())
+   db = LsqDB(basis, configs, Ψ, dbpath)
    # parallel assembly of the LSQ matrix
    tfor_observations( configs,
       (n, okey, cfg, lck) -> safe_append!(db, lck, cfg, okey),
@@ -305,12 +222,12 @@ end
 
 function safe_append!(db::LsqDB, db_lock, cfg, okey)
    # computing the lsq blocks ("rows") can be done in parallel,
-   lsdo_qrow = eval_obs(okey, basis(db), cfg)
-   vec_lsdo_qrow = vec_obs(okey, lsdo_qrow)
+   lsqrow = eval_obs(okey, basis(db), cfg)
+   vec_lsqrow = vec_obs(okey, lsqrow)
    irows = matrows(cfg, okey)
    # but writing them into the DB must be done in a threadsafe way
    lock(db_lock)
-   db.Ψ[irows, :] = vec_lsdo_qrow
+   db.Ψ[irows, :] = vec_lsqrow
    unlock(db_lock)
    return nothing
 end

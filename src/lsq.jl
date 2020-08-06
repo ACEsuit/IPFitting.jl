@@ -39,7 +39,7 @@ using LowRankApprox
 using JuLIP.Utils
 using JuLIP: JVecF
 
-using SHIPs
+using ACE: scaling
 
 const Err = IPFitting.Errors
 
@@ -340,29 +340,23 @@ end
    GC.gc()
    verbose && _show_free_mem()
 
-   if !haskey(db.QR, "Q") && !haskey(db.QR, "R")
-      if isfile(qrfile(db.dbpath))
-         @info("Checking QR decomposition")
-         Q,R,Y_load = load_qr(db.dbpath)
-
-         if Y_load == Y ##WEIGHTS ARE IDENTICAL!
-            db = LsqDB(db.basis, db.configs, db.Ψ, db.dbpath, Dict("Q" => Q, "R" => R, "Y" => Y))
-         else
-            db = do_qr!(db, Ψ, Y)
-         end
-      else
-         db = do_qr!(db, Ψ, Y)
-      end
-   end
-
    κ = 0.0
    if (solver[1] == :qr) || (solver == :qr)
       verbose && @info("solve $(size(Ψ)) LSQ system using QR factorisation")
-      # qrΨ = qr!(Ψ)
-      κ = cond(db.QR["R"])
-      verbose && @info("cond(R) = $(κ)")
-      c = inv(db.QR["R"]) * (Matrix(db.QR["Q"])' * Y)
-      rel_rms = norm(db.QR["Q"] * (db.QR["R"] * c) - Y) / norm(Y)
+      qrΨ = qr!(Ψ)
+      κ = cond(qrΨ.R)
+      GC.gc();
+      verbose && @info("cond(R) = $(cond(qrΨ.R))")
+      c = qrΨ \ Y
+      rel_rms = norm(qrΨ.Q * (qrΨ.R * c) - Y) / norm(Y)
+
+      if saveqr isa Dict
+         saveqr["Q"] = qrΨ.Q
+         saveqr["R"] = qrΨ.R
+         saveqr["Y"] = Y
+      end
+
+      qrΨ = nothing
 
    elseif solver[1] == :svd
       verbose && @info("solve $(size(Ψ)) LSQ system using SVD factorisation")
@@ -372,9 +366,8 @@ end
       rel_rms = norm(Ψ * c - Y) / norm(Y)
 
    elseif solver[1] == :rrqr
-      rtol=solver[2]
-      verbose && @info("solve $(size(Ψ)) LSQ system using Rank-Revealing QR factorisation [rtol = $(rtol)]")
-      qrΨ = pqrfact(Ψ, rtol=rtol)
+      verbose && @info("solve $(size(Ψ)) LSQ system using Rank-Revealing QR factorisation")
+      qrΨ = pqrfact(Ψ, rtol=solver[2])
       verbose && @info("cond(R) = $(cond(qrΨ.R))")
       c = qrΨ \ Y
       rel_rms = norm(Ψ * c - Y) / norm(Y)
@@ -382,31 +375,34 @@ end
    elseif solver[1] == :rid
       r = solver[2]
       verbose && @info("solve $(size(Ψ)) LSQ system using Ridge Regression [r = $(r)] ")
-      Nb = size(db.QR["R"], 1)
-      y = (Y' * db.QR["Q"])[1:Nb]
-      η0 = norm(Y - db.QR["Q"] * y)
+      qrΨ = qr!(Ψ)
+      Nb = size(qrΨ.R, 1)
+      y = (Y' * Matrix(qrΨ.Q))[1:Nb]
+      η0 = norm(Y - Matrix(qrΨ.Q) * y)
 
       τ = r * η0
       Γ = Matrix(I, Nb, Nb)
 
-      c = reglsq(Γ = Γ, R = db.QR["R"], y=y, τ= τ, η0 = η0 );
+      c = reglsq(Γ = Γ, R = Matrix(qrΨ.R), y=y, τ= τ, η0 = η0 );
 
       rel_rms = norm(Ψ * c - Y) / norm(Y)
 
    elseif solver[1] == :lap
       r = solver[2]
       verbose && @info("solve $(size(Ψ)) LSQ system using Laplacian Regularisation [r = $(r)] ")
-      Nb = size(db.QR["R"], 1)
-      y = (Y' * db.QR["Q"])[1:Nb]
-      η0 = norm(Y - db.QR["Q"] * y)
+      qrΨ = qr!(Ψ)
+      Nb = size(qrΨ.R, 1)
+      y = (Y' * Matrix(qrΨ.Q))[1:Nb]
+      η0 = norm(Y - Matrix(qrΨ.Q) * y)
 
       τ = r * η0
 
       #TO DO: ADD in SCALING for 2B!
-      s = SHIPs.scaling(db.basis, 2)
-      Γ = collect(Diagonal(s))
+      s = scaling(db.basis.BB[2], 2)
+      l = append!(ones(length(db.basis.BB[1])), s)
+      Γ = collect(Diagonal(l))
 
-      c = reglsq(Γ = Γ, R = db.QR["R"], y=y, τ= τ, η0 = η0 );
+      c = reglsq(Γ = Γ, R = Matrix(qrΨ.R), y=y, τ= τ, η0 = η0 );
 
       rel_rms = norm(Ψ * c - Y) / norm(Y)
    else
