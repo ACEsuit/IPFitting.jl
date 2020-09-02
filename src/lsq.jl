@@ -33,7 +33,7 @@ using IPFitting: Dat, LsqDB, weighthook, observations,
 using IPFitting.Data: configtype
 using IPFitting.DB: dbpath, _nconfigs, matrows
 
-using LinearAlgebra: lmul!, Diagonal, qr, qr!, cond, norm, svd, I
+using LinearAlgebra: lmul!, Diagonal, qr, qr!, cond, norm, svd, I, pinv
 using InteractiveUtils: versioninfo
 using LowRankApprox
 using JuLIP.Utils
@@ -421,6 +421,20 @@ end
       c = qrΨreg \ Yreg
 
       rel_rms = norm(qrΨreg * c - Yreg) / norm(Yreg)
+   elseif solver[1] == :rrqr_lap_res
+      r_tol = solver[2]
+      rlap = solver[3]
+
+      s = scaling(db.basis.BB[2], 2)
+      l = append!(ones(length(db.basis.BB[1])), s)
+      Γ = collect(Diagonal(rlap .* l))
+
+      D_inv = pinv(Γ)
+      Ψreg = Ψ * D_inv
+
+      qrΨreg = pqrfact(Ψreg, rtol=r_tol)
+      c = D_inv * (qrΨreg \  Y)
+      rel_rms = norm(Ψreg * c - Y) / norm(Y)
    else
       error("unknown `solver` in `lsqfit`")
    end
