@@ -406,8 +406,8 @@ end
 
       rel_rms = norm(Ψ * c - Y) / norm(Y)
    elseif solver[1] == :rrqr_lap
+      r_tol = solver[2]
       rlap = solver[2]
-      r_tol = solver[3]
 
       s = scaling(db.basis.BB[2], 2)
       l = append!(ones(length(db.basis.BB[1])), s)
@@ -416,9 +416,11 @@ end
       Ψreg = vcat(Ψ, Γ)
 
       qrΨreg = pqrfact(Ψreg, rtol=r_tol)
+      Yreg = vcat(Y, zeros(length(l)))
 
-      c = qrΨreg \ vcat(Y, length(l))
+      c = qrΨreg \ Yreg
 
+      rel_rms = norm(qrΨreg * c - Yreg) / norm(Yreg)
    else
       error("unknown `solver` in `lsqfit`")
    end
