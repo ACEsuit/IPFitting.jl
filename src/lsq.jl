@@ -407,7 +407,7 @@ end
       rel_rms = norm(Ψ * c - Y) / norm(Y)
    elseif solver[1] == :rrqr_lap
       r_tol = solver[2]
-      rlap = solver[2]
+      rlap = solver[3]
 
       s = scaling(db.basis.BB[2], 2)
       l = append!(ones(length(db.basis.BB[1])), s)
