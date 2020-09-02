@@ -405,6 +405,20 @@ end
       c = reglsq(Γ = Γ, R = Matrix(qrΨ.R), y=y, τ= τ, η0 = η0 );
 
       rel_rms = norm(Ψ * c - Y) / norm(Y)
+   elseif solver[1] == :rrqr_lap
+      rlap = solver[2]
+      r_tol = solver[3]
+
+      s = scaling(db.basis.BB[2], 2)
+      l = append!(ones(length(db.basis.BB[1])), s)
+      Γ = collect(Diagonal(rlap .* l))
+
+      Ψreg = vcat(Ψ, Γ)
+
+      qrΨreg = pqrfact(Ψreg, rtol=r_tol)
+
+      c = qrΨreg \ vcat(Y, length(l))
+
    else
       error("unknown `solver` in `lsqfit`")
    end
