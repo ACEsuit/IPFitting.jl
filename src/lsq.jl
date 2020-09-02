@@ -421,7 +421,7 @@ end
       c = qrΨreg \ Yreg
 
       rel_rms = norm(qrΨreg * c - Yreg) / norm(Yreg)
-   elseif solver[1] == :rrqr_lap_res
+   elseif solver[1] == :rrqr_lap_rescale
       r_tol = solver[2]
       rlap = solver[3]
 
