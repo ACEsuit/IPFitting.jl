@@ -38,6 +38,7 @@ using InteractiveUtils: versioninfo
 using LowRankApprox
 using JuLIP.Utils
 using JuLIP: JVecF
+using MLJLinearModels
 
 using ACE: scaling
 
@@ -435,6 +436,34 @@ end
       qrΨreg = pqrfact(Ψreg, rtol=r_tol)
       c = D_inv * (qrΨreg \  Y)
       rel_rms = norm(Ψreg * c - Y) / norm(Y)
+   elseif solver[1] == :lasso || solver[1] == :lasso_rrqr
+      λ = solver[2]
+      lasso = MLJLinearModels.LassoRegression(λ)
+      theta = MLJLinearModels.fit(lasso, Ψ, Y)[1:end-1]
+      
+      indices = findall(x -> x == 0.0, theta)
+      non_zero = findall(x -> x != 0.0, theta)
+
+      perc = round(length(non_zero)/length(db.basis)*100, digits=2)
+      @info("Reduced LSQ Problem using $(perc)% of total basis functions [$(length(non_zero))]")
+
+      Ψred = Ψ[:, setdiff(1:end, indices)]
+
+      if solver[1] == :lasso
+         cred = Ψred \ Y
+      elseif solver[1] == :lasso_rrqr
+         rtol = solver[3]
+         qrΨred = pqrfact(Ψred, rtol=rtol)
+         cred = qrΨred \ Y
+      end
+
+      c = zeros(length(db.basis))
+
+      for (i,k) in enumerate(non_zero)
+              c[k] = cred[i]
+      end
+
+      rel_rms = norm(Ψ * c - Y) / norm(Y)
    else
       error("unknown `solver` in `lsqfit`")
    end
