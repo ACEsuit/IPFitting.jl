@@ -319,6 +319,7 @@ end
                 regularisers = [],
                 deldb = false,
                 asmerrs = false,
+                lasso = false,
                 saveqr = nothing,
                 #scal_wgs = false,
                 kwargs...)
@@ -436,18 +437,18 @@ end
       qrΨreg = pqrfact(Ψreg, rtol=r_tol)
       c = D_inv * (qrΨreg \  Y)
       rel_rms = norm(Ψreg * c - Y) / norm(Y)
-   elseif solver[1] == :lasso || solver[1] == :lasso_rrqr
+   elseif solver[1] == :lasso || solver[1] == :lasso_rrqr || solver[1] == :lasso_lap
       λ = solver[2]
       lasso = MLJLinearModels.LassoRegression(λ)
       theta = MLJLinearModels.fit(lasso, Ψ, Y)[1:end-1]
-      
-      indices = findall(x -> x == 0.0, theta)
-      non_zero = findall(x -> x != 0.0, theta)
 
-      perc = round(length(non_zero)/length(db.basis)*100, digits=2)
-      @info("Reduced LSQ Problem using $(perc)% of total basis functions [$(length(non_zero))]")
+      zero_ind = findall(x -> x == 0.0, theta)
+      non_zero_ind = findall(x -> x != 0.0, theta)
 
-      Ψred = Ψ[:, setdiff(1:end, indices)]
+      perc = round(length(non_zero_ind)/length(db.basis)*100, digits=2)
+      @info("Reduced LSQ Problem using $(perc)% of total basis functions [$(length(non_zero_ind))]")
+
+      Ψred = Ψ[:, setdiff(1:end, zero_ind)]
 
       if solver[1] == :lasso
          cred = Ψred \ Y
@@ -455,11 +456,28 @@ end
          rtol = solver[3]
          qrΨred = pqrfact(Ψred, rtol=rtol)
          cred = qrΨred \ Y
+      elseif solver[1] == :lasso_lap
+         r = solver[3]
+         qrΨred = qr!(Ψred)
+         Nb = size(qrΨred.R, 1)
+         y = (Y' * Matrix(qrΨred.Q))[1:Nb]
+         η0 = norm(Y - Matrix(qrΨred.Q) * y)
+
+         τ = r * η0
+
+         #TO DO: ADD in SCALING for 2B!
+         s = scaling(db.basis.BB[2], 2)
+         l = append!(ones(length(db.basis.BB[1])), s)
+         lred = [l[i] for i in non_zero_ind]
+
+         Γ = collect(Diagonal(lred))
+
+         cred = reglsq(Γ = Γ, R = Matrix(qrΨred.R), y=y, τ= τ, η0 = η0 );
       end
 
       c = zeros(length(db.basis))
 
-      for (i,k) in enumerate(non_zero)
+      for (i,k) in enumerate(non_zero_ind)
               c[k] = cred[i]
       end
 
