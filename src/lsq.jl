@@ -437,10 +437,18 @@ end
       qrΨreg = pqrfact(Ψreg, rtol=r_tol)
       c = D_inv * (qrΨreg \  Y)
       rel_rms = norm(Ψreg * c - Y) / norm(Y)
-   elseif solver[1] == :lasso || solver[1] == :lasso_rrqr || solver[1] == :lasso_lap
-      λ = solver[2]
-      lasso = MLJLinearModels.LassoRegression(λ)
-      theta = MLJLinearModels.fit(lasso, Ψ, Y)[1:end-1]
+   elseif startswith(String(solver[1]), "lasso") || startswith(String(solver[1]), "elastic_net")
+      if startswith(String(solver[1]), "lasso")
+         λ = solver[2]
+         lasso = MLJLinearModels.LassoRegression(λ)
+         @info("Performing Lasso Regression [$(λ)]")
+         theta = MLJLinearModels.fit(lasso, Ψ, Y)[1:end-1]
+      elseif startswith(String(solver[1]), "elastic_net")
+         λ, γ = solver[2][1], solver[2][2]
+         elastic_net = MLJLinearModels.ElasticNetRegression(λ, γ)
+         @info("Performing Elastic Net Regression L1 penalty: $(γ), L2 penalty: $(λ)")
+         theta = MLJLinearModels.fit(elastic_net, Ψ, Y)[1:end-1]
+      end
 
       zero_ind = findall(x -> x == 0.0, theta)
       non_zero_ind = findall(x -> x != 0.0, theta)
@@ -450,14 +458,14 @@ end
 
       Ψred = Ψ[:, setdiff(1:end, zero_ind)]
 
-      if solver[1] == :lasso
-         cred = Ψred \ Y
-      elseif solver[1] == :lasso_rrqr
+      if endswith(String(solver[1]), "rrqr")
          rtol = solver[3]
+         @info("Performing RRQR [$(rtol)]")
          qrΨred = pqrfact(Ψred, rtol=rtol)
          cred = qrΨred \ Y
-      elseif solver[1] == :lasso_lap
+      elseif endswith(String(solver[1]), "lap")
          r = solver[3]
+         @info("Performing Laplacian Regularisation [$(r)]")
          qrΨred = qr!(Ψred)
          Nb = size(qrΨred.R, 1)
          y = (Y' * Matrix(qrΨred.Q))[1:Nb]
@@ -473,6 +481,9 @@ end
          Γ = collect(Diagonal(lred))
 
          cred = reglsq(Γ = Γ, R = Matrix(qrΨred.R), y=y, τ= τ, η0 = η0 );
+      else
+         @info("Performing QR decomposition")
+         cred = Ψred \ Y
       end
 
       c = zeros(length(db.basis))
