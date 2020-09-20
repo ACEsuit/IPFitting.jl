@@ -444,7 +444,7 @@ end
          @info("Performing Lasso Regression [$(λ)]")
          theta = MLJLinearModels.fit(lasso, Ψ, Y)[1:end-1]
       elseif startswith(String(solver[1]), "elastic_net")
-         λ, γ = solver[2][1], solver[2][2]
+         γ, λ = solver[2][1], solver[2][2]
          elastic_net = MLJLinearModels.ElasticNetRegression(λ, γ)
          @info("Performing Elastic Net Regression L1 penalty: $(γ), L2 penalty: $(λ)")
          theta = MLJLinearModels.fit(elastic_net, Ψ, Y)[1:end-1]
