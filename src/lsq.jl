@@ -476,7 +476,7 @@ end
             return perc - perc_ob
          end
 
-         λ = find_zero(λ -> _optimise_elastic_net(λ, α, perc_ob, Ψ, Y), (0,1E8), Roots.Bisection(), atol=0.01)
+         λ = find_zero(λ -> _optimise_elastic_net(λ, α, perc_ob, Ψ, Y), (0,1E30), Roots.Bisection(), atol=0.01)
          @info("λ found! λ=$(λ) (α=$(α))")
          elastic_net = MLJLinearModels.ElasticNetRegression(λ, α*λ)
          @info("Performing Elastic Net Regression L1 penalty: $(α*λ), L2 penalty: $(λ)")
