@@ -39,6 +39,7 @@ using LowRankApprox
 using JuLIP.Utils
 using JuLIP: JVecF
 using MLJLinearModels
+using Roots
 
 using ACE: scaling
 
@@ -438,7 +439,49 @@ end
       c = D_inv * (qrΨreg \  Y)
       rel_rms = norm(Ψreg * c - Y) / norm(Y)
    elseif startswith(String(solver[1]), "lasso") || startswith(String(solver[1]), "elastic_net")
-      if startswith(String(solver[1]), "lasso")
+      if startswith(String(solver[1]), "lasso_perc")
+         perc_ob = solver[2]
+         @info("Performing Bisection method")
+         function _optimise_lasso(λ, perc_ob, Ψ, Y)
+            lasso = MLJLinearModels.LassoRegression(λ)
+            theta = MLJLinearModels.fit(lasso, Ψ, Y)[1:end-1]
+
+            zero_ind = findall(x -> x == 0.0, theta)
+            non_zero_ind = findall(x -> x != 0.0, theta)
+
+            perc = length(non_zero_ind)/length(theta)
+            @info("λ=$(λ) keeps $(perc) of basis functions")
+
+            return perc - perc_ob
+         end
+
+         λ = find_zero(λ -> _optimise_lasso(λ, perc_ob, Ψ, Y), (0,1E8), Roots.Bisection(), atol=0.01)
+         @info("λ found! λ=$(λ)")
+         lasso = MLJLinearModels.LassoRegression(λ)
+         theta = MLJLinearModels.fit(lasso, Ψ, Y)[1:end-1]
+      elseif startswith(String(solver[1]), "elastic_net_perc")
+         perc_ob, α = solver[2][1], solver[2][2]
+         @info("Performing Bisection method")
+         function _optimise_elastic_net(λ, α, perc_ob, Ψ, Y)
+            elastic_net = MLJLinearModels.ElasticNetRegression(λ, α*λ)
+            @info("Performing Elastic Net Regression L1 penalty: $(α*λ), L2 penalty: $(λ)")
+            theta = MLJLinearModels.fit(elastic_net, Ψ, Y)[1:end-1]
+
+            zero_ind = findall(x -> x == 0.0, theta)
+            non_zero_ind = findall(x -> x != 0.0, theta)
+
+            perc = length(non_zero_ind)/length(theta)
+            @info("λ=$(λ) keeps $(perc) of basis functions")
+
+            return perc - perc_ob
+         end
+
+         λ = find_zero(λ -> _optimise_elastic_net(λ, α, perc_ob, Ψ, Y), (0,1E8), Roots.Bisection(), atol=0.01)
+         @info("λ found! λ=$(λ) (α=$(α))")
+         elastic_net = MLJLinearModels.ElasticNetRegression(λ, α*λ)
+         @info("Performing Elastic Net Regression L1 penalty: $(α*λ), L2 penalty: $(λ)")
+         theta = MLJLinearModels.fit(elastic_net, Ψ, Y)[1:end-1]
+      elseif startswith(String(solver[1]), "lasso")
          λ = solver[2]
          lasso = MLJLinearModels.LassoRegression(λ)
          @info("Performing Lasso Regression [$(λ)]")
