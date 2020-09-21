@@ -455,7 +455,7 @@ end
             return perc - perc_ob
          end
 
-         λ = find_zero(λ -> _optimise_lasso(λ, perc_ob, Ψ, Y), (0,1E8), Roots.Bisection(), atol=0.01)
+         λ = find_zero(λ -> _optimise_lasso(λ, perc_ob, Ψ, Y), (0,1E30), Roots.Bisection(), atol=0.01)
          @info("λ found! λ=$(λ)")
          lasso = MLJLinearModels.LassoRegression(λ)
          theta = MLJLinearModels.fit(lasso, Ψ, Y)[1:end-1]
