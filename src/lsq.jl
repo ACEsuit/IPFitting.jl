@@ -460,7 +460,7 @@ end
             return length(non_zero_ind)/length(theta) - perc_ob
          end
 
-         α = find_zero(α -> _f(α, perc_ob, Ψ, Y), (0,1), Roots.Bisection(), atol=0.001)
+         α = find_zero(α -> _f(α, perc_ob, Ψ, Y), (0,1), Roots.Bisection(), atol=0.01)
          @info("α found! α=$(α)")
          cv = glmnet(Ψ, Y, alpha=α)
          theta = cv.betas[:,end]
