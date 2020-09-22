@@ -446,8 +446,14 @@ end
          @info("Performing Elastic Net Regression")
          theta = coef(solve)[:,end]
       elseif startswith(String(solver[1]), "glm_elastic_net_perc")
-         perc_ob = solver[2]
-         function _f(α, perc_ob, Ψ, Y)
+         perc_ob = solver[2][1]
+         if length(solver[2]) == 2
+            tol = solver[2][2]
+         else
+            tol = 0.01
+         end
+         @info("Bisection Tolerance tol=$(tol)")
+         function _f(α, perc_ob, Ψ, Y, tol)
             cv = glmnet(Ψ, Y, alpha=α)
             theta = cv.betas[:,end]
 
@@ -460,7 +466,7 @@ end
             return length(non_zero_ind)/length(theta) - perc_ob
          end
 
-         α = find_zero(α -> _f(α, perc_ob, Ψ, Y), (0,1), Roots.Bisection(), atol=0.0001)
+         α = find_zero(α -> _f(α, perc_ob, Ψ, Y, tol), (0,1), Roots.Bisection(), atol=tol)
          @info("α found! α=$(α)")
          cv = glmnet(Ψ, Y, alpha=α)
          theta = cv.betas[:,end]
