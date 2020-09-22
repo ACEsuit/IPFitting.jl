@@ -39,6 +39,8 @@ using LowRankApprox
 using JuLIP.Utils
 using JuLIP: JVecF
 using Lasso
+using GLMNet
+using Roots
 
 using ACE: scaling
 
@@ -437,12 +439,35 @@ end
       qrΨreg = pqrfact(Ψreg, rtol=r_tol)
       c = D_inv * (qrΨreg \  Y)
       rel_rms = norm(Ψreg * c - Y) / norm(Y)
-   elseif startswith(String(solver[1]), "elastic_net") #startswith(String(solver[1]), "lasso") ||
+   elseif startswith(String(solver[1]), "elastic_net") || startswith(String(solver[1]), "glm_elastic_net")
       if startswith(String(solver[1]), "elastic_net")
          α = solver[2]
          solve = fit(LassoPath, Ψ, Y, α=α, standardize=false, intercept=false)
          @info("Performing Elastic Net Regression")
          theta = coef(solve)[:,end]
+      elseif startswith(String(solver[1]), "glm_elastic_net_perc")
+         perc_ob = solver[2]
+         function _f(α, perc_ob, Ψ, Y)
+            cv = glmnet(Ψ, Y, alpha=α)
+            theta = cv.betas[:,end]
+
+            zero_ind = findall(x -> x == 0.0, theta)
+            non_zero_ind = findall(x -> x != 0.0, theta)
+
+            perc = round(length(non_zero_ind)/length(theta) * 100.0, digits=2)
+            @info("α=$(α) keeps $(perc)% of total basis functions")
+
+            return length(non_zero_ind)/length(theta) - perc_ob
+         end
+
+         α = find_zero(α -> _f(α, perc_ob, Ψ, Y), (0,1), Roots.Bisection(), atol=0.001)
+         @info("α found! α=$(α)")
+         cv = glmnet(Ψ, Y, alpha=α)
+         theta = cv.betas[:,end]
+      elseif startswith(String(solver[1]), "glm_elastic_net")
+         α = solver[2]
+         cv = glmnet(Ψ, Y, alpha=α)
+         theta = cv.betas[:,end]
       end
 
       zero_ind = findall(x -> x == 0.0, theta)
@@ -458,7 +483,7 @@ end
          @info("Performing RRQR [$(rtol)]")
          qrΨred = pqrfact(Ψred, rtol=rtol)
          cred = qrΨred \ Y
-      elseif endswith(String(solver[1]), "lap")
+      elseif endswith(String(solver[1]), "lap") || endswith(String(solver[1]), "rid")
          r = solver[3]
          @info("Performing Laplacian Regularisation [r = $(r)]")
          qrΨred = qr!(Ψred)
@@ -468,28 +493,21 @@ end
 
          τ = r * η0
 
-         #TO DO: ADD in SCALING for 2B!
-         s = scaling(db.basis.BB[2], 2)
-         l = append!(ones(length(db.basis.BB[1])), s)
-         lred = [l[i] for i in non_zero_ind]
+         if endswith(String(solver[1]), "lap")
+            #TO DO: ADD in SCALING for 2B!
+            s = scaling(db.basis.BB[2], 2)
+            l = append!(ones(length(db.basis.BB[1])), s)
+            lred = [l[i] for i in non_zero_ind]
+            Γ = collect(Diagonal(lred))
+         elseif endswith(String(solver[1]), "rid")
+            N = size(qrΨred.R, 2)
+            Γ = Matrix(I, N, N)
+         end
 
-         Γ = collect(Diagonal(lred))
+         @show size(qrΨred.R)
+         @show size(Γ)
 
          cred = reglsq(Γ = Γ, R = Matrix(qrΨred.R), y=y, τ= τ, η0 = η0 );
-      elseif endswith(String(solver[1]), "rid")
-         r = solver[2]
-         verbose && @info("Performing Ridge Regression [r = $(r)] ")
-         qrΨ = qr!(Ψ)
-         Nb = size(qrΨ.R, 1)
-         y = (Y' * Matrix(qrΨ.Q))[1:Nb]
-         η0 = norm(Y - Matrix(qrΨ.Q) * y)
-
-         τ = r * η0
-         Γ = Matrix(I, Nb, Nb)
-
-         c = reglsq(Γ = Γ, R = Matrix(qrΨ.R), y=y, τ= τ, η0 = η0 );
-
-         rel_rms = norm(Ψ * c - Y) / norm(Y)
       else
          @info("Performing QR decomposition")
          cred = Ψred \ Y
