@@ -460,7 +460,7 @@ end
          cred = qrΨred \ Y
       elseif endswith(String(solver[1]), "lap")
          r = solver[3]
-         @info("Performing Laplacian Regularisation [$(r)]")
+         @info("Performing Laplacian Regularisation [r = $(r)]")
          qrΨred = qr!(Ψred)
          Nb = size(qrΨred.R, 1)
          y = (Y' * Matrix(qrΨred.Q))[1:Nb]
@@ -476,6 +476,20 @@ end
          Γ = collect(Diagonal(lred))
 
          cred = reglsq(Γ = Γ, R = Matrix(qrΨred.R), y=y, τ= τ, η0 = η0 );
+      elseif endswith(String(solver[1]), "rid")
+         r = solver[2]
+         verbose && @info("Performing Ridge Regression [r = $(r)] ")
+         qrΨ = qr!(Ψ)
+         Nb = size(qrΨ.R, 1)
+         y = (Y' * Matrix(qrΨ.Q))[1:Nb]
+         η0 = norm(Y - Matrix(qrΨ.Q) * y)
+
+         τ = r * η0
+         Γ = Matrix(I, Nb, Nb)
+
+         c = reglsq(Γ = Γ, R = Matrix(qrΨ.R), y=y, τ= τ, η0 = η0 );
+
+         rel_rms = norm(Ψ * c - Y) / norm(Y)
       else
          @info("Performing QR decomposition")
          cred = Ψred \ Y
