@@ -504,9 +504,6 @@ end
             Γ = Matrix(I, N, N)
          end
 
-         @show size(qrΨred.R)
-         @show size(Γ)
-
          cred = reglsq(Γ = Γ, R = Matrix(qrΨred.R), y=y, τ= τ, η0 = η0 );
       else
          @info("Performing QR decomposition")
