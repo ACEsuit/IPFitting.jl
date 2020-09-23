@@ -38,7 +38,6 @@ using InteractiveUtils: versioninfo
 using LowRankApprox
 using JuLIP.Utils
 using JuLIP: JVecF
-using Lasso
 using GLMNet
 using Roots
 
@@ -439,13 +438,8 @@ end
       qrΨreg = pqrfact(Ψreg, rtol=r_tol)
       c = D_inv * (qrΨreg \  Y)
       rel_rms = norm(Ψreg * c - Y) / norm(Y)
-   elseif startswith(String(solver[1]), "elastic_net") || startswith(String(solver[1]), "glm_elastic_net")
-      if startswith(String(solver[1]), "elastic_net")
-         α = solver[2]
-         solve = fit(LassoPath, Ψ, Y, α=α, standardize=false, intercept=false)
-         @info("Performing Elastic Net Regression")
-         theta = coef(solve)[:,end]
-      elseif startswith(String(solver[1]), "glm_elastic_net_perc")
+   elseif startswith(String(solver[1]), "elastic_net") || startswith(String(solver[1]), "rid_elastic_net") || startswith(String(solver[1]), "lap_elastic_net")
+      if startswith(String(solver[1]), "elastic_net_perc")
          perc_ob = solver[2][1]
          if length(solver[2]) == 2
             tol = solver[2][2]
@@ -470,9 +464,27 @@ end
          @info("α found! α=$(α)")
          cv = glmnet(Ψ, Y, alpha=α)
          theta = cv.betas[:,end]
-      elseif startswith(String(solver[1]), "glm_elastic_net")
+      elseif startswith(String(solver[1]), "elastic_net")
          α = solver[2]
          cv = glmnet(Ψ, Y, alpha=α)
+         theta = cv.betas[:,end]
+      elseif startswith(String(solver[1]), "lap_elastic_net") || startswith(String(solver[1]), "rid_elastic_net")
+         α = solver[2][1]
+         reg_scal = solver[2][2]
+
+         if startswith(String(solver[1]), "lap_elastic_net")
+            s = scaling(db.basis.BB[2], 2)
+            l = append!(ones(length(db.basis.BB[1])), s)
+            Γ = collect(Diagonal(reg_scal .* l))
+         elseif startswith(String(solver[1]), "rid_elastic_net")
+            N = length(Ψ[1,:])
+            Γ = reg_scal * Matrix(I, N, N)
+         end
+
+         Ψreg = vcat(Ψ, Γ)
+         Yreg = vcat(Y, zeros(length(Γ[1,:])))
+
+         cv = glmnet(Ψreg, Yreg, alpha=α)
          theta = cv.betas[:,end]
       end
 
@@ -519,7 +531,7 @@ end
       c = zeros(length(db.basis))
 
       for (i,k) in enumerate(non_zero_ind)
-              c[k] = cred[i]
+         c[k] = cred[i]
       end
 
       rel_rms = norm(Ψ * c - Y) / norm(Y)
