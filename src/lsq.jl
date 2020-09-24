@@ -439,11 +439,12 @@ end
       c = D_inv * (qrΨreg \  Y)
       rel_rms = norm(Ψreg * c - Y) / norm(Y)
    elseif startswith(String(solver[1]), "lap_elastic_net") || startswith(String(solver[1]), "lap_elastic_net_perc")
-      p = solver[2][2]
+      rlap = solver[2][2]
+      p = solver[2][3]
 
       s_p = scaling(db.basis.BB[2], p)
       p_p = append!(ones(length(db.basis.BB[1])), s_p)
-      Γ = collect(Diagonal(p_p))
+      Γ = collect(Diagonal(rlap .* p_p))
 
       D_inv = pinv(Γ)
       Ψreg = Ψ * D_inv
