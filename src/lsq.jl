@@ -343,7 +343,7 @@ end
    GC.gc()
    verbose && _show_free_mem()
 
-   κ = 0.0
+   κ, p_1 = 0.0, 0.0
    if (solver[1] == :qr) || (solver == :qr)
       verbose && @info("solve $(size(Ψ)) LSQ system using QR factorisation")
       qrΨ = qr!(Ψ)
@@ -438,17 +438,20 @@ end
       qrΨreg = pqrfact(Ψreg, rtol=r_tol)
       c = D_inv * (qrΨreg \  Y)
       rel_rms = norm(Ψreg * c - Y) / norm(Y)
-   elseif startswith(String(solver[1]), "elastic_net") || startswith(String(solver[1]), "rid_elastic_net") || startswith(String(solver[1]), "lap_elastic_net")
-      if startswith(String(solver[1]), "elastic_net_perc")
+   elseif startswith(String(solver[1]), "lap_elastic_net") || startswith(String(solver[1]), "lap_elastic_net_perc")
+      p = solver[2][2]
+
+      s_p = scaling(db.basis.BB[2], p)
+      p_p = append!(ones(length(db.basis.BB[1])), s_p)
+      Γ = collect(Diagonal(p_p))
+
+      D_inv = pinv(Γ)
+      Ψreg = Ψ * D_inv
+
+      if startswith(String(solver[1]), "lap_elastic_net_perc")
          perc_ob = solver[2][1]
-         if length(solver[2]) == 2
-            tol = solver[2][2]
-         else
-            tol = 0.01
-         end
-         @info("Bisection Tolerance tol=$(tol)")
-         function _f(α, perc_ob, Ψ, Y, tol)
-            cv = glmnet(Ψ, Y, alpha=α)
+         function _f(α, perc_ob, Ψreg, Y)
+            cv = glmnet(Ψreg, Y, alpha=α)
             theta = cv.betas[:,end]
 
             zero_ind = findall(x -> x == 0.0, theta)
@@ -460,33 +463,14 @@ end
             return length(non_zero_ind)/length(theta) - perc_ob
          end
 
-         α = find_zero(α -> _f(α, perc_ob, Ψ, Y, tol), (0,1), Roots.Bisection(), atol=tol)
+         α = find_zero(α -> _f(α, perc_ob, Ψreg, Y), (0,1), Roots.Bisection(), atol=0.01)
          @info("α found! α=$(α)")
-         cv = glmnet(Ψ, Y, alpha=α)
-         theta = cv.betas[:,end]
-      elseif startswith(String(solver[1]), "elastic_net")
-         α = solver[2]
-         cv = glmnet(Ψ, Y, alpha=α)
-         theta = cv.betas[:,end]
-      elseif startswith(String(solver[1]), "lap_elastic_net") || startswith(String(solver[1]), "rid_elastic_net")
+      else
          α = solver[2][1]
-         reg_scal = solver[2][2]
-
-         if startswith(String(solver[1]), "lap_elastic_net")
-            s = scaling(db.basis.BB[2], 2)
-            l = append!(ones(length(db.basis.BB[1])), s)
-            Γ = collect(Diagonal(reg_scal .* l))
-         elseif startswith(String(solver[1]), "rid_elastic_net")
-            N = length(Ψ[1,:])
-            Γ = reg_scal * Matrix(I, N, N)
-         end
-
-         Ψreg = vcat(Ψ, Γ)
-         Yreg = vcat(Y, zeros(length(Γ[1,:])))
-
-         cv = glmnet(Ψreg, Yreg, alpha=α)
-         theta = cv.betas[:,end]
       end
+
+      cv = glmnet(Ψreg, Y, alpha=α)
+      theta = cv.betas[:,end]
 
       zero_ind = findall(x -> x == 0.0, theta)
       non_zero_ind = findall(x -> x != 0.0, theta)
@@ -494,47 +478,36 @@ end
       perc = round(length(non_zero_ind)/length(db.basis)*100, digits=2)
       @info("Reduced LSQ Problem using $(perc)% of total basis functions [$(length(non_zero_ind))]")
 
-      Ψred = Ψ[:, setdiff(1:end, zero_ind)]
+      Ψred = Ψreg[:, setdiff(1:end, zero_ind)]
 
       if endswith(String(solver[1]), "rrqr")
          rtol = solver[3]
          @info("Performing RRQR [$(rtol)]")
          qrΨred = pqrfact(Ψred, rtol=rtol)
          cred = qrΨred \ Y
-      elseif endswith(String(solver[1]), "lap") || endswith(String(solver[1]), "rid")
-         r = solver[3]
-         @info("Performing Laplacian Regularisation [r = $(r)]")
-         qrΨred = qr!(Ψred)
-         Nb = size(qrΨred.R, 1)
-         y = (Y' * Matrix(qrΨred.Q))[1:Nb]
-         η0 = norm(Y - Matrix(qrΨred.Q) * y)
-
-         τ = r * η0
-
-         if endswith(String(solver[1]), "lap")
-            #TO DO: ADD in SCALING for 2B!
-            s = scaling(db.basis.BB[2], 2)
-            l = append!(ones(length(db.basis.BB[1])), s)
-            lred = [l[i] for i in non_zero_ind]
-            Γ = collect(Diagonal(lred))
-         elseif endswith(String(solver[1]), "rid")
-            N = size(qrΨred.R, 2)
-            Γ = Matrix(I, N, N)
-         end
-
-         cred = reglsq(Γ = Γ, R = Matrix(qrΨred.R), y=y, τ= τ, η0 = η0 );
       else
          @info("Performing QR decomposition")
          cred = Ψred \ Y
       end
 
-      c = zeros(length(db.basis))
+      c_scal = zeros(length(db.basis))
 
       for (i,k) in enumerate(non_zero_ind)
-         c[k] = cred[i]
+         c_scal[k] = cred[i]
+      end
+
+      c = D_inv * c_scal
+
+      if any(iszero, c[1:length(db.basis.BB[1])])
+         @info("Warning: culled a 2B function!! [TODO]")
       end
 
       rel_rms = norm(Ψ * c - Y) / norm(Y)
+
+      ##
+      s_1 = scaling(db.basis.BB[2], 1)
+      p_1 = append!(ones(length(db.basis.BB[1])), s_1)
+      ##
    else
       error("unknown `solver` in `lsqfit`")
    end
@@ -557,6 +530,7 @@ end
                           Vref, solver, E0, regularisers, verbose,
                           Itrain, Itest, asmerrs)
    infodict["kappa"] = κ
+   infodict["p_1"] = p_1
    GC.gc()
    return IP, infodict
 end
