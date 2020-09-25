@@ -442,17 +442,28 @@ end
       rlap = solver[2][2]
       p = solver[2][3]
 
+      scale = true
+      if length(solver[2]) == 4 && solver[2][4] == false
+         scale = false
+      end
+
       s_p = scaling(db.basis.BB[2], p)
       p_p = append!(ones(length(db.basis.BB[1])), s_p)
       Γ = collect(Diagonal(rlap .* p_p))
 
-      D_inv = pinv(Γ)
-      Ψreg = Ψ * D_inv
+      if scale == true
+         D_inv = pinv(Γ)
+         Ψreg = Ψ * D_inv
+         Yreg = Y
+      else
+         Ψreg = vcat(Ψ, Γ)
+         Yreg = vcat(Y, ones(length(Ψ[1,:])))
+      end
 
       if startswith(String(solver[1]), "lap_elastic_net_perc")
          perc_ob = solver[2][1]
-         function _f(α, perc_ob, Ψreg, Y)
-            cv = glmnet(Ψreg, Y, alpha=α)
+         function _f(α, perc_ob, Ψreg, Yreg)
+            cv = glmnet(Ψreg, Yreg, alpha=α)
             theta = cv.betas[:,end]
 
             zero_ind = findall(x -> x == 0.0, theta)
@@ -464,13 +475,13 @@ end
             return length(non_zero_ind)/length(theta) - perc_ob
          end
 
-         α = find_zero(α -> _f(α, perc_ob, Ψreg, Y), (0,1), Roots.Bisection(), atol=0.01)
+         α = find_zero(α -> _f(α, perc_ob, Ψreg, Yreg), (0,1), Roots.Bisection(), atol=0.01)
          @info("α found! α=$(α)")
       else
          α = solver[2][1]
       end
 
-      cv = glmnet(Ψreg, Y, alpha=α)
+      cv = glmnet(Ψreg, Yreg, alpha=α)
       theta = cv.betas[:,end]
 
       zero_ind = findall(x -> x == 0.0, theta)
@@ -479,16 +490,28 @@ end
       perc = round(length(non_zero_ind)/length(db.basis)*100, digits=2)
       @info("Reduced LSQ Problem using $(perc)% of total basis functions [$(length(non_zero_ind))]")
 
-      Ψred = Ψreg[:, setdiff(1:end, zero_ind)]
+      if scale == true
+         Ψred = Ψreg[:, setdiff(1:end, zero_ind)]
+      else
+         Ψred = Ψ[:, setdiff(1:end, zero_ind)]
+      end
 
       if endswith(String(solver[1]), "rrqr")
          rtol = solver[3]
          @info("Performing RRQR [$(rtol)]")
          qrΨred = pqrfact(Ψred, rtol=rtol)
-         cred = qrΨred \ Y
+         if scale == true
+            cred = qrΨred \ Yreg
+         else
+            cred = qrΨred \ Y
+         end
       else
          @info("Performing QR decomposition")
-         cred = Ψred \ Y
+         if scale == true
+            cred = Ψred \ Yreg
+         else
+            cred = Ψred \ Y
+         end
       end
 
       c_scal = zeros(length(db.basis))
@@ -497,7 +520,11 @@ end
          c_scal[k] = cred[i]
       end
 
-      c = D_inv * c_scal
+      if scale == true
+         c = D_inv * c_scal
+      else
+         c = c_scal
+      end
 
       if any(iszero, c[1:length(db.basis.BB[1])])
          @info("Warning: culled a 2B function!! [TODO]")
