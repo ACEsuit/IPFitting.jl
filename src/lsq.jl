@@ -500,18 +500,10 @@ end
          rtol = solver[3]
          @info("Performing RRQR [$(rtol)]")
          qrΨred = pqrfact(Ψred, rtol=rtol)
-         if scale == true
-            cred = qrΨred \ Yreg
-         else
-            cred = qrΨred \ Y
-         end
+         cred = qrΨred \ Y
       else
          @info("Performing QR decomposition")
-         if scale == true
-            cred = Ψred \ Yreg
-         else
-            cred = Ψred \ Y
-         end
+         cred = Ψred \ Y
       end
 
       c_scal = zeros(length(db.basis))
