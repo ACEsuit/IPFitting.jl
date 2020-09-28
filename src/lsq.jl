@@ -391,8 +391,20 @@ end
       rel_rms = norm(Ψ * c - Y) / norm(Y)
 
    elseif solver[1] == :lap
-      r = solver[2]
+      rscal = solver[2][1]
+      r = solver[2][2]
       verbose && @info("solve $(size(Ψ)) LSQ system using Laplacian Regularisation [r = $(r)] ")
+
+      non_zero_ind = [j for (j,i) in enumerate(Ψ[1,:]) if sum(i) != 0]
+      zero_ind = [j for (j,i) in enumerate(Ψ[1,:]) if sum(i) == 0]
+
+      Ψ_old = deepcopy(Ψ)
+
+      if length(zero_ind) > 0
+         @info("Cleaning up Ψ, removing $(length(zero_ind)) empty columns")
+         Ψ = Ψ[:, setdiff(1:end, zero_ind)]
+      end
+
       qrΨ = qr!(Ψ)
       Nb = size(qrΨ.R, 1)
       y = (Y' * Matrix(qrΨ.Q))[1:Nb]
@@ -400,14 +412,31 @@ end
 
       τ = r * η0
 
-      #TO DO: ADD in SCALING for 2B!
-      s = scaling(db.basis.BB[2], 2)
+      s = scaling(db.basis.BB[2], rscal)
       l = append!(ones(length(db.basis.BB[1])), s)
-      Γ = collect(Diagonal(l))
 
-      c = reglsq(Γ = Γ, R = Matrix(qrΨ.R), y=y, τ= τ, η0 = η0 );
+      if length(zero_ind) > 0
+         lred = [l[i] for i in non_zero_ind]
+         Γ = collect(Diagonal(lred))
+      else
+         Γ = collect(Diagonal(l))
+      end
 
-      rel_rms = norm(Ψ * c - Y) / norm(Y)
+      cred = reglsq(Γ = Γ, R = Matrix(qrΨ.R), y=y, τ= τ, η0 = η0 );
+
+      if length(zero_ind) > 0
+         cred_big = zeros(length(db.basis))
+
+         for (i,k) in enumerate(non_zero_ind)
+             cred_big[k] = cred[i]
+         end
+
+         c = cred_big
+      else
+         c = cred
+      end
+
+      rel_rms = norm(Ψ_old * c - Y) / norm(Y)
    elseif solver[1] == :rrqr_lap
       r_tol = solver[2]
       rlap = solver[3]
@@ -438,96 +467,161 @@ end
       qrΨreg = pqrfact(Ψreg, rtol=r_tol)
       c = D_inv * (qrΨreg \  Y)
       rel_rms = norm(Ψreg * c - Y) / norm(Y)
-   elseif startswith(String(solver[1]), "lap_elastic_net") || startswith(String(solver[1]), "lap_elastic_net_perc")
-      rlap = solver[2][2]
-      p = solver[2][3]
+   elseif solver[1] == :lap_elastic_net_rel
+      rel_err = solver[2][1]
+      rlap_scal = solver[2][2]
+      rtol = solver[2][3]
 
-      scale = true
-      if length(solver[2]) == 4 && solver[2][4] == false
-         scale = false
+      s = scaling(db.basis.BB[2], rlap_scal)
+      l = append!(ones(length(db.basis.BB[1])), s)
+      Γ = collect(Diagonal(l))
+
+      D_inv = pinv(Γ)
+      Ψreg = Ψ * D_inv
+
+      function _f(rel_err, Ψreg, Y, α; rtol = 1e-9, return_solution=false)
+          cv = glmnet(Ψreg, Y, alpha=α)
+          theta = cv.betas[:, end]
+
+          non_zero_ind = findall(x -> x != 0.0, theta)
+          zero_ind = findall(x -> x == 0.0, theta)
+
+          Ψreg_red = Ψreg[:, setdiff(1:end, zero_ind)]
+
+          qrΨ = pqrfact(Ψreg_red, rtol=rtol)
+          cred = qrΨ \ Y
+
+          cred_big = zeros(length(Ψreg[1,:]))
+
+          for (i,k) in enumerate(non_zero_ind)
+              cred_big[k] = cred[i]
+          end
+
+          c = D_inv * cred_big
+
+          rel_rms = norm(Ψ * c - Y) / norm(Y)
+
+          rel_rms_scal = (rel_rms - rel_err)*100000
+          @info("rel_rms_scal=$(rel_rms_scal) and α=$(α)")
+
+          if return_solution
+              return c
+          else
+              return rel_rms_scal
+          end
       end
 
-      s_p = scaling(db.basis.BB[2], p)
-      p_p = append!(ones(length(db.basis.BB[1])), s_p)
-      Γ = collect(Diagonal(rlap .* p_p))
-
-      if scale == true
-         D_inv = pinv(Γ)
-         Ψreg = Ψ * D_inv
-         Yreg = Y
-      else
-         Ψreg = vcat(Ψ, Γ)
-         Yreg = vcat(Y, ones(length(Ψ[1,:])))
-      end
-
-      if startswith(String(solver[1]), "lap_elastic_net_perc")
-         perc_ob = solver[2][1]
-         function _f(α, perc_ob, Ψreg, Yreg)
-            cv = glmnet(Ψreg, Yreg, alpha=α)
-            theta = cv.betas[:,end]
-
-            zero_ind = findall(x -> x == 0.0, theta)
-            non_zero_ind = findall(x -> x != 0.0, theta)
-
-            perc = round(length(non_zero_ind)/length(theta) * 100.0, digits=2)
-            @info("α=$(α) keeps $(perc)% of total basis functions")
-
-            return length(non_zero_ind)/length(theta) - perc_ob
-         end
-
-         α = find_zero(α -> _f(α, perc_ob, Ψreg, Yreg), (0,1), Roots.Bisection(), atol=0.01)
-         @info("α found! α=$(α)")
-      else
-         α = solver[2][1]
-      end
-
-      cv = glmnet(Ψreg, Yreg, alpha=α)
-      theta = cv.betas[:,end]
-
-      zero_ind = findall(x -> x == 0.0, theta)
-      non_zero_ind = findall(x -> x != 0.0, theta)
-
-      perc = round(length(non_zero_ind)/length(db.basis)*100, digits=2)
-      @info("Reduced LSQ Problem using $(perc)% of total basis functions [$(length(non_zero_ind))]")
-
-      if scale == true
-         Ψred = Ψreg[:, setdiff(1:end, zero_ind)]
-      else
-         Ψred = Ψ[:, setdiff(1:end, zero_ind)]
-      end
-
-      if endswith(String(solver[1]), "rrqr")
-         rtol = solver[3]
-         @info("Performing RRQR [$(rtol)]")
-         qrΨred = pqrfact(Ψred, rtol=rtol)
-         cred = qrΨred \ Y
-      else
-         @info("Performing QR decomposition")
-         cred = Ψred \ Y
-      end
-
-      c_scal = zeros(length(db.basis))
-
-      for (i,k) in enumerate(non_zero_ind)
-         c_scal[k] = cred[i]
-      end
-
-      if scale == true
-         c = D_inv * c_scal
-      else
-         c = c_scal
-      end
-
-      if any(iszero, c[1:length(db.basis.BB[1])])
-         @info("Warning: culled a 2B function!! [TODO]")
-      end
-
-      rel_rms = norm(Ψ * c - Y) / norm(Y)
+      α = find_zero(α -> _f(rel_err, Ψreg, Y, α, rtol=rtol), (0,1), Roots.Bisection(), atol=0.1)
+      c = _f(rel_err, Ψreg, Y, α, return_solution=true)
 
       ##
       s_1 = scaling(db.basis.BB[2], 1)
       p_1 = append!(ones(length(db.basis.BB[1])), s_1)
       ##
+   elseif solver[1] == :lap_rrqr
+      rlap_scal = solver[2][1]
+      rtol = solver[2][2]
+
+      s = scaling(db.basis.BB[2], rlap_scal)
+      l = append!(ones(length(db.basis.BB[1])), s)
+      Γ = collect(Diagonal(l))
+
+      D_inv = pinv(Γ)
+      Ψreg = Ψ * D_inv
+
+      non_zero_ind = [j for (j,i) in enumerate(Ψ[1,:]) if sum(i) != 0]
+      zero_ind = [j for (j,i) in enumerate(Ψ[1,:]) if sum(i) == 0]
+
+      Ψreg_red = Ψreg[:, setdiff(1:end, zero_ind)]
+
+      qrΨ = pqrfact(Ψreg_red, rtol=rtol)
+      cred = qrΨ \ Y
+
+      cred_big = zeros(length(Ψreg[1,:]))
+
+      for (i,k) in enumerate(non_zero_ind)
+        cred_big[k] = cred[i]
+      end
+
+      c = D_inv * cred_big
+
+      rel_rms = norm(Ψ * c - Y) / norm(Y)
+   elseif solver[1] == :elastic_net_lap
+      α = solver[2][1]
+      rlap_scal = solver[2][2]
+      r = solver[2][3]
+      cv = glmnet(Ψ, Y, alpha=α)
+      theta = cv.betas[:,end]
+
+      non_zero_ind = findall(x -> x != 0.0, theta)
+      zero_ind = findall(x -> x == 0.0, theta)
+
+      Ψred = Ψ[:, setdiff(1:end, zero_ind)]
+
+      qrΨred = qr!(Ψred)
+      Nb = size(qrΨred.R, 1)
+      y = (Y' * Matrix(qrΨred.Q))[1:Nb]
+      η0 = norm(Y - Matrix(qrΨred.Q) * y)
+
+      τ = r * η0
+
+      s = scaling(db.basis.BB[2], rlap_scal)
+      l = append!(ones(length(db.basis.BB[1])), s)
+      lred = [l[i] for i in non_zero_ind]
+      Γ = collect(Diagonal(lred))
+
+      cred = reglsq(Γ = Γ, R = Matrix(qrΨred.R), y=y, τ= τ, η0 = η0 );
+
+      c = zeros(length(Ψ[1,:]))
+
+      for (i,k) in enumerate(non_zero_ind)
+        c[k] = cred[i]
+      end
+
+      rel_rms = norm(Ψ * c - Y) / norm(Y)
+   elseif solver[1] == :lap_elastic_net_lap
+      α = solver[2][1]
+      rlap_scal = solver[2][2]
+      r = solver[2][3]
+
+      s = scaling(db.basis.BB[2], rlap_scal)
+      l = append!(ones(length(db.basis.BB[1])), s)
+      Γ = collect(Diagonal(l))
+
+      D_inv = pinv(Γ)
+      Ψreg = Ψ * D_inv
+
+      cv = glmnet(Ψreg, Y, alpha=α)
+      theta = cv.betas[:,end]
+
+      non_zero_ind = findall(x -> x != 0.0, theta)
+      zero_ind = findall(x -> x == 0.0, theta)
+
+      Ψred = Ψreg[:, setdiff(1:end, zero_ind)]
+
+      qrΨred = qr!(Ψred)
+      Nb = size(qrΨred.R, 1)
+      y = (Y' * Matrix(qrΨred.Q))[1:Nb]
+      η0 = norm(Y - Matrix(qrΨred.Q) * y)
+
+      τ = r * η0
+
+      s = scaling(db.basis.BB[2], rlap_scal)
+      l = append!(ones(length(db.basis.BB[1])), s)
+      lred = [l[i] for i in non_zero_ind]
+      Γ = collect(Diagonal(lred))
+
+      cred = reglsq(Γ = Γ, R = Matrix(qrΨred.R), y=y, τ= τ, η0 = η0 );
+
+      cred_big = zeros(length(Ψ[1,:]))
+
+      for (i,k) in enumerate(non_zero_ind)
+        cred_big[k] = cred[i]
+      end
+
+      c = D_inv * cred_big
+
+      rel_rms = norm(Ψ * c - Y) / norm(Y)
    else
       error("unknown `solver` in `lsqfit`")
    end
@@ -777,3 +871,93 @@ end
 #    end
 #    return [b for b in onb]
 # end
+#
+# rlap = solver[2][2]
+# p = solver[2][3]
+#
+# scale = true
+# if length(solver[2]) == 4 && solver[2][4] == false
+#    scale = false
+# end
+#
+# s_p = scaling(db.basis.BB[2], p)
+# p_p = append!(ones(length(db.basis.BB[1])), s_p)
+# Γ = collect(Diagonal(rlap .* p_p))
+#
+# if scale == true
+#    D_inv = pinv(Γ)
+#    Ψreg = Ψ * D_inv
+#    Yreg = Y
+# else
+#    Ψreg = vcat(Ψ, Γ)
+#    Yreg = vcat(Y, ones(length(Ψ[1,:])))
+# end
+#
+# if startswith(String(solver[1]), "lap_elastic_net_perc")
+#    perc_ob = solver[2][1]
+#    function _f(α, perc_ob, Ψreg, Yreg)
+#       cv = glmnet(Ψreg, Yreg, alpha=α)
+#       theta = cv.betas[:,end]
+#
+#       zero_ind = findall(x -> x == 0.0, theta)
+#       non_zero_ind = findall(x -> x != 0.0, theta)
+#
+#       perc = round(length(non_zero_ind)/length(theta) * 100.0, digits=2)
+#       @info("α=$(α) keeps $(perc)% of total basis functions")
+#
+#       return length(non_zero_ind)/length(theta) - perc_ob
+#    end
+#
+#    α = find_zero(α -> _f(α, perc_ob, Ψreg, Yreg), (0,1), Roots.Bisection(), atol=0.01)
+#    @info("α found! α=$(α)")
+# else
+#    α = solver[2][1]
+# end
+#
+# cv = glmnet(Ψreg, Yreg, alpha=α)
+# theta = cv.betas[:,end]
+#
+# zero_ind = findall(x -> x == 0.0, theta)
+# non_zero_ind = findall(x -> x != 0.0, theta)
+#
+# perc = round(length(non_zero_ind)/length(db.basis)*100, digits=2)
+# @info("Reduced LSQ Problem using $(perc)% of total basis functions [$(length(non_zero_ind))]")
+#
+# if scale == true
+#    Ψred = Ψreg[:, setdiff(1:end, zero_ind)]
+# else
+#    Ψred = Ψ[:, setdiff(1:end, zero_ind)]
+# end
+#
+# if endswith(String(solver[1]), "rrqr")
+#    rtol = solver[3]
+#    @info("Performing RRQR [$(rtol)]")
+#    qrΨred = pqrfact(Ψred, rtol=rtol)
+#    cred = qrΨred \ Y
+# else
+#    @info("Performing QR decomposition")
+#    cred = Ψred \ Y
+# end
+#
+# c_scal = zeros(length(db.basis))
+#
+# for (i,k) in enumerate(non_zero_ind)
+#    c_scal[k] = cred[i]
+# end
+#
+# if scale == true
+#    c = D_inv * c_scal
+# else
+#    c = c_scal
+# end
+#
+# if any(iszero, c[1:length(db.basis.BB[1])])
+#    @info("Warning: culled a 2B function!! [TODO]")
+# end
+#
+# rel_rms = norm(Ψ * c - Y) / norm(Y)
+#
+# ##
+# s_1 = scaling(db.basis.BB[2], 1)
+# p_1 = append!(ones(length(db.basis.BB[1])), s_1)
+# ##
