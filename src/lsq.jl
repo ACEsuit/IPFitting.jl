@@ -40,8 +40,7 @@ using JuLIP.Utils
 using JuLIP: JVecF
 using GLMNet
 using Roots
-
-using ACE: scaling
+using ACE
 
 const Err = IPFitting.Errors
 
@@ -468,7 +467,7 @@ end
       c = D_inv * (qrΨreg \  Y)
       rel_rms = norm(Ψreg * c - Y) / norm(Y)
    elseif solver[1] == :lap_elastic_net_rel
-      rel_err = solver[2][1]
+      etol = solver[2][1]
       rlap_scal = solver[2][2]
       rtol = solver[2][3]
 
@@ -479,7 +478,7 @@ end
       D_inv = pinv(Γ)
       Ψreg = Ψ * D_inv
 
-      function _f(rel_err, Ψreg, Y, α; rtol = 1e-9, return_solution=false)
+      function _f(Ψreg, Y, α; etol=1e-5, rtol=1e-9, return_solution=false)
           cv = glmnet(Ψreg, Y, alpha=α)
           theta = cv.betas[:, end]
 
@@ -500,20 +499,19 @@ end
           c = D_inv * cred_big
 
           rel_rms = norm(Ψ * c - Y) / norm(Y)
-
-          rel_rms_scal = (rel_rms - rel_err)*100000
-          @info("rel_rms_scal=$(rel_rms_scal) and α=$(α)")
+          @info("rel_rms=$(rel_rms) and α=$(α)")
 
           if return_solution
               return c
           else
-              return rel_rms_scal
+              return rel_rms - etol
           end
       end
 
-      α = find_zero(α -> _f(rel_err, Ψreg, Y, α, rtol=rtol), (0,1), Roots.Bisection(), atol=0.1)
-      c = _f(rel_err, Ψreg, Y, α, return_solution=true)
+      α = find_zero(α -> _f(Ψreg, Y, α, etol=etol, rtol=rtol), (0,1), Roots.Bisection(), xatol=1E-6)#atol=etol/2) #atol=0.5
+      @info("α found! α=$(α)")
 
+      c = _f(Ψreg, Y, α, return_solution=true)
       ##
       s_1 = scaling(db.basis.BB[2], 1)
       p_1 = append!(ones(length(db.basis.BB[1])), s_1)
@@ -522,7 +520,7 @@ end
       rlap_scal = solver[2][1]
       rtol = solver[2][2]
 
-      s = scaling(db.basis.BB[2], rlap_scal)
+      s = ACE.scaling(db.basis.BB[2], rlap_scal)
       l = append!(ones(length(db.basis.BB[1])), s)
       Γ = collect(Diagonal(l))
 
