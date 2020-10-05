@@ -342,7 +342,7 @@ end
    GC.gc()
    verbose && _show_free_mem()
 
-   κ, p_1 = 0.0, 0.0
+   κ, p_1, int_order = 0.0, 0.0, 0.0
    if (solver[1] == :qr) || (solver == :qr)
       verbose && @info("solve $(size(Ψ)) LSQ system using QR factorisation")
       qrΨ = qr!(Ψ)
@@ -411,7 +411,7 @@ end
 
       τ = r * η0
 
-      s = scaling(db.basis.BB[2], rscal)
+      s = ACE.scaling(db.basis.BB[2], rscal)
       l = append!(ones(length(db.basis.BB[1])), s)
 
       if length(zero_ind) > 0
@@ -440,7 +440,7 @@ end
       r_tol = solver[2]
       rlap = solver[3]
 
-      s = scaling(db.basis.BB[2], 2)
+      s = ACE.scaling(db.basis.BB[2], 2)
       l = append!(ones(length(db.basis.BB[1])), s)
       Γ = Diagonal(rlap .* l)
 
@@ -456,7 +456,7 @@ end
       r_tol = solver[2]
       rlap = solver[3]
 
-      s = scaling(db.basis.BB[2], 2)
+      s = ACE.scaling(db.basis.BB[2], 2)
       l = append!(ones(length(db.basis.BB[1])), s)
       Γ = Diagonal(rlap .* l)
 
@@ -471,7 +471,7 @@ end
       rlap_scal = solver[2][2]
       rtol = solver[2][3]
 
-      s = scaling(db.basis.BB[2], rlap_scal)
+      s = ACE.scaling(db.basis.BB[2], rlap_scal)
       l = append!(ones(length(db.basis.BB[1])), s)
       Γ = Diagonal(l)
 
@@ -513,8 +513,9 @@ end
 
       c = _f(Ψreg, Y, α, return_solution=true)
       ##
-      s_1 = scaling(db.basis.BB[2], 1)
+      s_1 = ACE.scaling(db.basis.BB[2], 1)
       p_1 = append!(ones(length(db.basis.BB[1])), s_1)
+      #int_order = db.basis.BB[2].pibasis.inner[1].orders
       ##
    elseif solver[1] == :lap_rrqr
       rlap_scal = solver[2][1]
@@ -544,6 +545,11 @@ end
       c = D_inv * cred_big
 
       rel_rms = norm(Ψ * c - Y) / norm(Y)
+      ##
+      s_1 = ACE.scaling(db.basis.BB[2], 1)
+      p_1 = append!(ones(length(db.basis.BB[1])), s_1)
+      #int_order = db.basis.BB[2].pibasis.inner[1].orders
+      ##
    elseif solver[1] == :elastic_net_lap
       α = solver[2][1]
       rlap_scal = solver[2][2]
@@ -563,7 +569,7 @@ end
 
       τ = r * η0
 
-      s = scaling(db.basis.BB[2], rlap_scal)
+      s = ACE.scaling(db.basis.BB[2], rlap_scal)
       l = append!(ones(length(db.basis.BB[1])), s)
       lred = [l[i] for i in non_zero_ind]
       Γ = Diagonal(lred)
@@ -582,7 +588,7 @@ end
       rlap_scal = solver[2][2]
       r = solver[2][3]
 
-      s = scaling(db.basis.BB[2], rlap_scal)
+      s = ACE.scaling(db.basis.BB[2], rlap_scal)
       l = append!(ones(length(db.basis.BB[1])), s)
       Γ = Diagonal(l)
 
@@ -604,7 +610,7 @@ end
 
       τ = r * η0
 
-      s = scaling(db.basis.BB[2], rlap_scal)
+      s = ACE.scaling(db.basis.BB[2], rlap_scal)
       l = append!(ones(length(db.basis.BB[1])), s)
       lred = [l[i] for i in non_zero_ind]
       Γ = Diagonal(lred)
@@ -643,6 +649,7 @@ end
                           Itrain, Itest, asmerrs)
    infodict["kappa"] = κ
    infodict["p_1"] = p_1
+   #infodict["int_order"] = int_order
    GC.gc()
    return IP, infodict
 end
