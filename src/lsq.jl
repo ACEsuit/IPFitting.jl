@@ -416,9 +416,9 @@ end
 
       if length(zero_ind) > 0
          lred = [l[i] for i in non_zero_ind]
-         Γ = collect(Diagonal(lred))
+         Γ = Diagonal(lred)
       else
-         Γ = collect(Diagonal(l))
+         Γ = Diagonal(l)
       end
 
       cred = reglsq(Γ = Γ, R = Matrix(qrΨ.R), y=y, τ= τ, η0 = η0 );
@@ -442,7 +442,7 @@ end
 
       s = scaling(db.basis.BB[2], 2)
       l = append!(ones(length(db.basis.BB[1])), s)
-      Γ = collect(Diagonal(rlap .* l))
+      Γ = Diagonal(rlap .* l)
 
       Ψreg = vcat(Ψ, Γ)
 
@@ -458,7 +458,7 @@ end
 
       s = scaling(db.basis.BB[2], 2)
       l = append!(ones(length(db.basis.BB[1])), s)
-      Γ = collect(Diagonal(rlap .* l))
+      Γ = Diagonal(rlap .* l)
 
       D_inv = pinv(Γ)
       Ψreg = Ψ * D_inv
@@ -473,7 +473,7 @@ end
 
       s = scaling(db.basis.BB[2], rlap_scal)
       l = append!(ones(length(db.basis.BB[1])), s)
-      Γ = collect(Diagonal(l))
+      Γ = Diagonal(l)
 
       D_inv = pinv(Γ)
       Ψreg = Ψ * D_inv
@@ -522,7 +522,7 @@ end
 
       s = ACE.scaling(db.basis.BB[2], rlap_scal)
       l = append!(ones(length(db.basis.BB[1])), s)
-      Γ = collect(Diagonal(l))
+      Γ = Diagonal(l)
 
       D_inv = pinv(Γ)
       Ψreg = Ψ * D_inv
@@ -566,7 +566,7 @@ end
       s = scaling(db.basis.BB[2], rlap_scal)
       l = append!(ones(length(db.basis.BB[1])), s)
       lred = [l[i] for i in non_zero_ind]
-      Γ = collect(Diagonal(lred))
+      Γ = Diagonal(lred)
 
       cred = reglsq(Γ = Γ, R = Matrix(qrΨred.R), y=y, τ= τ, η0 = η0 );
 
@@ -584,7 +584,7 @@ end
 
       s = scaling(db.basis.BB[2], rlap_scal)
       l = append!(ones(length(db.basis.BB[1])), s)
-      Γ = collect(Diagonal(l))
+      Γ = Diagonal(l)
 
       D_inv = pinv(Γ)
       Ψreg = Ψ * D_inv
@@ -607,7 +607,7 @@ end
       s = scaling(db.basis.BB[2], rlap_scal)
       l = append!(ones(length(db.basis.BB[1])), s)
       lred = [l[i] for i in non_zero_ind]
-      Γ = collect(Diagonal(lred))
+      Γ = Diagonal(lred)
 
       cred = reglsq(Γ = Γ, R = Matrix(qrΨred.R), y=y, τ= τ, η0 = η0 );
 
