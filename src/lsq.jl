@@ -550,6 +550,44 @@ end
       p_1 = append!(ones(length(db.basis.BB[1])), s_1)
       #int_order = db.basis.BB[2].pibasis.inner[1].orders
       ##
+   elseif solver[1] == :elastic_net_lap_rrqr
+      rlap_scal = solver[2][1]
+      rtol = solver[2][2]
+      α = solver[2][3]
+
+      s = ACE.scaling(db.basis.BB[2], rlap_scal)
+      l = append!(ones(length(db.basis.BB[1])), s)
+      Γ = Diagonal(l)
+
+      D_inv = pinv(Γ)
+      Ψreg = Ψ * D_inv
+
+      cv = glmnet(Ψreg, Y, alpha=α)
+      theta = cv.betas[:,end]
+
+      non_zero_ind = findall(x -> x != 0.0, theta)
+      zero_ind = findall(x -> x == 0.0, theta)
+
+      @info("α=$(α), keeping $(length(non_zero_ind)) basis functions ($(round(length(non_zero_ind)/length(theta), digits=2)*100)%)")
+      Ψreg_red = Ψreg[:, setdiff(1:end, zero_ind)]
+
+      qrΨ = pqrfact(Ψreg_red, rtol=rtol)
+      cred = qrΨ \ Y
+
+      cred_big = zeros(length(Ψreg[1,:]))
+
+      for (i,k) in enumerate(non_zero_ind)
+        cred_big[k] = cred[i]
+      end
+
+      c = D_inv * cred_big
+
+      rel_rms = norm(Ψ * c - Y) / norm(Y)
+      ##
+      s_1 = ACE.scaling(db.basis.BB[2], 1)
+      p_1 = append!(ones(length(db.basis.BB[1])), s_1)
+      #int_order = db.basis.BB[2].pibasis.inner[1].orders
+      ##
    elseif solver[1] == :elastic_net_lap
       α = solver[2][1]
       rlap_scal = solver[2][2]
