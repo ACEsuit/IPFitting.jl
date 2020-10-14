@@ -480,6 +480,24 @@ end
       D_inv = pinv(Γ)
       Ψreg = Ψ * D_inv
 
+      non_zero_ind = [j for (j,i) in enumerate(Ψ[1,:]) if sum(i) != 0]
+      zero_ind = [j for (j,i) in enumerate(Ψ[1,:]) if sum(i) == 0]
+
+      Ψreg_red = Ψreg[:, setdiff(1:end, zero_ind)]
+
+      qrΨ = pqrfact(Ψreg_red, rtol=rtol)
+      cred = qrΨ \ Y
+
+      cred_big = zeros(length(Ψreg[1,:]))
+
+      for (i,k) in enumerate(non_zero_ind)
+        cred_big[k] = cred[i]
+      end
+
+      c = D_inv * cred_big
+
+      rel_rms0 = norm(Ψ * c - Y) / norm(Y)
+
       function _f(Ψreg, Y, α; etol=1e-5, rtol=1e-9, return_solution=false)
           cv = glmnet(Ψreg, Y, alpha=α)
           theta = cv.betas[:, end]
@@ -510,7 +528,7 @@ end
           end
       end
 
-      α = find_zero(α -> _f(Ψreg, Y, α, etol=etol, rtol=rtol), (0,1), Roots.Bisection(), xatol=1E-6)#atol=etol/2) #atol=0.5
+      α = find_zero(α -> _f(Ψreg, Y, α, etol=etol*rel_rms0, rtol=rtol), (0,1), Roots.Bisection(), xatol=1E-6)#atol=etol/2) #atol=0.5
       @info("α found! α=$(α)")
 
       c = _f(Ψreg, Y, α, return_solution=true)
