@@ -467,9 +467,9 @@ end
       c = D_inv * (qrΨreg \  Y)
       rel_rms = norm(Ψreg * c - Y) / norm(Y)
    elseif solver[1] == :lap_elastic_net_rel
-      etol = solver[2][1]
-      rlap_scal = solver[2][2]
-      rtol = solver[2][3]
+      rlap_scal = solver[2][1]
+      rtol = solver[2][2]
+      etol = solver[2][3]
 
       s = ACE.scaling(db.basis.BB[2], rlap_scal)
       l = append!(ones(length(db.basis.BB[1])), s)
