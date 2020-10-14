@@ -471,6 +471,8 @@ end
       rtol = solver[2][2]
       etol = solver[2][3]
 
+      @info("rlap_scal = $(rlap_scal), rrqr_tol=$(rtol), e_tol = $(etol)")
+
       s = ACE.scaling(db.basis.BB[2], rlap_scal)
       l = append!(ones(length(db.basis.BB[1])), s)
       Γ = Diagonal(l)
@@ -520,6 +522,8 @@ end
    elseif solver[1] == :lap_rrqr
       rlap_scal = solver[2][1]
       rtol = solver[2][2]
+
+      @info("rlap_scal = $(rlap_scal), rrqr_tol=$(rtol)")
 
       s = ACE.scaling(db.basis.BB[2], rlap_scal)
       l = append!(ones(length(db.basis.BB[1])), s)
