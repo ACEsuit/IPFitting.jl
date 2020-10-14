@@ -498,6 +498,9 @@ end
 
       rel_rms0 = norm(Ψ * c - Y) / norm(Y)
 
+      @info("rel_rms0 = $(rel_rms0)")
+      @info("etol*rel_rms0 = $(etol*rel_rms0)")
+
       function _f(Ψreg, Y, α; etol=1e-5, rtol=1e-9, return_solution=false)
           cv = glmnet(Ψreg, Y, alpha=α)
           theta = cv.betas[:, end]
