@@ -499,7 +499,7 @@ end
           c = D_inv * cred_big
 
           rel_rms = norm(Ψ * c - Y) / norm(Y)
-          @info("rel_rms=$(rel_rms) and α=$(α)")
+          @info("rel_rms=$(rel_rms) and α=$(α), keeping $(length(non_zero_ind)) basis functions ($(round(length(non_zero_ind)/length(theta), digits=2)*100)%)")
 
           if return_solution
               return c
