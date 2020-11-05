@@ -558,7 +558,7 @@ end
 
       Ψreg_red = Ψreg[:, setdiff(1:end, zero_ind)]
 
-      qrΨ = pqrfact(Ψreg_red, rtol=rtol)
+      qrΨ = pqrfact!(Ψreg_red, rtol=rtol)
       cred = qrΨ \ Y
 
       cred_big = zeros(length(Ψreg[1,:]))
