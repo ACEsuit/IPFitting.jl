@@ -553,21 +553,10 @@ end
       D_inv = pinv(Γ)
       Ψreg = Ψ * D_inv
 
-      non_zero_ind = [j for (j,i) in enumerate(Ψ[1,:]) if sum(i) != 0]
-      zero_ind = [j for (j,i) in enumerate(Ψ[1,:]) if sum(i) == 0]
-
-      Ψreg_red = Ψreg[:, setdiff(1:end, zero_ind)]
-
-      qrΨ = pqrfact!(Ψreg_red, rtol=rtol)
+      qrΨ = pqrfact!(Ψreg, rtol=rtol)
       cred = qrΨ \ Y
 
-      cred_big = zeros(length(Ψreg[1,:]))
-
-      for (i,k) in enumerate(non_zero_ind)
-        cred_big[k] = cred[i]
-      end
-
-      c = D_inv * cred_big
+      c = D_inv * cred
 
       rel_rms = norm(Ψ * c - Y) / norm(Y)
       ##
