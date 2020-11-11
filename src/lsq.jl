@@ -544,6 +544,10 @@ end
    elseif solver[1] == :lap_rrqr
       rlap_scal = solver[2][1]
       rtol = solver[2][2]
+      reduce = false
+      if length(solver[2]) == 3 && solver[2][3] == true
+         reduce = true
+      end 
 
       @info("rlap_scal = $(rlap_scal), rrqr_tol=$(rtol)")
 
@@ -553,6 +557,11 @@ end
 
       D_inv = pinv(Γ)
       Ψreg = Ψ * D_inv
+
+      if reduce
+         Ψreg = convert.(Float32, Ψreg)
+         Y = convert.(Float32, Y)
+      end
 
       qrΨ = pqrfact!(Ψreg, rtol=rtol)
       cred = qrΨ \ Y
