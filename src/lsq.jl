@@ -33,7 +33,7 @@ using IPFitting: Dat, LsqDB, weighthook, observations,
 using IPFitting.Data: configtype
 using IPFitting.DB: dbpath, _nconfigs, matrows
 
-using LinearAlgebra: lmul!, Diagonal, qr, qr!, cond, norm, svd, I, pinv
+using LinearAlgebra: lmul!, Diagonal, qr, qr!, cond, norm, svd, I, pinv, mul!
 using InteractiveUtils: versioninfo
 using LowRankApprox
 using JuLIP.Utils
@@ -41,6 +41,7 @@ using JuLIP: JVecF
 using GLMNet
 using Roots
 using ACE
+using BenchmarkTools
 
 const Err = IPFitting.Errors
 
@@ -564,6 +565,59 @@ end
       p_1 = append!(ones(length(db.basis.BB[1])), s_1)
       #int_order = db.basis.BB[2].pibasis.inner[1].orders
       ##
+   elseif solver[1] == :lap_tik
+      rlap_scal = solver[2][1]
+      r_tik = solver[2][2]
+
+      @info("rlap_scal = $(rlap_scal), r_tik=$(r_tik)")
+
+      non_zero_ind = [j for (j,i) in enumerate(Ψ[1,:]) if sum(i) != 0]
+      zero_ind = [j for (j,i) in enumerate(Ψ[1,:]) if sum(i) == 0]
+
+      nbasis_full = length(Ψ[1,:])
+      Ψ = Ψ[:, setdiff(1:end, zero_ind)]
+      nbasis = length(Ψ[1,:])
+      nobs = length(Ψ[:,1])
+
+      s = ACE.scaling(db.basis.BB[2], rlap_scal)
+      l = append!(ones(length(db.basis.BB[1])), s)
+      Γ = Diagonal(l[:, setdiff(1:end, zero_ind)])
+
+      D_inv = pinv(Γ)
+      Ψred = similar(Ψ)
+      mul!(Ψred, Ψ, D_inv)
+      Ψ = nothing
+
+      Ψreg = zeros(nobs + nbasis, nbasis)
+
+      for (i,row) in enumerate(eachrow(Ψred))
+         Ψreg[i,:] = row
+      end
+
+      for i in 1:nbasis
+         Ψreg[nobs+i,i] = r_tik
+      end
+      Ψred = nothing
+
+      Yreg = vcat(Y, zeros(nbasis))
+
+      GC.gc()
+      qrΨreg = qr!(Ψreg)
+      cred = qrΨreg \ Yreg
+
+      cred_small = D_inv * cred
+      c = zeros(nbasis_full)
+
+      for (i,k) in enumerate(non_zero_ind)
+         c[k] = cred_small[i]
+      end
+
+      rel_rms = 0.0
+      ##
+      s_1 = ACE.scaling(db.basis.BB[2], 1)
+      p_1 = append!(ones(length(db.basis.BB[1])), s_1)
+      #int_order = db.basis.BB[2].pibasis.inner[1].orders
+      ##
    elseif solver[1] == :elastic_net_lap_rrqr
       rlap_scal = solver[2][1]
       rtol = solver[2][2]
@@ -1018,3 +1072,4 @@ end
 # s_1 = scaling(db.basis.BB[2], 1)
 # p_1 = append!(ones(length(db.basis.BB[1])), s_1)
 # ##
+
