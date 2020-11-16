@@ -42,6 +42,7 @@ using GLMNet
 using Roots
 using ACE
 using BenchmarkTools
+using GenSPGL
 
 const Err = IPFitting.Errors
 
@@ -675,6 +676,8 @@ end
       non_zero_ind = findall(x -> x != 0.0, theta)
       zero_ind = findall(x -> x == 0.0, theta)
 
+      @info("keeping $(length(non_zero_ind)) basis functions ($(round(length(non_zero_ind)/length(theta), digits=2)*100)%)")
+
       Ψred = Ψ[:, setdiff(1:end, zero_ind)]
 
       qrΨred = qr!(Ψred)
@@ -733,6 +736,41 @@ end
       cred = reglsq(Γ = Γ, R = Matrix(qrΨred.R), y=y, τ= τ, η0 = η0 );
 
       cred_big = zeros(length(Ψ[1,:]))
+
+      for (i,k) in enumerate(non_zero_ind)
+        cred_big[k] = cred[i]
+      end
+
+      c = D_inv * cred_big
+
+      rel_rms = norm(Ψ * c - Y) / norm(Y)
+   elseif solver[1] == :spgl_lap_rrqr
+      it = solver[2][1]
+      rlap_scal = solver[2][2]
+      rtol = solver[2][3]
+
+      s = ACE.scaling(db.basis.BB[2], rlap_scal)
+      l = append!(ones(length(db.basis.BB[1])), s)
+      Γ = Diagonal(l)
+
+      D_inv = pinv(Γ)
+      Ψreg = Ψ * D_inv
+
+      opts = spgOptions(iterations = it)
+      theta, r, g, info = spgl1(Ψ, Y, sigma = 1e-5, options=opts)
+
+      non_zero_ind = findall(x -> x != 0.0, theta)
+      zero_ind = findall(x -> x == 0.0, theta)
+
+      Ψred = Ψreg[:, setdiff(1:end, zero_ind)]
+
+      qrΨ = pqrfact!(Ψred, rtol=rtol)
+      cred = qrΨ \ Y
+
+      cred_big = zeros(length(Ψ[1,:]))
+
+      @show length(cred_big)
+      @show length(zero_ind)
 
       for (i,k) in enumerate(non_zero_ind)
         cred_big[k] = cred[i]
@@ -884,7 +922,7 @@ function reglsq( ;
                 verbose = true)
    @assert size(Γ, 2) == size(R, 2)
    @assert length(y) == size(R, 1)
-   Qc, Rc = qr(Γ)
+   Qc, Rc = qr(collect(Γ))
    Y = [y; zeros(size(Γ, 1))]
 
    verbose && @info("`reglsq` : solve regularised least squares")
