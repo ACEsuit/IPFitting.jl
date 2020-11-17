@@ -42,7 +42,10 @@ using GLMNet
 using Roots
 using ACE
 using BenchmarkTools
-using GenSPGL
+using IterativeSolvers
+using Optim
+#using GenSPGL
+#using SGDOptim
 
 const Err = IPFitting.Errors
 
@@ -742,6 +745,61 @@ end
       end
 
       c = D_inv * cred_big
+
+      rel_rms = norm(Ψ * c - Y) / norm(Y)
+   elseif solver[1] == :gd_reg
+      λ = solver[2][1]
+      @show λ
+
+      function error(c, y, Ψ, λ)
+         ŷ = Ψ*c
+         loss = mean((y .- ŷ).^2) + λ*norm(c)
+         return loss
+     end
+
+      res = optimize(c -> error(c, Y, Ψ, λ), zeros(length(Ψ[1,:])), GradientDescent())
+
+      c = Optim.minimizer(res)
+
+      rel_rms = norm(Ψ * c - Y) / norm(Y)
+   elseif solver[1] == :itlsq
+      damp = solver[2][1]
+
+      c = lsqr(Ψ, Y, damp=damp)
+
+      rel_rms = norm(Ψ * c - Y) / norm(Y)
+   elseif solver[1] == :elastic_net_lap_manual
+      α = solver[2][1]
+      rscal = solver[2][2]
+      lap_pen = solver[2][3]
+
+      cv = glmnet(Ψ, Y, alpha=α)
+      theta = cv.betas[:,end]
+
+      non_zero_ind = findall(x -> x != 0.0, theta)
+      zero_ind = findall(x -> x == 0.0, theta)
+
+      @info("keeping $(length(non_zero_ind)) basis functions ($(round(length(non_zero_ind)/length(theta), digits=2)*100)%)")
+
+      Ψred = Ψ[:, setdiff(1:end, zero_ind)]
+
+      s = ACE.scaling(db.basis.BB[2], rscal)
+      l = append!(ones(length(db.basis.BB[1])), s)
+
+      lred = [l[i] for i in non_zero_ind]
+      Γ = Diagonal(lap_pen .* lred)
+
+      Ψreg = vcat(Ψred, collect(Γ))
+      Yreg = vcat(Y, zeros(length(lred)))
+
+      #qrΨreg = qr!(Ψreg)
+      cred = Ψreg \ Yreg
+
+      c = zeros(length(Ψ[1,:]))
+
+      for (i,k) in enumerate(non_zero_ind)
+        c[k] = cred[i]
+      end
 
       rel_rms = norm(Ψ * c - Y) / norm(Y)
    elseif solver[1] == :spgl_lap_rrqr
