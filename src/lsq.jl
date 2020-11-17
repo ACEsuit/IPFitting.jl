@@ -749,7 +749,14 @@ end
       rel_rms = norm(Ψ * c - Y) / norm(Y)
    elseif solver[1] == :gd_reg
       λ = solver[2][1]
-      @show λ
+      rlap_scal = solver[2][2]
+
+      s = ACE.scaling(db.basis.BB[2], rlap_scal)
+      l = append!(ones(length(db.basis.BB[1])), s)
+      Γ = Diagonal(l)
+
+      D_inv = pinv(Γ)
+      Ψreg = Ψ * D_inv
 
       function error(c, y, Ψ, λ)
          ŷ = Ψ*c
@@ -757,15 +764,27 @@ end
          return loss
      end
 
-      res = optimize(c -> error(c, Y, Ψ, λ), zeros(length(Ψ[1,:])), GradientDescent())
+      res = optimize(c -> error(c, Y, Ψreg, λ), zeros(length(Ψ[1,:])), GradientDescent())
 
-      c = Optim.minimizer(res)
+      creg = Optim.minimizer(res)
+
+      c = D_inv * creg
 
       rel_rms = norm(Ψ * c - Y) / norm(Y)
    elseif solver[1] == :itlsq
       damp = solver[2][1]
+      rlap_scal = solver[2][2]
 
-      c = lsqr(Ψ, Y, damp=damp)
+      s = ACE.scaling(db.basis.BB[2], rlap_scal)
+      l = append!(ones(length(db.basis.BB[1])), s)
+      Γ = Diagonal(l)
+
+      D_inv = pinv(Γ)
+      Ψreg = Ψ * D_inv
+
+      creg = lsqr(Ψreg, Y, damp=damp)
+
+      c = D_inv * creg
 
       rel_rms = norm(Ψ * c - Y) / norm(Y)
    elseif solver[1] == :elastic_net_lap_manual
