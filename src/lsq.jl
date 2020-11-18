@@ -816,18 +816,19 @@ end
       Γ = Diagonal(l)
 
       D_inv = pinv(Γ)
-      Ψreg = Ψ * D_inv
+      mul!(Ψ,Ψ,D_inv)
 
       if reduce
-         Ψreg = convert.(Float32, Ψreg)
+         Ψ = convert.(Float32, Ψ)
          Y = convert.(Float32, Y)
       end
 
-      creg = lsqr(Ψreg, Y, damp=damp)
-
+      creg = lsqr(Ψ, Y, damp=damp)
+      #c = creg
       c = D_inv * creg
 
-      rel_rms = norm(Ψ * c - Y) / norm(Y)
+      rel_rms = norm(Ψ * creg - Y) / norm(Y)
+      #rel_rms = 0.0
    elseif solver[1] == :elastic_net_lap_manual
       α = solver[2][1]
       rscal = solver[2][2]
