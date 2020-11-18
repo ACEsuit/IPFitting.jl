@@ -635,6 +635,10 @@ end
       rlap_scal = solver[2][1]
       rtol = solver[2][2]
       α = solver[2][3]
+      reduce = false
+      if length(solver[2]) == 4 && solver[2][4] == true
+         reduce = true
+      end 
 
       s = ACE.scaling(db.basis.BB[2], rlap_scal)
       l = append!(ones(length(db.basis.BB[1])), s)
@@ -651,6 +655,11 @@ end
 
       @info("α=$(α), keeping $(length(non_zero_ind)) basis functions ($(round(length(non_zero_ind)/length(theta), digits=2)*100)%)")
       Ψreg_red = Ψreg[:, setdiff(1:end, zero_ind)]
+
+      if reduce
+         Ψreg_red = convert.(Float32, Ψreg_red)
+         Y = convert.(Float32, Y)
+      end
 
       qrΨ = pqrfact!(Ψreg_red, rtol=rtol)
       cred = qrΨ \ Y
@@ -771,8 +780,8 @@ end
       c = D_inv * creg
 
       rel_rms = norm(Ψ * c - Y) / norm(Y)
-   elseif solver[1] == :itlsq
-      damp = solver[2][1]
+   elseif solver[1] == :lbfgs_reg
+      λ = solver[2][1]
       rlap_scal = solver[2][2]
 
       s = ACE.scaling(db.basis.BB[2], rlap_scal)
@@ -781,6 +790,38 @@ end
 
       D_inv = pinv(Γ)
       Ψreg = Ψ * D_inv
+      
+      function _error(c, y, Ψ, λ)
+         ŷ = Ψ*c
+         loss = mean((y .- ŷ).^2) + λ*norm(c)
+         return loss
+      end
+      
+      res = optimize(c -> _error(c, Y, Ψreg, λ), zeros(length(Ψ[1,:])), LBFGS())
+
+      creg = Optim.minimizer(res)
+
+      c = D_inv * creg
+      rel_rms = norm(Ψ * c - Y) / norm(Y)
+   elseif solver[1] == :itlsq
+      damp = solver[2][1]
+      rlap_scal = solver[2][2]
+      reduce = false
+      if length(solver[2]) == 3 && solver[2][3] == true
+         reduce = true
+      end 
+
+      s = ACE.scaling(db.basis.BB[2], rlap_scal)
+      l = append!(ones(length(db.basis.BB[1])), s)
+      Γ = Diagonal(l)
+
+      D_inv = pinv(Γ)
+      Ψreg = Ψ * D_inv
+
+      if reduce
+         Ψreg = convert.(Float32, Ψreg)
+         Y = convert.(Float32, Y)
+      end
 
       creg = lsqr(Ψreg, Y, damp=damp)
 
