@@ -828,6 +828,47 @@ end
       c = D_inv * creg
 
       rel_rms = norm(Ψ * creg - Y) / norm(Y)
+   elseif solver[1] == :elastic_net_itlsq
+      α = solver[2][1]
+      damp = solver[2][2]
+      rlap_scal = solver[2][3]
+      reduce = false
+      if length(solver[2]) == 4 && solver[2][4] == true
+         reduce = true
+      end 
+
+      s = ACE.scaling(db.basis.BB[2], rlap_scal)
+      l = append!(ones(length(db.basis.BB[1])), s)
+      Γ = Diagonal(l)
+
+      D_inv = pinv(Γ)
+      mul!(Ψ,Ψ,D_inv)
+
+      cv = glmnet(Ψ, Y, alpha=α)
+      theta = cv.betas[:,end]
+
+      non_zero_ind = findall(x -> x != 0.0, theta)
+      zero_ind = findall(x -> x == 0.0, theta)
+
+      @info("α=$(α), keeping $(length(non_zero_ind)) basis functions ($(round(length(non_zero_ind)/length(theta), digits=2)*100)%)")
+      Ψ = Ψ[:, setdiff(1:end, zero_ind)]
+
+      if reduce
+         Ψ = convert.(Float32, Ψ)
+         Y = convert.(Float32, Y)
+      end
+
+      cred = lsqr(Ψ, Y, damp=damp)
+      #c = creg
+      cred_big = zeros(length(l))
+
+      for (i,k) in enumerate(non_zero_ind)
+        cred_big[k] = cred[i]
+      end
+
+      c = D_inv * cred_big
+
+      rel_rms = norm(Ψ * cred - Y) / norm(Y)
       #rel_rms = 0.0
    elseif solver[1] == :elastic_net_lap_manual
       α = solver[2][1]
