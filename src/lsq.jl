@@ -41,9 +41,9 @@ using JuLIP: JVecF
 using GLMNet
 using Roots
 using ACE
-using BenchmarkTools
 using IterativeSolvers
 using Optim
+using Mmap
 #using GenSPGL
 #using SGDOptim
 
@@ -806,9 +806,9 @@ end
    elseif solver[1] == :itlsq
       damp = solver[2][1]
       rlap_scal = solver[2][2]
-      reduce = false
+      mmap = false
       if length(solver[2]) == 3 && solver[2][3] == true
-         reduce = true
+         mmap = true
       end 
 
       s = ACE.scaling(db.basis.BB[2], rlap_scal)
@@ -818,13 +818,23 @@ end
       D_inv = pinv(Γ)
       mul!(Ψ,Ψ,D_inv)
 
-      if reduce
-         Ψ = convert.(Float32, Ψ)
-         Y = convert.(Float32, Y)
+      if mmap
+         s = open("/tmp/mmap.bin", "w+")
+         write(s, size(Ψ,1))
+         write(s, size(Ψ,2))
+         write(s, Ψ)
+         close(s)
+   
+         Ψ = nothing
+   
+         s = open("/tmp/mmap.bin")  
+         m = read(s, Int)
+         n = read(s, Int)
+         Ψ = Mmap.mmap(s, Matrix{Float64}, (m,n))
       end
 
       creg = lsqr(Ψ, Y, damp=damp)
-      #c = creg
+
       c = D_inv * creg
 
       rel_rms = norm(Ψ * creg - Y) / norm(Y)
@@ -832,9 +842,9 @@ end
       α = solver[2][1]
       damp = solver[2][2]
       rlap_scal = solver[2][3]
-      reduce = false
-      if length(solver[2]) == 4 && solver[2][4] == true
-         reduce = true
+      mmap = false
+      if length(solver[2]) == 3 && solver[2][3] == true
+         mmap = true
       end 
 
       s = ACE.scaling(db.basis.BB[2], rlap_scal)
@@ -843,6 +853,21 @@ end
 
       D_inv = pinv(Γ)
       mul!(Ψ,Ψ,D_inv)
+
+      if mmap
+         s = open("/tmp/mmap.bin", "w+")
+         write(s, size(Ψ,1))
+         write(s, size(Ψ,2))
+         write(s, Ψ)
+         close(s)
+   
+         Ψ = nothing
+   
+         s = open("/tmp/mmap.bin")  
+         m = read(s, Int)
+         n = read(s, Int)
+         Ψ = Mmap.mmap(s, Matrix{Float64}, (m,n))
+      end
 
       cv = glmnet(Ψ, Y, alpha=α)
       theta = cv.betas[:,end]
@@ -853,13 +878,8 @@ end
       @info("α=$(α), keeping $(length(non_zero_ind)) basis functions ($(round(length(non_zero_ind)/length(theta), digits=2)*100)%)")
       Ψ = Ψ[:, setdiff(1:end, zero_ind)]
 
-      if reduce
-         Ψ = convert.(Float32, Ψ)
-         Y = convert.(Float32, Y)
-      end
-
       cred = lsqr(Ψ, Y, damp=damp)
-      #c = creg
+
       cred_big = zeros(length(l))
 
       for (i,k) in enumerate(non_zero_ind)
