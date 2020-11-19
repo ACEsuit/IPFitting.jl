@@ -399,16 +399,6 @@ end
       r = solver[2][2]
       verbose && @info("solve $(size(Ψ)) LSQ system using Laplacian Regularisation [r = $(r)] ")
 
-      non_zero_ind = [j for (j,i) in enumerate(Ψ[1,:]) if sum(i) != 0]
-      zero_ind = [j for (j,i) in enumerate(Ψ[1,:]) if sum(i) == 0]
-
-      Ψ_old = deepcopy(Ψ)
-
-      if length(zero_ind) > 0
-         @info("Cleaning up Ψ, removing $(length(zero_ind)) empty columns")
-         Ψ = Ψ[:, setdiff(1:end, zero_ind)]
-      end
-
       qrΨ = qr!(Ψ)
       Nb = size(qrΨ.R, 1)
       y = (Y' * Matrix(qrΨ.Q))[1:Nb]
@@ -419,28 +409,11 @@ end
       s = ACE.scaling(db.basis.BB[2], rscal)
       l = append!(ones(length(db.basis.BB[1])), s)
 
-      if length(zero_ind) > 0
-         lred = [l[i] for i in non_zero_ind]
-         Γ = Diagonal(lred)
-      else
-         Γ = Diagonal(l)
-      end
+      Γ = Diagonal(l)
 
-      cred = reglsq(Γ = Γ, R = Matrix(qrΨ.R), y=y, τ= τ, η0 = η0 );
+      c = reglsq(Γ = Γ, R = Matrix(qrΨ.R), y=y, τ= τ, η0 = η0 );
 
-      if length(zero_ind) > 0
-         cred_big = zeros(length(db.basis))
-
-         for (i,k) in enumerate(non_zero_ind)
-             cred_big[k] = cred[i]
-         end
-
-         c = cred_big
-      else
-         c = cred
-      end
-
-      rel_rms = norm(Ψ_old * c - Y) / norm(Y)
+      rel_rms = norm(Ψ * c - Y) / norm(Y)
    elseif solver[1] == :rrqr_lap
       r_tol = solver[2]
       rlap = solver[3]
