@@ -806,6 +806,7 @@ end
    elseif solver[1] == :itlsq
       damp = solver[2][1]
       rlap_scal = solver[2][2]
+      @info("damp=$(damp), rlap_scal=$(rlap_scal)")
       mmap = false
       if length(solver[2]) == 3 && solver[2][3] == true
          mmap = true
@@ -819,6 +820,7 @@ end
       mul!(Ψ,Ψ,D_inv)
 
       if mmap
+         @info("Using Memory Mapping!")
          s = open("/tmp/mmap.bin", "w+")
          write(s, size(Ψ,1))
          write(s, size(Ψ,2))
@@ -842,8 +844,9 @@ end
       α = solver[2][1]
       damp = solver[2][2]
       rlap_scal = solver[2][3]
+      @info("α=$(α), damp=$(damp), rlap_scal=$(rlap_scal)")
       mmap = false
-      if length(solver[2]) == 3 && solver[2][3] == true
+      if length(solver[2]) == 4 && solver[2][4] == true
          mmap = true
       end 
 
@@ -855,6 +858,7 @@ end
       mul!(Ψ,Ψ,D_inv)
 
       if mmap
+         @info("Using Memory Mapping!")
          s = open("/tmp/mmap.bin", "w+")
          write(s, size(Ψ,1))
          write(s, size(Ψ,2))
