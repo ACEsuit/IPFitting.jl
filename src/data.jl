@@ -15,6 +15,7 @@ as a `Vector{Dat}`. This can then be stored using `JLD` or `JLD2`.
 If `d::Dat`, then one can call `energy(d), forces(d)`, etc to extract the
 loaded information.
 """
+__precompile__()
 module Data
 
 using JuLIP, ProgressMeter, FileIO, Printf, StatsBase, PrettyTables, DataFrames
@@ -23,11 +24,18 @@ using IPFitting.DataTypes
 using StringDistances
 import JuLIP: Atoms, energy, forces, virial
 import Base: length, Dict
+using PyCall
 
 import ASE     # use ASE since this will have already figured out how to
                # load `ase` without problems
 using ASE: ASEAtoms
-ase_io = ASE.ase_io
+#ase_io = ASE.ase_io
+
+const ase_io = PyNULL()
+
+function __init__()
+   copy!(ase_io, pyimport_conda("ase.io", "ase", "rmg"))
+end
 
 export configtype, weight, load_data, truncate_string
 
@@ -125,6 +133,7 @@ function read_xyz(fname; energy_key = "dft_energy", force_key = "dft_force", vir
       println("Reading in $fname ...")
    end
    at_list = ase_io.read(fname, index=index)
+   #at_list = ase_io_read(fname, index=index)
    data = Vector{Dat}(undef, length(at_list))
    idx = 0
    if verbose

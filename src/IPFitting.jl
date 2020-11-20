@@ -10,6 +10,7 @@ See `?...` on how to
 * `?IPFitting.Data` : load data sets
 * `?IPFitting.IO` : write and read an `NBodyIP`
 """
+__precompile__()
 module IPFitting
 
 using Reexport
