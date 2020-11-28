@@ -51,8 +51,6 @@ const Err = IPFitting.Errors
 
 export lsqfit, onb
 
-
-
 """
 `collect_observations(db::LsqDB, weights::Dict, Vref) -> Y, W, Icfg
 
@@ -378,7 +376,6 @@ end
       verbose && @info("cond(R) = $(cond(qrΨ.R))")
       c = qrΨ \ Y
       rel_rms = norm(Ψ * c - Y) / norm(Y)
-
    elseif solver[1] == :rid
       r = solver[2]
       verbose && @info("solve $(size(Ψ)) LSQ system using Ridge Regression [r = $(r)] ")
@@ -393,7 +390,6 @@ end
       c = reglsq(Γ = Γ, R = Matrix(qrΨ.R), y=y, τ= τ, η0 = η0 );
 
       rel_rms = norm(Ψ * c - Y) / norm(Y)
-
    elseif solver[1] == :lap
       rscal = solver[2][1]
       r = solver[2][2]
@@ -785,6 +781,27 @@ end
       s = ACE.scaling(db.basis.BB[2], rlap_scal)
       l = append!(ones(length(db.basis.BB[1])), s)
       Γ = Diagonal(l)
+
+      D_inv = pinv(Γ)
+      mul!(Ψ,Ψ,D_inv)
+
+      creg, lsqrinfo = lsqr(Ψ, Y, damp=damp, atol=atol, log=true)
+      println(lsqrinfo)
+
+      c = D_inv * creg
+
+      rel_rms = norm(Ψ * creg - Y) / norm(Y)
+   elseif solver[1] == :itlsq_Nw
+      damp = solver[2][1]
+      rlap_scal = solver[2][2]
+      atol = solver[2][3]
+      Nweight = solver[2][4]
+      @info("damp=$(damp), rlap_scal=$(rlap_scal), lsqr_atol=$(atol)")
+
+      V2scal = Nweight["2B"] .* ACE.scaling(db.basis.BB[1], rlap_scal)
+      NBscal = ACE.scaling(db.basis.BB[2], rlap_scal)
+      RegDiag = vcat(V2scal, NBscal)
+      Γ = Diagonal(RegDiag)
 
       D_inv = pinv(Γ)
       mul!(Ψ,Ψ,D_inv)
