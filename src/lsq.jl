@@ -776,6 +776,12 @@ end
       damp = solver[2][1]
       rlap_scal = solver[2][2]
       atol = solver[2][3]
+      if length(solver[2]) == 4
+         @info("Using a given approximate solution c")
+         c_init = solver[2][4]
+      else
+         c_init = zeros(length(db.Ψ[1,:]))
+      end 
       @info("damp=$(damp), rlap_scal=$(rlap_scal), lsqr_atol=$(atol)")
     
       s = ACE.scaling(db.basis.BB[2], rlap_scal)
@@ -785,7 +791,7 @@ end
       D_inv = pinv(Γ)
       mul!(Ψ,Ψ,D_inv)
 
-      creg, lsqrinfo = lsqr(Ψ, Y, damp=damp, atol=atol, log=true)
+      creg, lsqrinfo = lsqr!(c_init, Ψ, Y, damp=damp, atol=atol, log=true)
       println(lsqrinfo)
 
       c = D_inv * creg
