@@ -776,16 +776,17 @@ end
       damp = solver[2][1]
       rlap_scal = solver[2][2]
       atol = solver[2][3]
-      if length(solver[2]) == 4
-         maxiter, c_init = solver[2][4]
+      a2b = solver[2][4]
+      if length(solver[2]) == 5
+         maxiter, c_init = solver[2][5]
          @info("Using a given approximate solution c, maxiter=$(maxiter)")
       else
          c_init = zeros(length(db.Ψ[1,:]))
          maxiter=100000
       end 
-      @info("damp=$(damp), rlap_scal=$(rlap_scal), lsqr_atol=$(atol)")
+      @info("damp=$(damp), rlap_scal=$(rlap_scal), lsqr_atol=$(atol), a2b=$(a2b)")
     
-      s = ACE.scaling(db.basis.BB[2], rlap_scal)
+      s = ACE.scaling(db.basis.BB[2], rlap_scal; a2b = a2b)
       l = append!(ones(length(db.basis.BB[1])), s)
       Γ = Diagonal(l)
 
@@ -793,6 +794,25 @@ end
       mul!(Ψ,Ψ,D_inv)
 
       creg, lsqrinfo = lsqr!(c_init, Ψ, Y, damp=damp, atol=atol, maxiter=maxiter, log=true)
+      println(lsqrinfo)
+
+      c = D_inv * creg
+
+      rel_rms = norm(Ψ * creg - Y) / norm(Y)
+   elseif solver[1] == :itlsq_lap2b
+      damp = solver[2][1]
+      rlap_scal = solver[2][2]
+      atol = solver[2][3]
+      @info("damp=$(damp), rlap_scal=$(rlap_scal), lsqr_atol=$(atol) | scaling 2B ONLY")
+    
+      s = ACE.scaling(db.basis.BB[1], rlap_scal)#; a2b = a2b)
+      l = append!(s, ones(length(db.basis.BB[2])))
+      Γ = Diagonal(l)
+
+      D_inv = pinv(Γ)
+      mul!(Ψ,Ψ,D_inv)
+
+      creg, lsqrinfo = lsqr(Ψ, Y, damp=damp, atol=atol, log=true)
       println(lsqrinfo)
 
       c = D_inv * creg
