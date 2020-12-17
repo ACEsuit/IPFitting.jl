@@ -818,6 +818,40 @@ end
       c = D_inv * creg
 
       rel_rms = norm(Ψ * creg - Y) / norm(Y)
+   elseif solver[1] == :lap2b_rid
+      r = solver[2][1]
+      rlap_scal = solver[2][2]
+      @info("r=$(r), rlap_scal=$(rlap_scal) | scaling 2B ONLY")
+    
+      s = ACE.scaling(db.basis.BB[1], rlap_scal)#; a2b = a2b)
+      l = append!(s, ones(length(db.basis.BB[2])))
+      Γ = Diagonal(l)
+
+      D_inv = pinv(Γ)
+      mul!(Ψ,Ψ,D_inv)
+
+      qrΨ = qr!(Ψ)
+      Nb = size(qrΨ.R, 1)
+      y = (Y' * Matrix(qrΨ.Q))[1:Nb]
+      η0 = norm(Y - Matrix(qrΨ.Q) * y)
+
+      τ = r * η0
+      Γ = Matrix(I, length(l), length(l))
+
+      creg = reglsq(Γ = Γ, R = Matrix(qrΨ.R), y=y, τ= τ, η0 = η0 );
+
+      c = D_inv * creg
+
+      rel_rms = norm(Ψ * c - Y) / norm(Y)
+   elseif solver[1] == :lsqr
+      damp = solver[2][1]
+      atol = solver[2][2]
+      @info("damp=$(damp), lsqr_atol=$(atol) | SIMPLE LSQR")
+
+      c, lsqrinfo = lsqr(Ψ, Y, damp=damp, atol=atol, log=true)
+      println(lsqrinfo)
+
+      rel_rms = norm(Ψ * c - Y) / norm(Y)
    elseif solver[1] == :itlsq_Nw
       damp = solver[2][1]
       rlap_scal = solver[2][2]
