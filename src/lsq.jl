@@ -878,9 +878,10 @@ end
       damp = solver[2][2]
       rlap_scal = solver[2][3]
       atol = solver[2][4]
-      @info("α=$(α), damp=$(damp), rlap_scal=$(rlap_scal), lsqr_atol=$(atol)")
+      a2b = solver[2][5]
+      @info("α=$(α), damp=$(damp), rlap_scal=$(rlap_scal), lsqr_atol=$(atol), a2b=$(a2b)")
 
-      s = ACE.scaling(db.basis.BB[2], rlap_scal)
+      s = ACE.scaling(db.basis.BB[2], rlap_scal; a2b = a2b)
       l = append!(ones(length(db.basis.BB[1])), s)
       Γ = Diagonal(l)
 
