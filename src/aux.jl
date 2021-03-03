@@ -31,7 +31,7 @@ function extrap_grade(test, train::AbstractVector{<: Dat}, basis)
    for (i,cfg) in enumerate(train)
       A[i,:] = energy(basis, cfg.at)
    end
-   A_inv = pinv(A, rtol=1e-10)
+   A_inv = inv(A)
    extrap_grades = zeros(length(test))
    for (i,cfg) in enumerate(test)
       C = energy(basis, cfg.at)
