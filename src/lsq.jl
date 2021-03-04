@@ -613,6 +613,8 @@ end
       non_zero_ind = findall(x -> x != 0.0, theta)
       zero_ind = findall(x -> x == 0.0, theta)
 
+      @info("keeping $(length(non_zero_ind)) basis functions ($(round(length(non_zero_ind)/length(theta), digits=2)*100)%)")
+
       Ψred = Ψ[:, setdiff(1:end, zero_ind)]
 
       cred, lsqrinfo = lsqr(Ψred, Y, damp=damp, atol=atol, log=true)
