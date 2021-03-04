@@ -3,9 +3,11 @@ uuid = "3002bd4c-79e4-52ce-b924-91256dde4e52"
 version = "0.4.1"
 
 [deps]
+ACE = "3e8ccfd2-c8b0-11ea-32f1-f3a5990fd77a"
 ASE = "51974c44-a7ed-5088-b8be-3e78c8ba416c"
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+Distributed = "8ba89e20-285c-5b6f-9357-94700520ee1b"
 DistributedArrays = "aaf54ef3-cdf8-58ed-94cc-d582ad619b94"
 FileIO = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
 GLMNet = "8d5ece8b-de18-5317-b113-243142960cc6"

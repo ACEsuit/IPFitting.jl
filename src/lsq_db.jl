@@ -37,7 +37,7 @@ module DB
 
 using Base.Threads:          SpinLock, nthreads
 using StaticArrays:          SVector
-using JuLIP:                 AbstractCalculator, AbstractAtoms, Atoms,
+using JuLIP:                 AbstractCalculator, AbstractAtoms, Atoms, energy, forces,
                              save_dict, load_dict, read_dict, write_dict
 using JuLIP.MLIPs:           IPBasis
 using IPFitting:        Dat, LsqDB, basis, eval_obs, observations,
@@ -46,9 +46,12 @@ using IPFitting:        Dat, LsqDB, basis, eval_obs, observations,
 using IPFitting.Data:   configtype
 using HDF5:                  h5open, read
 
+using DistributedArrays
+using Distributed
+
 import Base: flush, append!, union
 
-export LsqDB, info, configtypes
+export LsqDB, LsqDB_dist, info, configtypes
 
 const VERSION = 2
 const KRONFILE = "_kron.h5"
@@ -196,6 +199,33 @@ function LsqDB(dbpath::AbstractString,
    return db
 end
 
+# function LsqDB_dist(basis::IPBasis,
+#                      configs::AbstractVector{Dat})
+#       # assign indices, count observations and allocate a matrix
+#       Ψ = _alloc_lsq_matrix_dist(configs, basis, 4)
+#       irow = 0
+#       @sync @distributed for i = 1:nworkers()
+#          # add energy to the lsq system
+#          irow += 1
+#          #y[irow] = wE * E / length(at)
+#          #Ψ_part = localpart(Ψ) 
+#          #@show size(Ψ_part)
+#          #@show Ψ[irow, :] .= repeat([irow], 36)
+#          Ψ_part = localpart(Ψ) 
+#          vec(Ψ_part) .= (1:length(Ψ_part)) .+ 1000*myid()
+#          #Ψ_part .= energy(basis, at.at) / length(at.at)
+   
+#          # add forces to the lsq system
+#          # nf = 3*length(at.at)
+#          # #y[(irow+1):(irow+nf)] = wF * mat(F)[:]
+#          # Fb = forces(basis, at.at)
+#          # for ib = 1:length(basis)
+#          #    Ψ[(irow+1):(irow+nf), ib] = mat(Fb[ib])[:]
+#          # end
+#          # irow += nf
+#       end
+#       return Ψ
+# end
 
 function set_matrows!(d::Dat, okey::String, irows::Vector{Int})
    d.rows[okey] = irows
@@ -217,6 +247,21 @@ function _alloc_lsq_matrix(configs, basis)
    end
    # allocate and return the matrix
    return zeros(Float64, nrows, length(basis))
+end
+
+function _alloc_lsq_matrix_dist(configs, basis, nprocs)
+   # the indices associated with the basis are simply the indices within
+   # the array - there is nothing else to do here
+   #
+   # loop through all observations and assign indices
+   nrows = 0
+   for (okey, d, _) in observations(configs)
+      len = length(observation(d, okey))
+      set_matrows!(d, okey, collect(nrows .+ (1:len)))
+      nrows += len
+   end
+   # allocate and return the matrix
+   return dzeros((nrows,length(basis)), workers()[1:nprocs], [1,nprocs])
 end
 
 
