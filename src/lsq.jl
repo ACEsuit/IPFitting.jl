@@ -605,6 +605,8 @@ end
       atol = solver[2][2]
       α = solver[2][3]
 
+      @info("damp=$(damp), lsqr_atol=$(atol), alpha=$(α) | ELNET LSQR")
+
       cv = glmnet(Ψ, Y, alpha=α)
       theta = cv.betas[:,end]
 
@@ -612,8 +614,6 @@ end
       zero_ind = findall(x -> x == 0.0, theta)
 
       Ψred = Ψ[:, setdiff(1:end, zero_ind)]
-
-      @info("damp=$(damp), lsqr_atol=$(atol), alpha=$(alpha) | ELNET LSQR")
 
       cred, lsqrinfo = lsqr(Ψred, Y, damp=damp, atol=atol, log=true)
       println(lsqrinfo)
