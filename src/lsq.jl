@@ -44,6 +44,7 @@ using ACE
 using IterativeSolvers
 using Optim
 using Mmap
+using ACE: z2i, i2z, order
 #using GenSPGL
 #using SGDOptim
 
@@ -891,6 +892,55 @@ end
 
       rel_rms = norm(Ψ * cred - Y) / norm(Y)
       #rel_rms = 0.0
+      rel_rms = norm(Ψ * cred - Y) / norm(Y)
+   elseif solver[1] == :no2b_itlsq
+      damp = solver[2][1]
+      rlap_scal = solver[2][2]
+      atol = solver[2][3]
+      @info("Not keeping ACE 2B, damp=$(damp), rlap_scal=$(rlap_scal), lsqr_atol=$(atol)")
+      
+      len_pair = length(db.basis.BB[1])
+      len_ace = length(db.basis.BB[2])
+
+      s = ACE.scaling(db.basis.BB[2], rlap_scal)
+      l = append!(ones(len_pair), s)
+      Γ = Diagonal(l)
+
+      D_inv = pinv(Γ)
+      mul!(Ψ,Ψ,D_inv)
+
+      I_ord2 = findall(get_orders(db.basis.BB[2]) .== 1);
+
+      zero_ind = I_ord2 .+ len_pair
+      non_zero_ind = []
+      for i in 1:(len_pair+len_ace)
+          if i ∉ zero_ind
+              append!(non_zero_ind, i)
+          end
+      end
+
+      #theta = append!(ones(length(db.basis.BB[1])), cs)
+
+      #non_zero_ind = findall(x -> x != 0.0, theta)
+      #zero_ind = findall(x -> x == 0.0, theta)
+
+      @info("keeping $(length(non_zero_ind)) basis functions ($(round(length(non_zero_ind)/(len_pair+len_ace), digits=2)*100)%)")
+      Ψ = Ψ[:, setdiff(1:end, zero_ind)]
+
+      cred, lsqrinfo = lsqr(Ψ, Y, damp=damp, atol=atol, log=true)
+      println(lsqrinfo)
+
+      cred_big = zeros(length(l))
+
+      for (i,k) in enumerate(non_zero_ind)
+        cred_big[k] = cred[i]
+      end
+
+      c = D_inv * cred_big
+
+      rel_rms = norm(Ψ * cred - Y) / norm(Y)
+      #rel_rms = 0.0
+      rel_rms = norm(Ψ * cred - Y) / norm(Y)
    elseif solver[1] == :elastic_net_lap_manual
       α = solver[2][1]
       rscal = solver[2][2]
