@@ -7,18 +7,24 @@ using JuLIP, LinearAlgebra
 @doc raw"""
 `AdjacancyPrecon` :
 
+WARNING: While the code accounts for PBC, the following description does not.
+
 If `(r0, r1, k)` is in the `intervals` list and if
 `r0 <= rij <= r1` then the 3 x 3 block
 ```math
    P_{ij} = - k \big( (1-c) \hat{R}_{ij} \otimes \hat{R}_{ij} + c I \big),
 ```
-where ``\hat{R}`` is the bond direction and `c = innerstab`.
+where ``\hat{R}_{ij}`` is the bond direction and `c = innerstab`. The diagonal
+is then obtained by
+```math
+   P_{ii} = \sum_{j \neq i} P_{ij} + c_g I
+```
+where `cg = stab` is a second, global, stabilisation constant.
+
+Regarding the choice of `innerstab`:
 * Choose `innerstab = 0` to get full infinitesimal rotation-invariance
 * Choose `innerstab = 1` to get full resistance against infinitesimal rotations
 * In optimisation we often found that `innerstab = 0.1` is a decent choice.
-
-In addition the `stab` parameter adds a global stabilisation shifting
-the entire matrix by `stab * I`.
 """
 struct AdjacancyPrecon
    intervals::Vector{NamedTuple{(:r0, :r1, :k), Tuple{Float64, Float64, Float64}}}
