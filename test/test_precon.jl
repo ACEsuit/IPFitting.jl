@@ -10,7 +10,7 @@ using JuLIP, LinearAlgebra
 If `(r0, r1, k)` is in the `intervals` list and if
 `r0 <= rij <= r1` then the 3 x 3 block
 ```math
-   P_{ij} = k \big( (1-c) \hat{R} \otimes \hat{R} + c I \big),
+   P_{ij} = - k \big( (1-c) \hat{R}_{ij} \otimes \hat{R}_{ij} + c I \big),
 ```
 where ``\hat{R}`` is the bond direction and `c = innerstab`.
 * Choose `innerstab = 0` to get full infinitesimal rotation-invariance
