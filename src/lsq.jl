@@ -178,6 +178,53 @@ function _regularise!(Ψ::Matrix{T}, Y::Vector{T}, basis, regularisers;
 end
 
 
+function _forceprecon(db, Y, weights)
+   if !haskey(weights, "precon")
+      return db.Ψ, Y
+   end
+   if isempty(weights["precon"])
+      return db.Ψ, Y
+   end
+
+   Ψ = copy(db.Ψ)
+
+   for (obskey, dat, icfg) in observations(db)  # obskey ∈ {"E","F",...}; d::Dat
+      if obskey != "F"; continue; end
+      ct = configtype(dat)
+      if !haskey(weights["precon"], ct); continue; end
+
+      preconfun = ["precon"]["ct"]
+      P = weights(preconfun)
+      #   E(R + U) - E(R) - DE(R).U ~ U' D^2E(R) U ~ U' P U -> sqrt(U' P U)
+      # DE(R+U) - DE(R) ~ D^2E(R) U
+      # instead : DE(R+U) - DE(R) ~ P U
+      #         || P^{-1/2} (DE(R+U) - DE(R)) || ~ || P^{1/2} U || = sqrt(U' P U)
+      #         || P^{-1} (DE(R+U) - DE(R)) || ~ || U ||  => PROBABLY NOT THIS!!!!
+      # all we need is
+      #     sqrt(P)^2 = P
+      #    || sqrt(P)^{-1} F ||^2 = F' sqrt{P}^{-2} F = F' P^{-1} F
+      # Option 1: sqrt(P) = Q sqrt(Λ) Q'
+      # Option 2: sqrt(P) = chol(P).L
+      if !haskey(weights["precon"]["_solver"])
+         solver = "chol"
+      else
+         solver = weights["precon"]["_solver"]
+      end
+      if solver == "chol"
+         rtP = chol(P, Val(false)).L
+      elseif solver == "sqrt"
+         rtP = sqrt(P)
+      else
+         error("unknown root solver")
+      end
+
+      irows = matrows(dat, obskey)
+      Y[irows] = rtP \ Y[irows]
+      Ψ[irows, :] = rtP \ Ψ[irows, :]
+   end
+   @info("USING FORCE PRECONDITIONER")
+   return Ψ, Y
+end
 
 """
 `get_lsq_system(db::LsqDB; kwargs...) -> Ψ, Y`
@@ -207,6 +254,10 @@ E0, Vref, Ibasis, Itrain, regularisers`.
    any(isnan, Y) && error("NaN detected in observations vector")
    any(isnan, W) && error("NaN detected in weights vector")
 
+   # NON-DIAGONAL ADDITIONAL WEIGHTS
+   #  If the user supplies a force preconditioner, then we premultiply
+   #  Ψ and Y with another weight function that modifies everything
+   Ψ, Y = _forceprecon(db, Y, weights)
 
    # convert : into a vector or list
    if Itrain == : ; Itrain = 1:length(Y); end
@@ -520,7 +571,7 @@ end
       reduce = false
       if length(solver[2]) == 3 && solver[2][3] == true
          reduce = true
-      end 
+      end
 
       @info("rlap_scal = $(rlap_scal), rrqr_tol=$(rtol)")
 
@@ -741,13 +792,13 @@ end
 
       D_inv = pinv(Γ)
       Ψreg = Ψ * D_inv
-      
+
       function _error(c, y, Ψ, λ)
          ŷ = Ψ*c
          loss = mean((y .- ŷ).^2) + λ*norm(c)
          return loss
       end
-      
+
       res = optimize(c -> _error(c, Y, Ψreg, λ), zeros(length(Ψ[1,:])), LBFGS())
 
       creg = Optim.minimizer(res)
@@ -765,9 +816,9 @@ end
       else
          c_init = zeros(length(db.Ψ[1,:]))
          maxiter=100000
-      end 
+      end
       @info("damp=$(damp), rlap_scal=$(rlap_scal), lsqr_atol=$(atol), a2b=$(a2b)")
-    
+
       s = ACE.scaling(db.basis.BB[2], rlap_scal; a2b = a2b)
       l = append!(ones(length(db.basis.BB[1])), s)
       Γ = Diagonal(l)
@@ -786,7 +837,7 @@ end
       rlap_scal = solver[2][2]
       atol = solver[2][3]
       @info("damp=$(damp), rlap_scal=$(rlap_scal), lsqr_atol=$(atol) | scaling 2B ONLY")
-    
+
       s = ACE.scaling(db.basis.BB[1], rlap_scal)#; a2b = a2b)
       l = append!(s, ones(length(db.basis.BB[2])))
       Γ = Diagonal(l)
@@ -804,7 +855,7 @@ end
       r = solver[2][1]
       rlap_scal = solver[2][2]
       @info("r=$(r), rlap_scal=$(rlap_scal) | scaling 2B ONLY")
-    
+
       s = ACE.scaling(db.basis.BB[1], rlap_scal)#; a2b = a2b)
       l = append!(s, ones(length(db.basis.BB[2])))
       Γ = Diagonal(l)
@@ -1301,4 +1352,3 @@ end
 # s_1 = scaling(db.basis.BB[2], 1)
 # p_1 = append!(ones(length(db.basis.BB[1])), s_1)
 # ##
-

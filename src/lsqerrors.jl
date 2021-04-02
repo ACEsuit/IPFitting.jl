@@ -148,24 +148,26 @@ end
 # end
 
 function _err_table(errs, relerrs, title, configtypes=:)
+   #@show relerrs
    lentitle = length(title)
    datf = DataFrame()
    datf[!, Symbol("cf")] = Any[]
    datf[!, Symbol("E")]= Any[]
    datf[!, Symbol("F")]= Any[]
+   datf[!, Symbol("Fr")]= Any[]
    datf[!, Symbol("V")]= Any[]
 
    #need to add relative errors!
 
    for ct in sort(collect(keys(errs)))
       if ct != "set"
-         push!(datf, [ct, _err(errs, ct, "E")*1000, _err(errs, ct, "F"),  _err(errs, ct, "V")*1000])
+         push!(datf, [ct, _err(errs, ct, "E")*1000, _err(errs, ct, "F"), _err(relerrs, ct, "F")*100, _err(errs, ct, "V")*1000])
       end
    end
 
-   push!(datf, ["set", _err(errs, "set", "E")*1000, _err(errs, "set", "F"),  _err(errs, "set", "V")*1000])
+   push!(datf, ["set", _err(errs, "set", "E")*1000, _err(errs, "set", "F"), _err(relerrs, "set", "F")*100, _err(errs, "set", "V")*1000])
 
-   header = ["config type" "E [meV]" "F [eV/A]" "V[meV]"]
+   header = ["config type" "E [meV]" "F [eV/A]" "F [%]" "V[meV]"]
 
    pretty_table(datf, header, formatters = ft_printf("%5.3f"), body_hlines = [length(datf[!, 1])-1])
 
