@@ -222,6 +222,7 @@ function _forceprecon(db, Y, weights)
       Y[irows] = rtP \ Y[irows]
       Ψ[irows, :] = rtP \ Ψ[irows, :]
    end
+   @info("USING FORCE PRECONDITIONER")
    return Ψ, Y
 end
 
