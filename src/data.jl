@@ -49,7 +49,7 @@ virial(d::Dat) = haskey(d.D, VIRIAL) ? devec_obs(Val(:V), d.D[VIRIAL]) : nothing
 
 function read_energy(atpy, energy_key)
    for key in keys(atpy.info)
-      if lowercase(key) == energy_key
+      if key == energy_key
          return atpy.info[key]
       end
    end
@@ -58,7 +58,7 @@ end
 
 function read_forces(atpy, force_key)
    for key in keys(atpy.arrays)
-      if lowercase(key) == force_key
+      if key == force_key
          return atpy.arrays[key]' |> vecs
       end
    end
@@ -67,7 +67,7 @@ end
 
 function read_virial(atpy, virial_key)
    for key in keys(atpy.info)
-      if lowercase(key) == virial_key
+      if key == virial_key
          return JMat(atpy.info[key]...)
       end
    end
