@@ -36,8 +36,8 @@ include("lsqerrors.jl")
 include("lsq.jl")
 @reexport using IPFitting.Lsq
 
-# include("weights.jl")
-# @reexport using IPFitting.Weights
+include("preconditioners.jl")
+@reexport using IPFitting.Preconditioners
 
 include("auxiliary.jl")
 
