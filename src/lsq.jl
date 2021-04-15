@@ -33,7 +33,7 @@ using IPFitting: Dat, LsqDB, weighthook, observations,
 using IPFitting.Data: configtype
 using IPFitting.DB: dbpath, _nconfigs, matrows
 
-using LinearAlgebra: lmul!, Diagonal, qr, qr!, cond, norm, svd, I, pinv, mul!
+using LinearAlgebra: lmul!, Diagonal, qr, qr!, cond, norm, svd, I, pinv, mul!, cholesky
 using InteractiveUtils: versioninfo
 using LowRankApprox
 using JuLIP.Utils
@@ -177,7 +177,7 @@ function _regularise!(Ψ::Matrix{T}, Y::Vector{T}, basis, regularisers;
    # check they all have the correct size
    return vcat(Ψ, Ψreg), vcat(Y, Yreg)
 end
-
+#using DelimitedFiles
 
 function _forceprecon(db, Y, weights)
    if !haskey(weights, "precon")
@@ -194,8 +194,8 @@ function _forceprecon(db, Y, weights)
       ct = configtype(dat)
       if !haskey(weights["precon"], ct); continue; end
 
-      preconfun = ["precon"]["ct"]
-      P = weights(preconfun)
+      #preconfun = ["precon"][ct]
+      P = weights["precon"][ct](dat.at)
       #   E(R + U) - E(R) - DE(R).U ~ U' D^2E(R) U ~ U' P U -> sqrt(U' P U)
       # DE(R+U) - DE(R) ~ D^2E(R) U
       # instead : DE(R+U) - DE(R) ~ P U
@@ -206,13 +206,13 @@ function _forceprecon(db, Y, weights)
       #    || sqrt(P)^{-1} F ||^2 = F' sqrt{P}^{-2} F = F' P^{-1} F
       # Option 1: sqrt(P) = Q sqrt(Λ) Q'
       # Option 2: sqrt(P) = chol(P).L
-      if !haskey(weights["precon"]["_solver"])
+      if !haskey(weights["precon"],"_solver")
          solver = "chol"
       else
          solver = weights["precon"]["_solver"]
       end
       if solver == "chol"
-         rtP = chol(P, Val(false)).L
+         rtP = cholesky(P, Val(false)).L  ##### WRONG here
       elseif solver == "sqrt"
          rtP = sqrt(P)
       else
