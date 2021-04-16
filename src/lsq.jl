@@ -198,7 +198,7 @@ function _forceprecon(db, Y, weights)
       if haskey(weights["precon"], ct)
          P = weights["precon"][ct](dat.at)
       elseif haskey(weights["precon"], "default")
-         P = weights["precon"]["default"](dat.at) 
+         P = weights["precon"]["default"](dat.at)
       end
       #   E(R + U) - E(R) - DE(R).U ~ U' D^2E(R) U ~ U' P U -> sqrt(U' P U)
       # DE(R+U) - DE(R) ~ D^2E(R) U
@@ -216,7 +216,7 @@ function _forceprecon(db, Y, weights)
          solver = weights["precon"]["_solver"]
       end
       if solver == "chol"
-         rtP = cholesky(P, Val(false)).L  
+         rtP = cholesky(P, Val(false)).L
       elseif solver == "sqrt"
          rtP = sqrt(P)
       else
@@ -276,7 +276,7 @@ E0, Vref, Ibasis, Itrain, regularisers`.
                       findall(in.(Icfg, Ref(Itrain))) )
 
    # we make this a view but make sure to copy it before applying the weights
-   Ψ = @view db.Ψ[Irows, Icols]
+   Ψ = @view Ψ[Irows, Icols]
    Y = Y[Irows]
    W = W[Irows]
 
@@ -954,7 +954,7 @@ end
       rlap_scal = solver[2][2]
       atol = solver[2][3]
       @info("Not keeping ACE 2B, damp=$(damp), rlap_scal=$(rlap_scal), lsqr_atol=$(atol)")
-      
+
       len_pair = length(db.basis.BB[1])
       len_ace = length(db.basis.BB[2])
 
