@@ -58,7 +58,7 @@ function (precon::AdjacancyPrecon)(at::Atoms)
       Js, Rs = neigs(nlist, i)
       for (j, Rij) in zip(Js, Rs)
          if j < i; continue; end
-         Pij = precon(Rij)
+         Pij = precon(Rij)  
          inds = 3*(i-1) .+ (1:3)
          jnds = 3*(j-1) .+ (1:3)
          for a = 1:3, b = 1:3

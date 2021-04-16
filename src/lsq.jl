@@ -192,10 +192,14 @@ function _forceprecon(db, Y, weights)
    for (obskey, dat, icfg) in observations(db)  # obskey ∈ {"E","F",...}; d::Dat
       if obskey != "F"; continue; end
       ct = configtype(dat)
-      if !haskey(weights["precon"], ct); continue; end
+      if !haskey(weights["precon"], ct) && !haskey(weights["precon"], "default"); continue; end  ###### TOBE changed if we want to precondition only certain config_types
 
       #preconfun = ["precon"][ct]
-      P = weights["precon"][ct](dat.at)
+      if haskey(weights["precon"], ct)
+         P = weights["precon"][ct](dat.at)
+      elseif haskey(weights["precon"], "default")
+         P = weights["precon"]["default"](dat.at) 
+      end
       #   E(R + U) - E(R) - DE(R).U ~ U' D^2E(R) U ~ U' P U -> sqrt(U' P U)
       # DE(R+U) - DE(R) ~ D^2E(R) U
       # instead : DE(R+U) - DE(R) ~ P U
@@ -212,7 +216,7 @@ function _forceprecon(db, Y, weights)
          solver = weights["precon"]["_solver"]
       end
       if solver == "chol"
-         rtP = cholesky(P, Val(false)).L  ##### WRONG here
+         rtP = cholesky(P, Val(false)).L  
       elseif solver == "sqrt"
          rtP = sqrt(P)
       else
