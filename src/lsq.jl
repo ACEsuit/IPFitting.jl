@@ -219,6 +219,8 @@ function _forceprecon(db, Y, weights)
          rtP = cholesky(P, Val(false)).L
       elseif solver == "sqrt"
          rtP = sqrt(P)
+      elseif solver == "id"
+         rtP = cholesky(P)   # rtP is just P now, but factorized
       else
          error("unknown root solver")
       end
