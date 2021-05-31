@@ -45,6 +45,7 @@ using IterativeSolvers
 using Optim
 using Mmap
 using ACE: z2i, i2z, order
+using PyCall
 #using GenSPGL
 #using SGDOptim
 
@@ -446,6 +447,28 @@ end
       c = reglsq(Γ = Γ, R = Matrix(qrΨ.R), y=y, τ= τ, η0 = η0 );
 
       rel_rms = norm(Ψ * c - Y) / norm(Y)
+   elseif solver[1] == :brr
+      BRR = pyimport("sklearn.linear_model")["BayesianRidge"]
+
+      rlap_scal = solver[2]
+      #a2b = solver[2][2]
+      @info("rlap_scal=$(rlap_scal)")#, a2b=$(a2b)")
+
+      s = ACE.scaling(db.basis.BB[2], rlap_scal)#; a2b = a2b)
+      l = append!(ones(length(db.basis.BB[1])), s)
+      Γ = Diagonal(l)
+
+      D_inv = pinv(Γ)
+      mul!(Ψ,Ψ,D_inv)
+
+      clf = BRR(normalize=true)
+      clf.fit(Ψ, Y)
+
+      creg = clf.coef_
+
+      c = D_inv * creg
+
+      rel_rms = norm(Ψ * creg - Y) / norm(Y)
    elseif solver[1] == :lap
       rscal = solver[2][1]
       r = solver[2][2]
