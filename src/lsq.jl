@@ -44,7 +44,6 @@ using ACE
 using IterativeSolvers
 using Optim
 using Mmap
-using ACE: z2i, i2z, order
 #using GenSPGL
 #using SGDOptim
 
