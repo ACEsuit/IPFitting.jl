@@ -45,6 +45,7 @@ configtype(d::Dat) = d.configtype
 energy(d::Dat) = haskey(d.D, ENERGY) ? devec_obs(Val(:E), d.D[ENERGY]) : nothing
 forces(d::Dat) = haskey(d.D, FORCES) ? devec_obs(Val(:F), d.D[FORCES]) : nothing
 virial(d::Dat) = haskey(d.D, VIRIAL) ? devec_obs(Val(:V), d.D[VIRIAL]) : nothing
+dipole(d::Dat) = haskey(d.D, DIPOLE) ? devec_obs(Val(:MU), d.D[DIPOLE]) : nothing
 
 
 function read_energy(atpy, energy_key)
@@ -77,6 +78,15 @@ function read_virial(atpy, virial_key)
    #       return -1.0 * JMat(atpy.info[key]...) * atpy.get_volume()
    #    end
    # end
+   return nothing
+end
+
+function read_dipole(atpy, dipole_key)
+   for key in keys(atpy.info)
+      if key == dipole_key
+         return JVec(atpy.info[key])
+      end
+   end
    return nothing
 end
 
@@ -127,8 +137,8 @@ function read_xyz(fname; verbose=true, index = ":",
 Loads the atoms objects contained in an xyz file, attempts to read the
 DFT data stored inside and returns a `Vector{Dat}`.
 """
-function read_xyz(fname; energy_key = "dft_energy", force_key = "dft_force", virial_key = "dft_virial", auto=false, verbose=true, index = ":",
-                         include = nothing, exclude = nothing)
+function read_xyz(fname; energy_key = "dft_energy", force_key = "dft_force", virial_key = "dft_virial", dipole_key = "dipole",  auto=false, verbose=true, 
+                        index = ":", include = nothing, exclude = nothing)
    if verbose
       println("Reading in $fname ...")
    end
@@ -148,9 +158,10 @@ function read_xyz(fname; energy_key = "dft_energy", force_key = "dft_force", vir
       energy_key = findmax([[compare(energy_key, key, Levenshtein()), key] for key in keys(info_dict)])[1][2]
       force_key = findmax([[compare(force_key, key, Levenshtein()), key] for key in keys(array_dict)])[1][2]
       virial_key = findmax([[compare(virial_key, key, Levenshtein()), key] for key in keys(info_dict)])[1][2]
+      dipole_key = findmax([[compare(dipole_key, key, Levenshtein()), key] for key in keys(info_dict)])[1][2]
    end
 
-   @info("Keys used: E => \"$(energy_key)\", F => \"$(force_key)\", V => \"$(virial_key)\"")
+   @info("Keys used: E => \"$(energy_key)\", F => \"$(force_key)\", V => \"$(virial_key)\",  MU => \"$(dipole_key)\"")
 
    if verbose
       for (key,val) in Dict("Info " => info_dict, "Array " => array_dict)
@@ -186,33 +197,36 @@ function read_xyz(fname; energy_key = "dft_energy", force_key = "dft_force", vir
       E = read_energy(atpy, energy_key)
       F = read_forces(atpy, force_key)
       V = read_virial(atpy, virial_key)
+      MU = read_dipole(atpy, dipole_key)
 
       E_c = count_scalars(E)
       F_c = count_scalars(F)
       V_c = count_scalars(V)
+      MU_c = count_scalars(MU)
 
       if ct in names(ct_datf)
-         ct_datf[!, Symbol(ct)] .+= [1, length(atpy), E_c, F_c, V_c]
+         ct_datf[!, Symbol(ct)] .+= [1, length(atpy), E_c, F_c, V_c, MU_c]
       else
-         ct_datf[!, Symbol(ct)] = [1, length(atpy), E_c, F_c, V_c]
+         ct_datf[!, Symbol(ct)] = [1, length(atpy), E_c, F_c, V_c, MU_c]
       end
 
-      EFV = ""
-      (E != nothing) && (EFV *= "E")
-      (F != nothing) && (EFV *= "F")
-      (V != nothing) && (EFV *= "V")
+      EFVMU = ""
+      (E != nothing) && (EFVMU *= "E")
+      (F != nothing) && (EFVMU *= "F")
+      (V != nothing) && (EFVMU *= "V")
+      (MU != nothing) && (EFVMU *= "MU")
 
       data[idx] = Dat( at,
                        ct;
-                       E = E, F = F, V = V )
+                       E = E, F = F, V = V, MU = MU )
    end
    # verbose && toc()
 
    ct_datf_trans = DataFrame([[names(ct_datf)]; collect.(eachrow(ct_datf))], [:column; Symbol.(axes(ct_datf, 1))]) #apparently only "simple" way to take a dataframe transpose......
-   rename!(ct_datf_trans, Symbol.(["config_type", "#cfgs", "#envs", "#E", "#F", "#V"]))
+   rename!(ct_datf_trans, Symbol.(["config_type", "#cfgs", "#envs", "#E", "#F", "#V", "#MU"]))
 
    totals = sum.(eachcol(ct_datf_trans[:, 2:end]))
-   missings = [0, 0, abs(totals[1] - totals[3]), abs(3*totals[2] - totals[4]), abs(9*totals[1] - totals[5])]
+   missings = [0, 0, abs(totals[1] - totals[3]), abs(3*totals[2] - totals[4]), abs(9*totals[1] - totals[5]), abs(3*totals[1] - totals[6])]
    push!(ct_datf_trans, vcat(["total", totals]...))
    push!(ct_datf_trans, vcat(["missing", missings]...))
 
