@@ -2,10 +2,10 @@
 module DataTypes
 
 using StaticArrays
-using JuLIP: vecs, mat, JVec, energy, forces, virial
+using JuLIP: vecs, mat, JVec, energy, forces, virial, dipole
 import IPFitting: vec_obs, devec_obs, eval_obs, weighthook, Dat, err_weighthook
 
-export ENERGY, FORCES, VIRIAL
+export ENERGY, FORCES, VIRIAL, DIPOLE
 
 # some convenience functions to dispatch string arguments
 vec_obs(s::AbstractString, args...) = vec_obs(Val(Symbol(s)), args...)
@@ -75,6 +75,26 @@ function vec_obs(valV::ValV, V::AbstractVector{<: AbstractMatrix})
    return Vmat
 end
 
+# ------------------- DIPOLE ------------------
+# 3 x 1 vector
+const DIPOLE = "MU"
+const ValMU = Val{:MU}
+vec_obs(::ValMU, v::AbstractVector{<: Real}) = (@assert length(v) == 3; collect(v))
+#vec_obs(::ValMU, V::AbstractMatrix) = (@assert size(V) == (3,3); V[_IV])
+devec_obs(::ValMU, x::AbstractVector) =
+   SMatrix{3,1}(x[1], x[2], x[3])
+eval_obs(::ValMU, B, dat::Dat) = dipole(B, dat.at)
+weighthook(::ValMU, d::Dat) = 1.0 / sqrt(length(d.at))
+err_weighthook(::ValMU, d::Dat) = 1.0 / length(d.at)
+
+function vec_obs(valMU::ValMU, MU::AbstractVector{<: AbstractMatrix})
+   nbasis = length(MU)
+   MUmat = zeros(3, nbasis)
+   for ib = 1:nbasis
+      MUmat[:, ib] .= vec_obs(valMU, MU[ib])
+   end
+   return MUmat
+end
 
 
 end
