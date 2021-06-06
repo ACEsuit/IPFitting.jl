@@ -4,7 +4,6 @@ module DataTypes
 using StaticArrays
 using JuLIP: vecs, mat, JVec, energy, forces, virial, dipole
 import IPFitting: vec_obs, devec_obs, eval_obs, weighthook, Dat, err_weighthook
-
 export ENERGY, FORCES, VIRIAL, DIPOLE
 
 # some convenience functions to dispatch string arguments
@@ -79,7 +78,8 @@ end
 # 3 x 1 vector
 const DIPOLE = "MU"
 const ValMU = Val{:MU}
-vec_obs(::ValMU, v::AbstractVector{<: Real}) = (@assert length(v) == 3; collect(v))
+#vec_obs(::ValMU, v::AbstractVector{<: Real}) = (@assert length(v) == 3; collect(v))
+vec_obs(::ValMU, v::AbstractVector{StaticArrays.SVector{3, Float64}}) = collect(v)  #(@assert length(v) == 3; collect(v))
 #vec_obs(::ValMU, V::AbstractMatrix) = (@assert size(V) == (3,3); V[_IV])
 devec_obs(::ValMU, x::AbstractVector) =
    SMatrix{3,1}(x[1], x[2], x[3])

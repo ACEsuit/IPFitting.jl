@@ -269,6 +269,14 @@ function safe_append!(db::LsqDB, db_lock, cfg, okey)
    # computing the lsq blocks ("rows") can be done in parallel,
    lsqrow = eval_obs(okey, basis(db), cfg)
    vec_lsqrow = vec_obs(okey, lsqrow)
+   ### Something like this has to come here:
+   if okey == "MU"
+      tmp = zeros(3, length(vec_lsqrow))
+      for i in 1:length(vec_lsqrow)
+         tmp[:,i] = vec_lsqrow[i]
+      end
+      vec_lsqrow = tmp  
+   end
    irows = matrows(cfg, okey)
    # but writing them into the DB must be done in a threadsafe way
    lock(db_lock)
