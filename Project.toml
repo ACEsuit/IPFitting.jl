@@ -39,8 +39,7 @@ JuLIP = "≥ 0.9.3"
 julia = "1"
 
 [extras]
-SHIPs = "07029e18-8f70-11e9-35ce-2d4df590abdc"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test", "SHIPs"]
+test = ["Test"]
