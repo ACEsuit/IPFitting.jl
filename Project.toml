@@ -1,9 +1,10 @@
 name = "IPFitting"
 uuid = "3002bd4c-79e4-52ce-b924-91256dde4e52"
-version = "0.5.0"
+version = "0.5.1"
 
 [deps]
 ACE = "3e8ccfd2-c8b0-11ea-32f1-f3a5990fd77a"
+ACEbase = "14bae519-eb20-449c-a949-9c58ed33163e"
 ASE = "51974c44-a7ed-5088-b8be-3e78c8ba416c"
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
@@ -37,6 +38,7 @@ StringDistances = "88034a9c-02f8-509d-84a9-84ec65e18404"
 ASE = "≥ 0.5.2"
 JuLIP = "≥ 0.9.3"
 julia = "1"
+ACE = "≥ 0.10"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
