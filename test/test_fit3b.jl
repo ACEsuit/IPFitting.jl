@@ -2,7 +2,7 @@
 using JuLIP, Test, IPFitting, DataFrames
 using JuLIP.Potentials: evaluate_d
 using JuLIP.MLIPs: IPSuperBasis
-using SHIPs
+using ACE
 using IPFitting: Dat, LsqDB
 Lsq = IPFitting.Lsq
 Err = IPFitting.Errors
