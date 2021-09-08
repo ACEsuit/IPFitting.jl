@@ -46,6 +46,7 @@ using Optim
 using Mmap
 using ACE: z2i, i2z, order
 using PyCall
+using Statistics
 #using GenSPGL
 #using SGDOptim
 
@@ -116,6 +117,8 @@ function collect_observations(db::LsqDB,
    return Y, W, Icfg
 end
 
+f_w(fi, fm; A=0.05, B=0.5, f0=1.0) = (A + (B * f0 * log(1 + fi/f0 + fm/f0)))^(-1.0)
+
 """
 see documentation in `collect_observations`
 """
@@ -150,11 +153,16 @@ function _get_weights(weights, wh, dat, obskey, o)
       end
    end
 
+   if obskey in ["E", "V"]
    # transform the weights into a vector (if necessary) and return
-   if length(w) == 1
-      return w * ones(length(o))
-   elseif length(w) == length(o)
-      return w
+      if length(w) == 1
+         return w * ones(length(o))
+      elseif length(w) == length(o)
+         return w
+      end
+   elseif obskey == "F"
+      wf = w * f_w.(abs.(dat.D["F"]), mean(abs.(dat.D["F"]))) 
+      return wf
    end
    error("_get_weights: length(w) is neither 1 nor length(o)?!?!?")
 end
