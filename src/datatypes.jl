@@ -37,7 +37,6 @@ vec_obs(v::ValF, F::AbstractVector{<:JVec}) = vec_obs(v, mat(F))
 vec_obs(::ValF, F::AbstractMatrix) = vec(F)
 devec_obs(::ValF, x::AbstractVector) = vecs(reshape(x, 3, :))
 eval_obs(::ValF, B, dat::Dat) = forces(B, dat.at)
-
 function vec_obs(valF::ValF, F::Vector{<: Vector})
    nbasis = length(F)
    nat = length(F[1])
