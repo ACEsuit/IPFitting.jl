@@ -3,7 +3,7 @@ using Test, JuLIP
 using IPFitting
 using IPFitting: Dat
 using IPFitting.Data: configtype
-using JuLIP: write_dict, read_dict
+using ACEbase: write_dict, read_dict
 
 ##
 
@@ -20,8 +20,8 @@ dat = Dat(at, "test"; E = energy(lj, at),
                       V = virial(lj, at) )
 
 println(@test(configtype(dat) == "test"))
-println(@test(energy(dat) == energy(lj, at)))
-println(@test(forces(dat) == forces(lj, at)))
+println(@test(energy(dat) ≈ energy(lj, at)))
+println(@test(forces(dat) ≈ forces(lj, at)))
 println(@test(virial(dat) ≈ virial(lj, at)))
 
 ##

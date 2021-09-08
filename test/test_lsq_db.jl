@@ -1,6 +1,6 @@
 
 using Test
-using IPFitting, ProgressMeter, JuLIP, SHIPs
+using IPFitting, ProgressMeter, JuLIP, ACE
 using JuLIP: read_dict
 using JuLIP.Testing: test_fio
 using JuLIP.MLIPs: IPSuperBasis
@@ -9,7 +9,7 @@ DB = IPFitting.DB
 Data = Fit.Data
 
 ##
-
+   
 function rand_data(sym, N, configtype="rand")
    cubic = (N == 1)
    at = bulk(sym, cubic=cubic) * N

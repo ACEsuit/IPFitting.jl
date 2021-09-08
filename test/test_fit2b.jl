@@ -1,6 +1,6 @@
 
 using JuLIP, Test, IPFitting, DataFrames
-using SHIPs
+using ACE
 using JuLIP.Potentials: evaluate_d
 using IPFitting: Dat, LsqDB
 Lsq = IPFitting.Lsq

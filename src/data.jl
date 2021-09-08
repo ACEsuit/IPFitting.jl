@@ -50,7 +50,7 @@ dipole(d::Dat) = haskey(d.D, DIPOLE) ? devec_obs(Val(:MU), d.D[DIPOLE]) : nothin
 
 function read_energy(atpy, energy_key)
    for key in keys(atpy.info)
-      if key == energy_key
+      if lowercase(key) == lowercase(energy_key)
          return atpy.info[key]
       end
    end
@@ -59,7 +59,7 @@ end
 
 function read_forces(atpy, force_key)
    for key in keys(atpy.arrays)
-      if key == force_key
+      if lowercase(key) == lowercase(force_key)
          return atpy.arrays[key]' |> vecs
       end
    end
@@ -68,7 +68,7 @@ end
 
 function read_virial(atpy, virial_key)
    for key in keys(atpy.info)
-      if key == virial_key
+      if lowercase(key) == lowercase(virial_key)
          return JMat(atpy.info[key]...)
       end
    end
