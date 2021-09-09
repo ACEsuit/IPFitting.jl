@@ -117,7 +117,7 @@ function collect_observations(db::LsqDB,
    return Y, W, Icfg
 end
 
-f_w(fi, fm; A=0.05, B=0.5, f0=1.0) = (A + (B * f0 * log(1 + fi/f0 + fm/f0)))^(-1.0)
+f_w(fi, fm; A=0.5, B=0.5, f0=0.5) = (A + (B * f0 * log(1 + fi/f0 + fm/f0)))^(-1.0)
 
 """
 see documentation in `collect_observations`
