@@ -117,7 +117,9 @@ function collect_observations(db::LsqDB,
    return Y, W, Icfg
 end
 
-f_w(fi, fm; A=0.5, B=0.5, f0=0.5) = (A + (B * f0 * log(1 + fi/f0 + fm/f0)))^(-1.0)
+#f_w(fi, fm; A=0.5, B=0.5, f0=0.5) = (A + (B * f0 * log(1 + fi/f0 + fm/f0)))^(-1.0)
+f_w(fi, fm) = (fi + fm)^(-0.5)
+
 
 """
 see documentation in `collect_observations`
@@ -161,7 +163,7 @@ function _get_weights(weights, wh, dat, obskey, o)
          return w
       end
    elseif obskey == "F"
-      wf = w * f_w.(abs.(dat.D["F"]), mean(abs.(dat.D["F"]))) 
+      wf = w * ones(length(o))#* f_w.(abs.(dat.D["F"]), mean(abs.(dat.D["F"]))) 
       return wf
    end
    error("_get_weights: length(w) is neither 1 nor length(o)?!?!?")
