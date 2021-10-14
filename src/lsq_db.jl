@@ -22,7 +22,7 @@ Informally two pieces of data with the same configtype should represent
 where the keys are the configtypes.
 ### (De-)Vectorising Data
 Forces in `JuLIP` are represented as `Vector{SVector{...}}`, which is the
-same memory layout as a 3 x N matrix (`JuLIP.mat`), which can can then be
+same memory layout as a 3 x N matrix (`JuLIP.mat`), which can then be
 vectorised (`[:]`), and this vectoriation is readily undone again.
 Analogously, any data must be stored in such a vectorised format. This is
 achieved (e.g. for forces) via
