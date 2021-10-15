@@ -49,6 +49,8 @@ using HDF5:                  h5open, read
 using DistributedArrays
 using Distributed
 
+using LinearMaps
+
 import Base: flush, append!, union
 
 export LsqDB, LsqDB_dist, info, configtypes
@@ -183,6 +185,7 @@ function LsqDB(dbpath::AbstractString,
       msg = "Assemble LSQ blocks",
       verbose=verbose,
       maxnthreads=maxnthreads )
+   db.Ψ = TransposeMap(LinearMap(db.Ψ))
    # save to file
    if dbpath != ""
       verbose && @info("Writing db to disk...")
@@ -234,19 +237,26 @@ end
 
 matrows(d::Dat, okey::String) = d.rows[okey]
 
+function set_matcols!(d::Dat, okey::String, icols::Vector{Int})
+   d.cols[okey] = icols
+   return d
+end
+
+matcols(d::Dat, okey::String) = d.cols[okey]
+
 function _alloc_lsq_matrix(configs, basis)
    # the indices associated with the basis are simply the indices within
    # the array - there is nothing else to do here
    #
    # loop through all observations and assign indices
-   nrows = 0
+   ncols = 0
    for (okey, d, _) in observations(configs)
       len = length(observation(d, okey))
-      set_matrows!(d, okey, collect(nrows .+ (1:len)))
-      nrows += len
+      set_matcols!(d, okey, collect(ncols .+ (1:len)))
+      ncols += len
    end
    # allocate and return the matrix
-   return zeros(Float64, nrows, length(basis))
+   return zeros(Float64, length(basis), ncols)
 end
 
 function _alloc_lsq_matrix_dist(configs, basis, nprocs)
@@ -254,33 +264,33 @@ function _alloc_lsq_matrix_dist(configs, basis, nprocs)
    # the array - there is nothing else to do here
    #
    # loop through all observations and assign indices
-   nrows = 0
+   ncols = 0
    for (okey, d, _) in observations(configs)
       len = length(observation(d, okey))
-      set_matrows!(d, okey, collect(nrows .+ (1:len)))
-      nrows += len
+      set_matcols!(d, okey, collect(ncols .+ (1:len)))
+      ncols += len
    end
    # allocate and return the matrix
-   return dzeros((nrows,length(basis)), workers()[1:nprocs], [1,nprocs])
+   return dzeros((length(basis), ncols), workers()[1:nprocs], [1,nprocs])
 end
 
 
 function safe_append!(db::LsqDB, db_lock, cfg, okey)
-   # computing the lsq blocks ("rows") can be done in parallel,
-   lsqrow = eval_obs(okey, basis(db), cfg)
-   vec_lsqrow = vec_obs(okey, lsqrow)
+   # computing the lsq blocks ("columns") can be done in parallel,
+   lsqcol = eval_obs(okey, basis(db), cfg)
+   vec_lsqcol = vec_obs(okey, lsqcol)
    ### Something like this has to come here:
    if okey == "MU"
-      tmp = zeros(3, length(vec_lsqrow))
-      for i in 1:length(vec_lsqrow)
-         tmp[:,i] = vec_lsqrow[i]
+      tmp = zeros(length(vec_lsqcol), 3)
+      for i in 1:length(vec_lsqcol)
+         tmp[i,:] = vec_lsqcol[i]
       end
-      vec_lsqrow = tmp  
+      vec_lsqcol = tmp  
    end
-   irows = matrows(cfg, okey)
+   icols = matcols(cfg, okey)
    # but writing them into the DB must be done in a threadsafe way
    lock(db_lock)
-   db.Ψ[irows, :] = vec_lsqrow
+   db.Ψ[:, icols] = vec_lsqcol
    unlock(db_lock)
    return nothing
 end
