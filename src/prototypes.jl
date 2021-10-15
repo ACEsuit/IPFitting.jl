@@ -20,7 +20,7 @@ mutable struct Dat
    at::Atoms                         # configuration
    configtype::String                # group identifier
    D::Dict{String, Vector{Float64}}  # list of observations
-   rows::Dict{String, Vector{Int}}   # row indices for LSQ system
+   cols::Dict{String, Vector{Int}}   # column indices for LSQ system
    info::Dict{String, Any}           # anything else...
 end
 
@@ -49,7 +49,7 @@ write_dict(d::Dat) =
          "at" => write_dict(d.at),
          "configtype" => d.configtype,
          "D" => d.D,
-         "rows" => d.rows,
+         "cols" => d.cols,
          "info" => d.info)
 
 
@@ -58,7 +58,7 @@ function Dat(D::Dict)
    return Dat(at,
               D["configtype"],
               Dict{String, Any}(D["D"]),
-              Dict{String, Any}(D["rows"]),
+              Dict{String, Any}(D["cols"]),
               Dict{String, Any}(D["info"]))
 end
 
