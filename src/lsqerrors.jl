@@ -14,7 +14,7 @@ using ProgressMeter, DataFrames, PrettyTables
 using Random: shuffle!
 
 export add_fits!, add_fits_serial!, rmse, mae, rmse_table, rmse_table_wg, mae_table,
-       lsqerrors, splittraintest
+       lsqerrors, splittraintest, rmse_table_mu
 
 
 # ------------------------- USER INTERFACE FUNCTIONS -------------------------
@@ -36,6 +36,9 @@ mae_table(D::Dict) =  mae_table( mae(D)...)
 
 rmse_table(errs::Dict, errs_rel::Dict; configtypes=:) =
    _err_table(errs, errs_rel, "RMSE", configtypes)
+
+rmse_table_mu(errs::Dict, errs_rel::Dict; configtypes=:) =
+   _err_table_mu(errs, errs_rel, "RMSE", configtypes)
 
 rmse_table_wg(errs::Dict, errs_rel::Dict, weights; configtypes=:) =
       _err_table_wg(errs, errs_rel, "RMSE WEIGHTED TABLE", weights, configtypes)
@@ -203,6 +206,27 @@ function _err_table(errs, relerrs, title, configtypes=:)
    #    print("┗━━━━━━━━━━━━━━┻━━━━━━━━┷━━━━━━━━┷━━━━━━━━┷━━━━━━━━┷━━━━━━━━┷━━━━━━━━┛\n")
 end
 
+function _err_table_mu(errs, relerrs, title, configtypes=:)
+   #@show relerrs
+   lentitle = length(title)
+   datf = DataFrame()
+   datf[!, Symbol("cf")] = Any[]
+   datf[!, Symbol("MU")]= Any[]
+
+   #need to add relative errors!
+
+   for ct in sort(collect(keys(errs)))
+      if ct != "set"
+         push!(datf, [ct, _err(errs, ct, "MU")])
+      end
+   end
+
+   push!(datf, ["set", _err(errs, "set", "MU")])
+
+   header = ["config type" "MU[Debye]"]
+
+   pretty_table(datf, header, formatters = ft_printf("%5.3f"), body_hlines = [length(datf[!, 1])-1])
+end
 
 # ---------------------------------------------------------------------
 # ------------------------- PRIVATE FUNCTIONS -------------------------
