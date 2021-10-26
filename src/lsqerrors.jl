@@ -212,18 +212,19 @@ function _err_table_mu(errs, relerrs, title, configtypes=:)
    datf = DataFrame()
    datf[!, Symbol("cf")] = Any[]
    datf[!, Symbol("MU")]= Any[]
+   datf[!, Symbol("MUr")]= Any[]
 
    #need to add relative errors!
 
    for ct in sort(collect(keys(errs)))
       if ct != "set"
-         push!(datf, [ct, _err(errs, ct, "MU")])
+         push!(datf, [ct, _err(errs, ct, "MU"), _err(relerrs, ct, "MU")*100])
       end
    end
 
-   push!(datf, ["set", _err(errs, "set", "MU")])
+   push!(datf, ["set", _err(errs, "set", "MU"), _err(relerrs, "set", "MU")*100])
 
-   header = ["config type" "MU[Debye]"]
+   header = ["config type" "MU[Debye]" "MU [%]"]
 
    pretty_table(datf, header, formatters = ft_printf("%5.3f"), body_hlines = [length(datf[!, 1])-1])
 end
