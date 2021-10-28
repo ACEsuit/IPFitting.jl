@@ -876,11 +876,11 @@ end
    elseif solver[1] == :itlsq_committee
       damp = solver[2][1]
       rlap_scal = solver[2][2]
-      Rank = solver[2][5]
-      n_committee = solver[2][7]
-      seed = solver[2][6]
-      if length(solver[2]) == 8
-         maxiter, c_init = solver[2][8]
+      Rank = solver[2][3]
+      n_committee = solver[2][4]
+      seed = solver[2][5]
+      if length(solver[2]) == 6
+         maxiter, c_init = solver[2][6]
          @info("Using a given approximate solution c, maxiter=$(maxiter)")
       else
          c_init = zeros(nbasis)
