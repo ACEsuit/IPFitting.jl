@@ -33,7 +33,8 @@ using IPFitting: Dat, LsqDB, weighthook, observations,
 using IPFitting.Data: configtype
 using IPFitting.DB: dbpath, _nconfigs, matrows
 
-using LinearAlgebra: lmul!, Diagonal, qr, qr!, cond, norm, svd, I, pinv, mul!, cholesky
+using LinearAlgebra: lmul!, Diagonal, qr, qr!, cond, norm, svd, I, 
+                     pinv, mul!, cholesky, diagm, eigmin, Symmetric
 using InteractiveUtils: versioninfo
 using LowRankApprox
 using JuLIP.Utils
@@ -875,18 +876,21 @@ end
    elseif solver[1] == :itlsq_committee
       damp = solver[2][1]
       rlap_scal = solver[2][2]
-      atol = solver[2][3]
-      a2b = solver[2][4]
-      seed = solver[2][5]
-      if length(solver[2]) == 6
-         maxiter, c_init = solver[2][6]
+      Rank = solver[2][5]
+      n_committee = solver[2][7]
+      seed = solver[2][6]
+      if length(solver[2]) == 8
+         maxiter, c_init = solver[2][8]
          @info("Using a given approximate solution c, maxiter=$(maxiter)")
       else
-         c_init = zeros(length(db.Ψ[1,:]))
+         c_init = zeros(nbasis)
          maxiter=100000
       end
+      nbasis = length(db.Ψ[1,:])
+      atol = 1e-6
+      a2b = identity
       @info("damp=$(damp), rlap_scal=$(rlap_scal), lsqr_atol=$(atol), a2b=$(a2b)")
-      @info("seed=$(seed)")
+      @info("rank=$(Rank) seed=$(seed)")
       
 
       s = ACE.scaling(db.basis.BB[2], rlap_scal; a2b = a2b)
@@ -899,18 +903,30 @@ end
       creg, lsqrinfo = lsqr!(c_init, Ψ, Y, damp=damp, atol=atol, maxiter=maxiter, log=true)
       println(lsqrinfo)
 
-      qrΨ = qr(Ψ)
-      psvdΨ = psvdfact(transpose(qrΨ.R) * qrΨ.R + damp^2*I(length(Ψ[1,:])))
-      Σ_approx = psvdΨ.U * pinv(diagm(psvdΨ.S)) * psvdΨ.Vt;
-      Σ_approx = 0.5 .* (Σ_approx + transpose(Σ_approx));
+
+      qrΨ = qr!(Ψ)
+      Ψ = nothing
+      psvdΨ = psvdfact(transpose(qrΨ.R) * qrΨ.R + damp^2*I(nbasis), rank=Rank)
+      Σ_approx = Symmetric(psvdΨ.U * pinv(diagm(psvdΨ.S)) * psvdΨ.Vt)
+      psvdΨ = nothing
+      global κ = 1.0
+      min_sigm_eigval = eigmin(Σ_approx)
+      global min_eigval = -1
+      global sigm_approx = zeros(nbasis, nbasis)
+      while min_eigval < 1e-15
+         global κ *= 1.005
+         global sigm_approx = Symmetric(Σ_approx-κ*min_sigm_eigval*I)
+         global min_eigval = eigmin(sigm_approx)
+      end
+      Σ_approx = sigm_approx
 
       μ = creg
       Random.seed!(seed)
-      coeff_dist = MvNormal(μ, Σ_approx)
-      _c = rand(coeff_dist)
+      coeff_dist = MvNormal(μ, Σ_approx-κ*minimum(eigvals(Σ_approx))*I)
+      _c = rand(coeff_dist, n_committee)
 
       c = D_inv * _c
-      rel_rms = norm(Ψ * c - Y) / norm(Y)
+      rel_rms = norm(Ψ * creg - Y) / norm(Y)
 
    elseif solver[1] == :itlsq_lap2b
       damp = solver[2][1]
@@ -1154,16 +1170,26 @@ end
       @info("Relative RMSE on training set: $rel_rms")
    end
 
-   IP = JuLIP.MLIPs.combine(db.basis, c)
-   if Vref != nothing
-      IP = SumIP(Vref, IP)
+   if solver[1] == :itlsq_committee
+      IP = [SumIP(Vref, JuLIP.MLIPs.combine(db.basis, c_col) for c_col in eachcol(c))]
+      infodict = asm_fitinfo(db, IP[1], c, Ibasis, weights,
+      Vref, solver, E0, regularisers, verbose,
+      Itrain, Itest, asmerrs)
+      infodict["kappa"] = κ
+      infodict["p_1"] = p_1
+   else
+      IP = JuLIP.MLIPs.combine(db.basis, c)
+      if Vref != nothing
+         IP = SumIP(Vref, IP)
+      end
+      infodict = asm_fitinfo(db, IP, c, Ibasis, weights,
+      Vref, solver, E0, regularisers, verbose,
+      Itrain, Itest, asmerrs)
+      infodict["kappa"] = κ
+      infodict["p_1"] = p_1
    end
 
-   infodict = asm_fitinfo(db, IP, c, Ibasis, weights,
-                          Vref, solver, E0, regularisers, verbose,
-                          Itrain, Itest, asmerrs)
-   infodict["kappa"] = κ
-   infodict["p_1"] = p_1
+
    #infodict["int_order"] = int_order
    GC.gc()
    return IP, infodict
