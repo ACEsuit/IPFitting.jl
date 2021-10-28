@@ -47,6 +47,8 @@ using Mmap
 using ACE: z2i, i2z, order
 using PyCall
 using Statistics
+using Random
+using Distributions
 #using GenSPGL
 #using SGDOptim
 
@@ -870,6 +872,46 @@ end
       c = D_inv * creg
 
       rel_rms = norm(Ψ * creg - Y) / norm(Y)
+   elseif solver[1] == :itlsq_committee
+      damp = solver[2][1]
+      rlap_scal = solver[2][2]
+      atol = solver[2][3]
+      a2b = solver[2][4]
+      seed = solver[2][5]
+      if length(solver[2]) == 6
+         maxiter, c_init = solver[2][6]
+         @info("Using a given approximate solution c, maxiter=$(maxiter)")
+      else
+         c_init = zeros(length(db.Ψ[1,:]))
+         maxiter=100000
+      end
+      @info("damp=$(damp), rlap_scal=$(rlap_scal), lsqr_atol=$(atol), a2b=$(a2b)")
+      @info("seed=$(seed)")
+      
+
+      s = ACE.scaling(db.basis.BB[2], rlap_scal; a2b = a2b)
+      l = append!(ones(length(db.basis.BB[1])), s)
+      Γ = Diagonal(l)
+
+      D_inv = pinv(Γ)
+      mul!(Ψ,Ψ,D_inv)
+
+      creg, lsqrinfo = lsqr!(c_init, Ψ, Y, damp=damp, atol=atol, maxiter=maxiter, log=true)
+      println(lsqrinfo)
+
+      qrΨ = qr(Ψ)
+      psvdΨ = psvdfact(transpose(qrΨ.R) * qrΨ.R + damp^2*I(length(Ψ[1,:])))
+      Σ_approx = psvdΨ.U * pinv(diagm(psvdΨ.S)) * psvdΨ.Vt;
+      Σ_approx = 0.5 .* (Σ_approx + transpose(Σ_approx));
+
+      μ = creg
+      Random.seed!(seed)
+      coeff_dist = MvNormal(μ, Σ_approx)
+      _c = rand(coeff_dist)
+
+      c = D_inv * _c
+      rel_rms = norm(Ψ * c - Y) / norm(Y)
+
    elseif solver[1] == :itlsq_lap2b
       damp = solver[2][1]
       rlap_scal = solver[2][2]
