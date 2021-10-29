@@ -903,7 +903,7 @@ end
 
       creg, lsqrinfo = lsqr!(c_init, Ψ, Y, damp=damp, atol=atol, maxiter=maxiter, log=true)
       println(lsqrinfo)
-
+      rel_rms = norm(Ψ * creg - Y) / norm(Y)
 
       qrΨ = qr!(Ψ)
       Ψ = nothing
@@ -928,7 +928,7 @@ end
 
       c = D_inv * _c
       c_mean = D_inv * creg
-      rel_rms = norm(Ψ * creg - Y) / norm(Y)
+      
 
    elseif solver[1] == :itlsq_lap2b
       damp = solver[2][1]
