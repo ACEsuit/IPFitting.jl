@@ -927,6 +927,7 @@ end
       _c = rand(coeff_dist, n_committee)
 
       c = D_inv * _c
+      c_mean = D_inv * creg
       rel_rms = norm(Ψ * creg - Y) / norm(Y)
 
    elseif solver[1] == :itlsq_lap2b
@@ -1172,7 +1173,10 @@ end
    end
 
    if solver[1] == :itlsq_committee
-      IP = [SumIP(Vref, JuLIP.MLIPs.combine(db.basis, c_col) for c_col in eachcol(c))]
+      IP = [sumIP(Vref, JuLIP.MLIPs.combine(db.basis, c_mean))]
+      for c_col in eachcol(c)
+         push!(IP, SumIP(Vref, JuLIP.MLIPs.combine(db.basis, c_col)))
+      end
       infodict = asm_fitinfo(db, IP[1], c, Ibasis, weights,
       Vref, solver, E0, regularisers, verbose,
       Itrain, Itest, asmerrs)
