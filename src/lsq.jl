@@ -49,6 +49,7 @@ using ACE: z2i, i2z, order
 using PyCall
 using Statistics
 using Random
+using Random: seed!
 using Distributions
 #using GenSPGL
 #using SGDOptim
@@ -879,6 +880,7 @@ end
       Rank = solver[2][3]
       n_committee = solver[2][4]
       seed = solver[2][5]
+      nbasis = length(db.Ψ[1,:])
       if length(solver[2]) == 6
          maxiter, c_init = solver[2][6]
          @info("Using a given approximate solution c, maxiter=$(maxiter)")
@@ -886,7 +888,6 @@ end
          c_init = zeros(nbasis)
          maxiter=100000
       end
-      nbasis = length(db.Ψ[1,:])
       atol = 1e-6
       a2b = identity
       @info("damp=$(damp), rlap_scal=$(rlap_scal), lsqr_atol=$(atol), a2b=$(a2b)")
@@ -921,8 +922,8 @@ end
       Σ_approx = sigm_approx
 
       μ = creg
-      Random.seed!(seed)
-      coeff_dist = MvNormal(μ, Σ_approx-κ*minimum(eigvals(Σ_approx))*I)
+      seed!(seed)
+      coeff_dist = MvNormal(μ, Σ_approx)
       _c = rand(coeff_dist, n_committee)
 
       c = D_inv * _c
