@@ -34,7 +34,7 @@ using IPFitting.Data: configtype
 using IPFitting.DB: dbpath, _nconfigs, matrows
 
 using LinearAlgebra: lmul!, Diagonal, qr, qr!, cond, norm, svd, I, 
-                     pinv, mul!, cholesky, diagm, eigmin, Symmetric
+                     pinv, mul!, cholesky, diagm, eigmin, Symmetric, isposdef
 using InteractiveUtils: versioninfo
 using LowRankApprox
 using JuLIP.Utils
@@ -905,22 +905,28 @@ end
       println(lsqrinfo)
       rel_rms = norm(Ψ * creg - Y) / norm(Y)
 
-      qrΨ = qr!(Ψ)
-      Ψ = nothing
-      # psvdΨ = psvdfact(transpose(qrΨ.R) * qrΨ.R + damp^2*I(nbasis), rank=Rank)
-      psvdΨ = psvdfact(transpose(qrΨ.R) * qrΨ.R + damp^2*I(nbasis))
-      Σ_approx = Symmetric(psvdΨ.U * pinv(diagm(psvdΨ.S)) * psvdΨ.Vt)
-      psvdΨ = nothing
-      global κ = 1.0
-      min_sigm_eigval = eigmin(Σ_approx)
-      global min_eigval = -1
-      global sigm_approx = zeros(nbasis, nbasis)
-      while min_eigval < 1e-13
-         global κ *= 1.0075
-         global sigm_approx = Symmetric(Σ_approx-κ*min_sigm_eigval*I)
-         global min_eigval = eigmin(sigm_approx)
+      if Rank == :full
+        Σ_approx = Symmetric(inv(Symmetric(transpose(Ψ) * Ψ + damp^2 * I(nbasis))))
+        Ψ = nothing
+      else
+         qrΨ = qr!(Ψ)
+         Ψ = nothing
+         psvdΨ = psvdfact(transpose(qrΨ.R) * qrΨ.R + damp^2 * I(nbasis), rank=Rank)
+         Σ_approx = Symmetric(psvdΨ.U * pinv(diagm(psvdΨ.S)) * psvdΨ.Vt)
+         psvdΨ = nothing
       end
-      Σ_approx = sigm_approx
+
+
+      global κ = 1.0
+      global itnum = 0
+      min_sigm_eigval = eigmin(Σ_approx)
+      # global min_eigval = -1
+      while !isposdef(Σ_approx)
+         global κ *= 1.0075
+         global Σ_approx -= κ * min_sigm_eigval*I
+         global itnum += 1
+      end
+      @info("It took $(itnum) iterations to numerically ensure positive definite covariance matrix")
 
       μ = creg
       seed!(seed)
