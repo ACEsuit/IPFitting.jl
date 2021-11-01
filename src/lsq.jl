@@ -907,15 +907,16 @@ end
 
       qrΨ = qr!(Ψ)
       Ψ = nothing
-      psvdΨ = psvdfact(transpose(qrΨ.R) * qrΨ.R + damp^2*I(nbasis), rank=Rank)
+      # psvdΨ = psvdfact(transpose(qrΨ.R) * qrΨ.R + damp^2*I(nbasis), rank=Rank)
+      psvdΨ = psvdfact(transpose(qrΨ.R) * qrΨ.R + damp^2*I(nbasis))
       Σ_approx = Symmetric(psvdΨ.U * pinv(diagm(psvdΨ.S)) * psvdΨ.Vt)
       psvdΨ = nothing
       global κ = 1.0
       min_sigm_eigval = eigmin(Σ_approx)
       global min_eigval = -1
       global sigm_approx = zeros(nbasis, nbasis)
-      while min_eigval < 1e-15
-         global κ *= 1.005
+      while min_eigval < 1e-13
+         global κ *= 1.0075
          global sigm_approx = Symmetric(Σ_approx-κ*min_sigm_eigval*I)
          global min_eigval = eigmin(sigm_approx)
       end
@@ -1173,11 +1174,11 @@ end
    end
 
    if solver[1] == :itlsq_committee
-      IP = [sumIP(Vref, JuLIP.MLIPs.combine(db.basis, c_mean))]
+      IP = [SumIP(Vref, JuLIP.MLIPs.combine(db.basis, c_mean))]
       for c_col in eachcol(c)
          push!(IP, SumIP(Vref, JuLIP.MLIPs.combine(db.basis, c_col)))
       end
-      infodict = asm_fitinfo(db, IP[1], c, Ibasis, weights,
+      infodict = asm_fitinfo(db, IP[1], c_mean, Ibasis, weights,
       Vref, solver, E0, regularisers, verbose,
       Itrain, Itest, asmerrs)
       infodict["kappa"] = κ
