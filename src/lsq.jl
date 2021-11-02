@@ -33,7 +33,7 @@ using IPFitting: Dat, LsqDB, weighthook, observations,
 using IPFitting.Data: configtype
 using IPFitting.DB: dbpath, _nconfigs, matrows
 
-using LinearAlgebra: lmul!, Diagonal, qr, qr!, cond, norm, svd, I, 
+using LinearAlgebra: lmul!, Diagonal, qr, qr!, cond, norm, svd, I, dot,
                      pinv, mul!, cholesky, diagm, eigmin, Symmetric, isposdef
 using InteractiveUtils: versioninfo
 using LowRankApprox
@@ -879,10 +879,11 @@ end
       rlap_scal = solver[2][2]
       Rank = solver[2][3]
       n_committee = solver[2][4]
-      seed = solver[2][5]
+      noise_scale = solver[2][5]
+      seed = solver[2][6]
       nbasis = length(db.Ψ[1,:])
-      if length(solver[2]) == 6
-         maxiter, c_init = solver[2][6]
+      if length(solver[2]) == 7
+         maxiter, c_init = solver[2][7]
          @info("Using a given approximate solution c, maxiter=$(maxiter)")
       else
          c_init = zeros(nbasis)
@@ -891,7 +892,7 @@ end
       atol = 1e-6
       a2b = identity
       @info("damp=$(damp), rlap_scal=$(rlap_scal), lsqr_atol=$(atol), a2b=$(a2b)")
-      @info("rank=$(Rank) seed=$(seed)")
+      @info("rank=$(Rank), noise_scale=$(noise_scale), seed=$(seed)")
       
 
       s = ACE.scaling(db.basis.BB[2], rlap_scal; a2b = a2b)
@@ -905,8 +906,9 @@ end
       println(lsqrinfo)
       rel_rms = norm(Ψ * creg - Y) / norm(Y)
 
+      β = (1 / noise_scale)^2
       if Rank == :full
-        Σ_approx = Symmetric(inv(Symmetric(transpose(Ψ) * Ψ + damp^2 * I(nbasis))))
+        Σ_approx = Symmetric(inv(β * Symmetric(transpose(Ψ) * Ψ + damp^2 * β * I(nbasis))))
       else
          qrΨ = qr!(Ψ)
          psvdΨ = psvdfact(transpose(qrΨ.R) * qrΨ.R + damp^2 * I(nbasis), rank=Rank)
@@ -927,12 +929,13 @@ end
       end
       @info("It took $(itnum) iterations to numerically ensure positive definite covariance matrix")
       
-      λ = 0
-      for (i, obs) in enumerate(eachrow(Ψ))
-          λ += (dot(obs, creg) - Y[i])^2 / (1 + transpose(obs) *Σ_approx * obs)
-      end
+      # Nobs = length(Ψ[:,1])
+      # λ = 0
+      # for (i, obs) in enumerate(eachrow(Ψ))
+      #     λ += (dot(obs, creg) - Y[i])^2 / (1 + transpose(obs) *Σ_approx * obs)
+      # end
       Ψ = nothing
-      Σ_approx = λ / Nobs *Σ_approx
+      # Σ_approx = λ / Nobs *Σ_approx
       μ = creg
       seed!(seed)
       coeff_dist = MvNormal(μ, Σ_approx)
