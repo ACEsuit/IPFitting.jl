@@ -907,10 +907,8 @@ end
 
       if Rank == :full
         Σ_approx = Symmetric(inv(Symmetric(transpose(Ψ) * Ψ + damp^2 * I(nbasis))))
-        Ψ = nothing
       else
          qrΨ = qr!(Ψ)
-         Ψ = nothing
          psvdΨ = psvdfact(transpose(qrΨ.R) * qrΨ.R + damp^2 * I(nbasis), rank=Rank)
          Σ_approx = Symmetric(psvdΨ.U * pinv(diagm(psvdΨ.S)) * psvdΨ.Vt)
          psvdΨ = nothing
@@ -919,15 +917,22 @@ end
 
       global κ = 1.0
       global itnum = 0
-      min_sigm_eigval = eigmin(Σ_approx)
-      # global min_eigval = -1
       while !isposdef(Σ_approx)
+         if itnum == 0
+            min_sigm_eigval = eigmin(Σ_approx)
+         end
          global κ *= 1.0075
          global Σ_approx -= κ * min_sigm_eigval*I
          global itnum += 1
       end
       @info("It took $(itnum) iterations to numerically ensure positive definite covariance matrix")
-
+      
+      λ = 0
+      for (i, obs) in enumerate(eachrow(Ψ))
+          λ += (dot(obs, creg) - Y[i])^2 / (1 + transpose(obs) *Σ_approx * obs)
+      end
+      Ψ = nothing
+      Σ_approx = λ / Nobs *Σ_approx
       μ = creg
       seed!(seed)
       coeff_dist = MvNormal(μ, Σ_approx)
