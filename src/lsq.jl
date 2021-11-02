@@ -908,37 +908,33 @@ end
 
       β = (1 / noise_scale)^2
       if Rank == :full
-        Σ_approx = Symmetric(inv(β * Symmetric(transpose(Ψ) * Ψ + damp^2 * β * I(nbasis))))
+         Σ = Symmetric(inv(β * Symmetric(transpose(Ψ) * Ψ + damp^2 * β * I(nbasis))))
+         Ψ = nothing
       else
          qrΨ = qr!(Ψ)
+         Ψ = nothing
          psvdΨ = psvdfact(transpose(qrΨ.R) * qrΨ.R + damp^2 * I(nbasis), rank=Rank)
-         Σ_approx = Symmetric(psvdΨ.U * pinv(diagm(psvdΨ.S)) * psvdΨ.Vt)
+         Σ = Symmetric(psvdΨ.U * pinv(diagm(psvdΨ.S)) * psvdΨ.Vt)
          psvdΨ = nothing
       end
 
 
       global κ = 1.0
       global itnum = 0
-      while !isposdef(Σ_approx)
+      while !isposdef(Σ)
          if itnum == 0
-            min_sigm_eigval = eigmin(Σ_approx)
+            min_sigm_eigval = eigmin(Σ)
          end
          global κ *= 1.0075
-         global Σ_approx -= κ * min_sigm_eigval*I
+         global Σ -= κ * min_sigm_eigval*I
          global itnum += 1
       end
       @info("It took $(itnum) iterations to numerically ensure positive definite covariance matrix")
       
-      # Nobs = length(Ψ[:,1])
-      # λ = 0
-      # for (i, obs) in enumerate(eachrow(Ψ))
-      #     λ += (dot(obs, creg) - Y[i])^2 / (1 + transpose(obs) *Σ_approx * obs)
-      # end
-      Ψ = nothing
-      # Σ_approx = λ / Nobs *Σ_approx
+      
       μ = creg
       seed!(seed)
-      coeff_dist = MvNormal(μ, Σ_approx)
+      coeff_dist = MvNormal(μ, Σ)
       _c = rand(coeff_dist, n_committee)
 
       c = D_inv * _c
