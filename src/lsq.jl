@@ -906,9 +906,15 @@ end
       println(lsqrinfo)
       rel_rms = norm(Ψ * creg - Y) / norm(Y)
 
-      β = (1 / noise_scale)^2
+      if noise_scale == :auto 
+         res = abs.(Ψ * creg - Y)
+         β = Diagonal(1 ./ res.^2)
+      else
+         β = [(1 / noise_scale)^2 for i in 1:nobs]
+         β = Diagonal(β)
+      end
       if Rank == :full
-         global Σ = Symmetric(inv(β * Symmetric(transpose(Ψ) * Ψ + damp^2 * β * I(nbasis))))
+         global Σ = Symmetric(inv( Symmetric(transpose(Ψ) * β * Ψ + damp^2 * mean(β) * I(nbasis))))
          Ψ = nothing
       else
          qrΨ = qr!(Ψ)
