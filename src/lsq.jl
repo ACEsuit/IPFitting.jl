@@ -908,7 +908,7 @@ end
 
       β = (1 / noise_scale)^2
       if Rank == :full
-         Σ = Symmetric(inv(β * Symmetric(transpose(Ψ) * Ψ + damp^2 * β * I(nbasis))))
+         global Σ = Symmetric(inv(β * Symmetric(transpose(Ψ) * Ψ + damp^2 * β * I(nbasis))))
          Ψ = nothing
       else
          qrΨ = qr!(Ψ)
