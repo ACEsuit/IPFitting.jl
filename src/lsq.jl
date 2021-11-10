@@ -909,20 +909,25 @@ end
       if noise_scale == :auto 
          res = abs.(Ψ * creg - Y)
          β = Diagonal(1 ./ res.^2)
+         global Σ = Symmetric(inv( Symmetric(transpose(Ψ) * β * Ψ + damp^2 * 1 / mean(res)^2 * I(nbasis))))
       else
          β = [(1 / noise_scale)^2 for i in 1:nobs]
          β = Diagonal(β)
-      end
-      if Rank == :full
          global Σ = Symmetric(inv( Symmetric(transpose(Ψ) * β * Ψ + damp^2 * mean(β) * I(nbasis))))
-         Ψ = nothing
-      else
-         qrΨ = qr!(Ψ)
-         Ψ = nothing
-         psvdΨ = psvdfact(transpose(qrΨ.R) * qrΨ.R + damp^2 * I(nbasis), rank=Rank)
-         Σ = Symmetric(psvdΨ.U * pinv(diagm(psvdΨ.S)) * psvdΨ.Vt)
-         psvdΨ = nothing
       end
+
+      Ψ = nothing
+
+      # if Rank == :full
+      #    global Σ = Symmetric(inv( Symmetric(transpose(Ψ) * β * Ψ + damp^2 * mean(β) * I(nbasis))))
+      #    Ψ = nothing
+      # else
+      #    qrΨ = qr!(Ψ)
+      #    Ψ = nothing
+      #    psvdΨ = psvdfact(transpose(qrΨ.R) * qrΨ.R + damp^2 * I(nbasis), rank=Rank)
+      #    Σ = Symmetric(psvdΨ.U * pinv(diagm(psvdΨ.S)) * psvdΨ.Vt)
+      #    psvdΨ = nothing
+      # end
 
 
       global κ = 1.0
