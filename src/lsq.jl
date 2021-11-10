@@ -877,13 +877,13 @@ end
    elseif solver[1] == :itlsq_committee
       damp = solver[2][1]
       rlap_scal = solver[2][2]
-      Rank = solver[2][3]
-      n_committee = solver[2][4]
-      noise_scale = solver[2][5]
-      seed = solver[2][6]
+      n_committee = solver[2][3]
+      noise_scale = solver[2][4]
+      seed = solver[2][5]
       nbasis = length(db.Ψ[1,:])
-      if length(solver[2]) == 7
-         maxiter, c_init = solver[2][7]
+      nobs = length(Ψ[:,1])
+      if length(solver[2]) == 6
+         maxiter, c_init = solver[2][6]
          @info("Using a given approximate solution c, maxiter=$(maxiter)")
       else
          c_init = zeros(nbasis)
@@ -892,7 +892,7 @@ end
       atol = 1e-6
       a2b = identity
       @info("damp=$(damp), rlap_scal=$(rlap_scal), lsqr_atol=$(atol), a2b=$(a2b)")
-      @info("rank=$(Rank), noise_scale=$(noise_scale), seed=$(seed)")
+      @info("noise_scale=$(noise_scale), seed=$(seed)")
       
 
       s = ACE.scaling(db.basis.BB[2], rlap_scal; a2b = a2b)
