@@ -934,7 +934,7 @@ end
       global itnum = 0
       while !isposdef(Σ)
          if itnum == 0
-            min_sigm_eigval = eigmin(Σ)
+            global min_sigm_eigval = eigmin(Σ)
          end
          global κ *= 1.0075
          global Σ -= κ * min_sigm_eigval*I
