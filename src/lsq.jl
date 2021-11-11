@@ -908,6 +908,7 @@ end
 
       if noise_scale == :auto 
          res = abs.(Ψ * creg - Y)
+         @info("Mean of the residuals is $(round(mean(res), digits=5))")
          β = Diagonal(1 ./ res.^2)
          global Σ = Symmetric(inv( Symmetric(transpose(Ψ) * β * Ψ + damp^2 * 1 / mean(res)^2 * I(nbasis))))
       else
