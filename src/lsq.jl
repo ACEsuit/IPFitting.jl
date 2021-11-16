@@ -937,7 +937,15 @@ end
          if itnum == 0
             min_sigm_eigval = eigmin(Σ)
          end
-         global κ *= 1.0075
+         global κ *= 1.01
+         if itnum > 2
+            global κ *= 2
+         elseif itnum > 5
+            global κ *= 5
+         elseif itnum > 20
+            @warn("Covariance matrix is ill conditioned")
+            break 
+         end 
          global Σ -= κ * min_sigm_eigval*I
          global itnum += 1
       end
