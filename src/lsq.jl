@@ -931,22 +931,26 @@ end
       # end
 
 
-      global κ = 1.0
+      global κ = 1e-20
       global itnum = 0
       while !isposdef(Σ)
          if itnum == 0
             global min_sigm_eigval = eigmin(Σ)
+            @info("Minimum eigenvalue is $(round(min_sigm_eigval, digits=5))")
+            global Σ -= (min_sigm_eigval - κ)*I
+         else
+            global Σ += κ * I
          end
-         global κ *= 1.01
-         if itnum > 2
-            global κ *= 2
-         elseif itnum > 5
-            global κ *= 5
-         elseif itnum > 20
-            @warn("Covariance matrix is ill conditioned")
-            break 
-         end 
-         global Σ -= κ * min_sigm_eigval*I
+         #global κ *= 1.01
+         # if itnum > 2
+         #    global κ *= 2
+         # elseif itnum > 5
+         #    global κ *= 5
+         # elseif itnum > 20
+         #    @warn("Covariance matrix is ill conditioned")
+         #    break 
+         # end 
+         global κ *= 10
          global itnum += 1
       end
       @info("It took $(itnum) iterations to numerically ensure positive definite covariance matrix")
