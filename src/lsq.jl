@@ -906,6 +906,17 @@ end
       println(lsqrinfo)
       rel_rms = norm(Ψ * creg - Y) / norm(Y)
 
+      # remove energies and virials from Ψ for the covariance computation
+      obskeys = []
+      for (obskey, _, _) in observations(db)
+         push!(obskeys, obskey)
+      end
+
+      zero_ind = findall(x -> x == "F", obskeys)
+
+      Ψ = Ψ[setdiff(1:end, zero_ind), :]
+      Y = Y[setdiff(1:end, zero_ind), :]
+
       if noise_scale == :auto 
          res = abs.(Ψ * creg - Y)
          @info("Mean of the residuals is $(round(mean(res), digits=5))")
