@@ -466,7 +466,7 @@ end
       c = clf.coef_
       score = clf.scores_[end]
 
-      rel_rms = norm(Ψ * creg - Y) / norm(Y)
+      rel_rms = norm(Ψ * c - Y) / norm(Y)
    elseif solver[1] == :brr_lap
       BRR = pyimport("sklearn.linear_model")["BayesianRidge"]
 
