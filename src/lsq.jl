@@ -460,6 +460,16 @@ end
    elseif solver[1] == :brr
       BRR = pyimport("sklearn.linear_model")["BayesianRidge"]
 
+      clf = BRR(normalize=true, compute_score=true)
+      clf.fit(Ψ, Y)
+
+      c = clf.coef_
+      score = clf.scores_[end]
+
+      rel_rms = norm(Ψ * creg - Y) / norm(Y)
+   elseif solver[1] == :brr_lap
+      BRR = pyimport("sklearn.linear_model")["BayesianRidge"]
+
       rlap_scal = solver[2]
       #a2b = solver[2][2]
       @info("rlap_scal=$(rlap_scal)")#, a2b=$(a2b)")
@@ -475,6 +485,7 @@ end
       clf.fit(Ψ, Y)
 
       creg = clf.coef_
+      score = clf.scores_[end]
 
       c = D_inv * creg
 
@@ -1122,6 +1133,9 @@ end
                           Itrain, Itest, asmerrs)
    infodict["kappa"] = κ
    infodict["p_1"] = p_1
+   if solver[1] == :brr || solver[1] == :brr_lap
+      infodict["lml_score"] = score
+   end
    #infodict["int_order"] = int_order
    GC.gc()
    return IP, infodict
