@@ -468,9 +468,10 @@ end
 
       rel_rms = norm(Ψ * c - Y) / norm(Y)
    elseif solver[1] == :ard
+      n_iter = solver[2]
       ARD = pyimport("sklearn.linear_model")["ARDRegression"]
 
-      clf = ARD(normalize=true, compute_score=true)
+      clf = ARD(n_iter=n_iter, normalize=true, compute_score=true)
       clf.fit(Ψ, Y)
 
       c = clf.coef_
