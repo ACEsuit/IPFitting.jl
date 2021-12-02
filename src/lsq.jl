@@ -467,6 +467,16 @@ end
       score = clf.scores_[end]
 
       rel_rms = norm(Ψ * c - Y) / norm(Y)
+   elseif solver[1] == :ard
+      ARD = pyimport("sklearn.linear_model")["ARDRegression"]
+
+      clf = ARD(normalize=true, compute_score=true)
+      clf.fit(Ψ, Y)
+
+      c = clf.coef_
+      score = clf.scores_[end]
+
+      rel_rms = norm(Ψ * c - Y) / norm(Y)
    elseif solver[1] == :brr_lap
       BRR = pyimport("sklearn.linear_model")["BayesianRidge"]
 
@@ -1133,8 +1143,8 @@ end
                           Itrain, Itest, asmerrs)
    infodict["kappa"] = κ
    infodict["p_1"] = p_1
-   if solver[1] == :brr || solver[1] == :brr_lap
-      infodict["lml_score"] = score
+   if solver[1] == :brr || solver[1] == :brr_lap || solver[1] == :ard
+         infodict["lml_score"] = score
    end
    #infodict["int_order"] = int_order
    GC.gc()
