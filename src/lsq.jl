@@ -484,7 +484,7 @@ end
       @info("Tolerance: $(tol), Threshold lambda: $(threshold_lambda)")
 
       zero_ind = findall(x -> x == 0.0, c)
-      non_zero_ind = findall(x -> x != 0.0, theta)
+      non_zero_ind = findall(x -> x != 0.0, c)
 
       @info("Fit complete!")
       @info("keeping $(length(non_zero_ind)) basis functions ($(round(length(non_zero_ind)/length(c), digits=2)*100)%)")
