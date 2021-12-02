@@ -481,13 +481,10 @@ end
       c = clf.coef_
       score = clf.scores_[end]
 
-      @info("Tolerance: $(tol), Threshold lambda: $(threshold_lambda)")
-
       zero_ind = findall(x -> x == 0.0, c)
       non_zero_ind = findall(x -> x != 0.0, c)
 
-      @info("Fit complete!")
-      @info("keeping $(length(non_zero_ind)) basis functions ($(round(length(non_zero_ind)/length(c), digits=2)*100)%)")
+      @info("Fit complete: keeping $(length(non_zero_ind)) basis functions ($(round(length(non_zero_ind)/length(c), digits=2)*100)%)")
       @info("Score: $(score)")
 
       rel_rms = norm(Ψ * c - Y) / norm(Y)
