@@ -473,7 +473,7 @@ end
 
       ARD = pyimport("sklearn.linear_model")["ARDRegression"]
       @info("Using ARD Regression")
-      @info("Tolerance: $(tol)), Threshold lambda: $(threshold_lambda)")
+      @info("Tolerance: $(tol), Threshold lambda: $(threshold_lambda)")
 
       clf = ARD(threshold_lambda = threshold_lambda, tol=tol, normalize=true, compute_score=true)
       clf.fit(Ψ, Y)
@@ -481,7 +481,7 @@ end
       c = clf.coef_
       score = clf.scores_[end]
 
-      @info("Max iterations: $(n_iter), Threshold lambda: $(threshold_lambda)")
+      @info("Tolerance: $(tol), Threshold lambda: $(threshold_lambda)")
 
       zero_ind = findall(x -> x == 0.0, c)
       non_zero_ind = findall(x -> x != 0.0, theta)
