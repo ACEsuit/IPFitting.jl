@@ -469,13 +469,26 @@ end
       rel_rms = norm(Ψ * c - Y) / norm(Y)
    elseif solver[1] == :ard
       n_iter = solver[2]
+      threshold_lambda = solver[3]
+      
       ARD = pyimport("sklearn.linear_model")["ARDRegression"]
+      @info("Using ARD Regression")
+      @info("Max iterations: $(n_iter), Threshold lambda: $(threshold_lambda)")
 
-      clf = ARD(n_iter=n_iter, normalize=true, compute_score=true)
+      clf = ARD(threshold_lambda = threshold_lambda, n_iter=n_iter, normalize=true, compute_score=true)
       clf.fit(Ψ, Y)
 
       c = clf.coef_
       score = clf.scores_[end]
+
+      @info("Max iterations: $(n_iter), Threshold lambda: $(threshold_lambda)")
+
+      zero_ind = findall(x -> x == 0.0, c)
+      non_zero_ind = findall(x -> x != 0.0, theta)
+
+      @info("Fit complete!")
+      @info("keeping $(length(non_zero_ind)) basis functions ($(round(length(non_zero_ind)/length(c), digits=2)*100)%)")
+      @info("Score: $(score)")
 
       rel_rms = norm(Ψ * c - Y) / norm(Y)
    elseif solver[1] == :brr_lap
