@@ -1158,7 +1158,7 @@ end
    infodict["kappa"] = κ
    infodict["p_1"] = p_1
    if solver[1] == :brr || solver[1] == :brr_lap || solver[1] == :ard
-         infodict["lml_score"] = score
+         infodict["score"] = score
    end
    #infodict["int_order"] = int_order
    GC.gc()
