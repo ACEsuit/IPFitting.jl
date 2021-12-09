@@ -466,6 +466,8 @@ end
       clf.fit(Ψ, Y)
 
       c = clf.coef_
+      global α = clf.alpha_
+      global β = clf.lambda_
       global score = clf.scores_[end]
 
       @info("Score: $(score)")
@@ -483,6 +485,8 @@ end
       clf.fit(Ψ, Y)
 
       c = clf.coef_
+      global alpha = clf.alpha_
+      global beta = clf.lambda_
       global score = clf.scores_[end]
 
       zero_ind = findall(x -> x == 0.0, c)
@@ -1160,6 +1164,8 @@ end
    infodict["p_1"] = p_1
    if solver[1] == :brr || solver[1] == :brr_lap || solver[1] == :ard
          infodict["score"] = score
+         infodict["alpha"] = alpha
+         infodict["beta"] = beta
    end
    #infodict["int_order"] = int_order
    GC.gc()
