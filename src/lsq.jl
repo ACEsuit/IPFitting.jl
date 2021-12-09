@@ -460,11 +460,15 @@ end
    elseif solver[1] == :brr
       BRR = pyimport("sklearn.linear_model")["BayesianRidge"]
 
+      @info("Using BRR Regression")
+
       clf = BRR(normalize=true, compute_score=true)
       clf.fit(Ψ, Y)
 
       c = clf.coef_
-      score = clf.scores_[end]
+      global score = clf.scores_[end]
+
+      @info("Score: $(score)")
 
       rel_rms = norm(Ψ * c - Y) / norm(Y)
    elseif solver[1] == :ard
@@ -479,7 +483,7 @@ end
       clf.fit(Ψ, Y)
 
       c = clf.coef_
-      score = clf.scores_[end]
+      global score = clf.scores_[end]
 
       zero_ind = findall(x -> x == 0.0, c)
       non_zero_ind = findall(x -> x != 0.0, c)
