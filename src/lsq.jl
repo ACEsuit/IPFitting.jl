@@ -466,8 +466,8 @@ end
       clf.fit(Ψ, Y)
 
       c = clf.coef_
-      global α = clf.alpha_
-      global β = clf.lambda_
+      global alpha = clf.alpha_
+      global beta = clf.lambda_
       global score = clf.scores_[end]
 
       @info("Score: $(score)")
