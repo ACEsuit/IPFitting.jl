@@ -334,8 +334,12 @@ squares system, compute the solution and return an interatomic potential
 
 * `E0` (required unless `Vref` is provided) : energy of the `OneBody` term
 * `Vref` : a reference potential from which to start the fit.
-* `weights` (required) : A dictionary specifying the weights for different
-types of configurations, see `?collect_observations` for how this is specified.
+* `weights` (required unless 'sigmas' is provided) : A dictionary specifying
+the weights for different types of configurations, see `?collect_observations`
+for how this is specified.
+* `sigmas` (required unless 'weights' is provided) : A dictionary specifying
+the sigmas for different types of configurations, see `?collect_observations`
+for how this is specified.
 * `Ibasis` : indices of basis functions to be used in the fit, default is `:`
 * `verbose` : true or false
 * `solver` : -experimental, still need to  write the docs for this-
@@ -386,6 +390,7 @@ end
                 E0 = 0.0,
                 Vref = nothing, # OneBody(E0),
                 weights = nothing,
+                sigmas = nothing,
                 regularisers = [],
                 deldb = false,
                 asmerrs = false,
@@ -393,6 +398,17 @@ end
                 saveqr = nothing,
                 #scal_wgs = false,
                 kwargs...)
+
+   if !isnothing(weights) && !isnothing(sigmas)
+      @error("cannot specify both weights and sigmas")
+   elseif !isnothing(sigmas)
+      weights = sigmas
+      for (config, config_weights) in weights
+         for (key, weight) in config_weights
+            config_weights[key] = 1.0/config_weights[key]
+         end
+      end
+   end
    weights = _fix_weights!(weights)
    Jbasis = ((Ibasis == Colon()) ? (1:length(db.basis)) : Ibasis)
 
