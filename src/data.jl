@@ -205,6 +205,22 @@ function read_xyz(fname; energy_key = "dft_energy", force_key = "dft_force", vir
       data[idx] = Dat( at,
                        ct;
                        E = E, F = F, V = V )
+
+      if (haskey(atpy.info, "energy_sigma")
+            || haskey(atpy.info, "force_sigma")
+            || haskey(atpy.info, "virial_sigma"))
+         data[idx].info["W"] = Dict{String,Float64}()
+      end
+      if haskey(atpy.info, "energy_sigma")
+         data[idx].info["W"]["E"] = 1.0/atpy.info["energy_sigma"]
+      end
+      if haskey(atpy.info, "force_sigma")
+         data[idx].info["W"]["F"] = 1.0/atpy.info["force_sigma"]
+      end
+      if haskey(atpy.info, "virial_sigma")
+         data[idx].info["W"]["V"] = 1.0/atpy.info["virial_sigma"]
+      end
+
    end
    # verbose && toc()
 
