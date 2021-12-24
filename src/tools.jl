@@ -70,6 +70,92 @@ function tfor(f, rg; verbose=true, msg="tfor", costs = ones(Int, length(rg)),
 end
 
 
+
+function pfor(db, f, rg; verbose=true, msg="tfor", costs = ones(Int, length(rg)),
+                     maxprocs=nprocs()-1)
+   p = Progress(sum(costs))
+   p_ctr = 0
+   t0 = time_ns()
+   nprcs = max(1, min(nprocs() - 1, maxprocs))
+   #TODO: serial will not work for now
+   if nprcs == 1
+      verbose && println("$msg in serial")
+      dt = verbose ? 1.0 : Inf
+      for (n, c) in zip(rg, costs)
+         f(n)
+         if verbose
+            p_ctr += c
+            ProgressMeter.update!(p, p_ctr)
+         end
+      end
+   else
+      if verbose
+         @info("$msg with $(nprcs) processors")
+         ProgressMeter.update!(p, 0)  # not sure this is useful/needed
+         p_lock = SpinLock()
+      end
+      # sort the tasks by cost: do the expensive ones first
+      Isort = sortperm(costs, rev=true)
+
+      # remember what the last job was
+      last_job = 1
+      not_done = true
+      #stores the current work the processors are doing
+      futures = Vector{Future}(undef, nprcs)
+
+      # loop until all jobs are done
+      while not_done
+         # spawn the first job for all workers
+         for i in 1:nprcs
+            tmpf = @spawnat (i+1) f(rg[Isort[last_job]])
+            futures[i] = tmpf
+            # submit progress
+            if verbose
+               p_ctr += costs[Isort[last_job]]
+               ProgressMeter.update!(p, p_ctr)
+            end
+            last_job += 1
+            # check if we are done
+            if last_job > length(Isort)
+               not_done = false
+               break
+            end
+         end
+
+         # loop through the workers, if they are done, record that value in the matrix and give them
+         # another job
+         for i in 1:nprcs
+            if(isready(futures[i]))
+               (irows,vec_lsqrow) = fetch(futures[i])
+               db.Ψ[irows, :] = vec_lsqrow
+               tmpf = @spawnat (i+1) f(rg[Isort[last_job]])
+               futures[i] = tmpf
+               # submit progress
+               if verbose
+                  p_ctr += costs[Isort[last_job]]
+                  ProgressMeter.update!(p, p_ctr)
+               end
+               last_job += 1
+               if last_job > length(Isort)
+                  not_done = false
+                  break 
+               end
+            end
+         end
+      end
+
+      # Once done we go over the features to get the last ones
+      # so far this is naive and will double update some of them TODO: improve this
+      for i in 1:nprcs
+         (irows,vec_lsqrow) = fetch(futures[i])
+         db.Ψ[irows, :] = vec_lsqrow
+      end
+   end
+   t1 = time_ns()
+   verbose && @info("Elapsed: $(round((t1-t0)*1e-9, digits=1))s")
+   return nothing
+end
+
 function analyse_include_exclude(set, include, exclude)
    if include != nothing && exclude != nothing
       error("only one of `include`, `exclude` may be different from `nothing`")

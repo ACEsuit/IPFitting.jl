@@ -3,6 +3,7 @@ import Base.iterate
 using IPFitting.Tools: tfor
 using Base.Threads: SpinLock, nthreads
 
+
 struct ObservationsIterator
    configs::Vector{Dat}   # remember the database
    Icfg::Vector{Int}      # vector of indices over which we iterate
@@ -100,6 +101,34 @@ function tfor_observations(configs::Vector{Dat}, callback;
          verbose=verbose, msg = msg,
          costs = costs,
          maxnthreads=maxnthreads )
+
+   return nothing
+end
+
+
+function pfor_observations(db, configs::Vector{Dat}, callback;
+                           verbose=true,
+                           msg = "Loop over observations",
+                           maxprocs=nprocs())
+
+   # collect a complete list of observations
+   idats = Int[]; sizehint!(idats, 3*length(configs))
+   okeys = String[]; sizehint!(okeys, 3*length(configs))
+   for (okey, _, idat) in observations(configs)
+      push!(idats, idat)
+      push!(okeys, okey)
+   end
+   # a rough cost estimate
+   costs = [ length(configs[i]) for i in idats ]
+
+   # start a loop in diff workers
+
+   pfor( db,
+         n -> callback(n, okeys[n], configs[idats[n]]),
+         1:length(idats),
+         verbose=verbose, msg = msg,
+         costs = costs,
+         maxprocs=maxprocs )
 
    return nothing
 end

@@ -199,6 +199,38 @@ function LsqDB(dbpath::AbstractString,
    return db
 end
 
+function LsqDB_dist(dbpath::AbstractString,
+               basis::IPBasis,
+               configs::AbstractVector{Dat};
+               verbose=true,
+               maxprocs=nprocs()-1)
+   # assign indices, count observations and allocate a matrix
+   Ψ = _alloc_lsq_matrix(configs, basis)
+   # create the struct where everything is stored
+   db = LsqDB(basis, configs, Ψ, dbpath)
+   # parallel assembly of the LSQ matrix
+   pfor_observations(db, configs,
+      (n, okey, cfg) -> procs_append!(db, cfg, okey),
+      msg = "Assemble LSQ blocks",
+      verbose=verbose,
+      maxprocs=maxprocs )
+   # save to file
+   if dbpath != ""
+      verbose && @info("Writing db to disk...")
+      try
+         flush(db)
+      catch
+         @warn("""something went wrong trying to save the db to disk, but the data
+               should be ok; if it is crucial to keep it, try to save manually.""")
+      end
+      verbose && @info("... done")
+   else
+      verbose && @info("db is not written to disk since `dbpath` is empty.")
+   end
+   return db
+end
+
+
 # function LsqDB_dist(basis::IPBasis,
 #                      configs::AbstractVector{Dat})
 #       # assign indices, count observations and allocate a matrix
@@ -275,6 +307,15 @@ function safe_append!(db::LsqDB, db_lock, cfg, okey)
    db.Ψ[irows, :] = vec_lsqrow
    unlock(db_lock)
    return nothing
+end
+
+function procs_append!(db::LsqDB, cfg, okey)
+   # computing the lsq blocks ("rows") can be done in parallel,
+   lsqrow = eval_obs(okey, basis(db), cfg)
+   vec_lsqrow = vec_obs(okey, lsqrow)
+   irows = matrows(cfg, okey)
+   # we don't write, but return so the main process can write 
+   return(irows, vec_lsqrow)
 end
 
 
