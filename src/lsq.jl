@@ -464,6 +464,45 @@ end
    elseif solver[1] == :brr
       BRR = pyimport("sklearn.linear_model")["BayesianRidge"]
 
+      @info("Using BRR Regression")
+
+      clf = BRR(normalize=true, compute_score=true)
+      clf.fit(Ψ, Y)
+
+      c = clf.coef_
+      global alpha = clf.alpha_
+      global beta = clf.lambda_
+      global score = clf.scores_[end]
+
+      @info("Score: $(score)")
+
+      rel_rms = norm(Ψ * c - Y) / norm(Y)
+   elseif solver[1] == :ard
+      tol = solver[2]
+      threshold_lambda = solver[3]
+
+      ARD = pyimport("sklearn.linear_model")["ARDRegression"]
+      @info("Using ARD Regression")
+      @info("Tolerance: $(tol), Threshold lambda: $(threshold_lambda)")
+
+      clf = ARD(threshold_lambda = threshold_lambda, tol=tol, normalize=true, compute_score=true)
+      clf.fit(Ψ, Y)
+
+      c = clf.coef_
+      global alpha = clf.alpha_
+      global beta = clf.lambda_
+      global score = clf.scores_[end]
+
+      zero_ind = findall(x -> x == 0.0, c)
+      non_zero_ind = findall(x -> x != 0.0, c)
+
+      @info("Fit complete: keeping $(length(non_zero_ind)) basis functions ($(round(length(non_zero_ind)/length(c), digits=2)*100)%)")
+      @info("Score: $(score)")
+
+      rel_rms = norm(Ψ * c - Y) / norm(Y)
+   elseif solver[1] == :brr_lap
+      BRR = pyimport("sklearn.linear_model")["BayesianRidge"]
+
       rlap_scal = solver[2]
       #a2b = solver[2][2]
       @info("rlap_scal=$(rlap_scal)")#, a2b=$(a2b)")
@@ -479,6 +518,7 @@ end
       clf.fit(Ψ, Y)
 
       creg = clf.coef_
+      score = clf.scores_[end]
 
       c = D_inv * creg
 
@@ -1241,6 +1281,16 @@ end
    end
 
 
+   infodict = asm_fitinfo(db, IP, c, Ibasis, weights,
+                          Vref, solver, E0, regularisers, verbose,
+                          Itrain, Itest, asmerrs)
+   infodict["kappa"] = κ
+   infodict["p_1"] = p_1
+   if solver[1] == :brr || solver[1] == :brr_lap || solver[1] == :ard
+         infodict["score"] = score
+         infodict["alpha"] = alpha
+         infodict["beta"] = beta
+   end
    #infodict["int_order"] = int_order
    GC.gc()
    return IP, infodict
