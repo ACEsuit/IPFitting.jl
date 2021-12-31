@@ -33,7 +33,8 @@ using IPFitting: Dat, LsqDB, weighthook, observations,
 using IPFitting.Data: configtype
 using IPFitting.DB: dbpath, _nconfigs, matrows
 
-using LinearAlgebra: lmul!, Diagonal, qr, qr!, cond, norm, svd, I, pinv, mul!, cholesky
+using LinearAlgebra: lmul!, Diagonal, qr, qr!, cond, norm, svd, I, dot,
+                     pinv, mul!, cholesky, diagm, eigmin, Symmetric, isposdef
 using InteractiveUtils: versioninfo
 using LowRankApprox
 using JuLIP.Utils
@@ -47,6 +48,9 @@ using Mmap
 using ACE: z2i, i2z, order
 using PyCall
 using Statistics
+using Random
+using Random: seed!
+using Distributions
 #using GenSPGL
 #using SGDOptim
 
@@ -910,6 +914,108 @@ end
       c = D_inv * creg
 
       rel_rms = norm(Ψ * creg - Y) / norm(Y)
+   elseif solver[1] == :itlsq_committee
+      damp = solver[2][1]
+      rlap_scal = solver[2][2]
+      n_committee = solver[2][3]
+      noise_scale = solver[2][4]
+      seed = solver[2][5]
+      nbasis = length(db.Ψ[1,:])
+      nobs = length(Ψ[:,1])
+      if length(solver[2]) == 6
+         maxiter, c_init = solver[2][6]
+         @info("Using a given approximate solution c, maxiter=$(maxiter)")
+      else
+         c_init = zeros(nbasis)
+         maxiter=100000
+      end
+      atol = 1e-6
+      a2b = identity
+      @info("damp=$(damp), rlap_scal=$(rlap_scal), lsqr_atol=$(atol), a2b=$(a2b)")
+      @info("noise_scale=$(noise_scale), seed=$(seed)")
+      
+
+      s = ACE.scaling(db.basis.BB[2], rlap_scal; a2b = a2b)
+      l = append!(ones(length(db.basis.BB[1])), s)
+      Γ = Diagonal(l)
+
+      D_inv = pinv(Γ)
+      mul!(Ψ,Ψ,D_inv)
+
+      creg, lsqrinfo = lsqr!(c_init, Ψ, Y, damp=damp, atol=atol, maxiter=maxiter, log=true)
+      println(lsqrinfo)
+      rel_rms = norm(Ψ * creg - Y) / norm(Y)
+
+      # remove energies and virials from Ψ for the covariance computation
+      obskeys = []
+      for (obskey, _, _) in observations(db)
+         push!(obskeys, obskey)
+      end
+
+      zero_ind = findall(x -> x == "F", obskeys)
+
+      Ψ = Ψ[setdiff(1:end, zero_ind), :]
+      Y = Y[setdiff(1:end, zero_ind), :]
+
+      if noise_scale == :auto 
+         res = abs.(Ψ * creg - Y)
+         @info("Mean of the residuals is $(round(mean(res), digits=5))")
+         β = Diagonal(1 ./ res.^2)
+         global Σ = Symmetric(inv( Symmetric(transpose(Ψ) * β * Ψ + damp^2 * 1 / mean(res)^2 * I(nbasis))))
+      else
+         β = [(1 / noise_scale)^2 for i in 1:nobs]
+         β = Diagonal(β)
+         global Σ = Symmetric(inv( Symmetric(transpose(Ψ) * β * Ψ + damp^2 * mean(β) * I(nbasis))))
+      end
+
+      Ψ = nothing
+
+      # if Rank == :full
+      #    global Σ = Symmetric(inv( Symmetric(transpose(Ψ) * β * Ψ + damp^2 * mean(β) * I(nbasis))))
+      #    Ψ = nothing
+      # else
+      #    qrΨ = qr!(Ψ)
+      #    Ψ = nothing
+      #    psvdΨ = psvdfact(transpose(qrΨ.R) * qrΨ.R + damp^2 * I(nbasis), rank=Rank)
+      #    Σ = Symmetric(psvdΨ.U * pinv(diagm(psvdΨ.S)) * psvdΨ.Vt)
+      #    psvdΨ = nothing
+      # end
+
+
+      global κ = 1e-20
+      global itnum = 0
+      while !isposdef(Σ)
+         if itnum == 0
+            global min_sigm_eigval = eigmin(Σ)
+            @info("Minimum eigenvalue is $(round(min_sigm_eigval, digits=5))")
+            global Σ -= (min_sigm_eigval - κ)*I
+         else
+            global Σ += κ * I
+         end
+         #global κ *= 1.01
+         # if itnum > 2
+         #    global κ *= 2
+         # elseif itnum > 5
+         #    global κ *= 5
+         # elseif itnum > 20
+         #    @warn("Covariance matrix is ill conditioned")
+         #    break 
+         # end 
+         global κ *= 10
+         global itnum += 1
+      end
+      @info("It took $(itnum) iterations to numerically ensure positive definite covariance matrix")
+      
+      
+      μ = creg
+      seed!(seed)
+      coeff_dist = MvNormal(μ, Σ)
+      _c = rand(coeff_dist, n_committee)
+
+      c = D_inv * _c
+      c_mean = D_inv * creg
+      
+
    elseif solver[1] == :itlsq_lap2b
       damp = solver[2][1]
       rlap_scal = solver[2][2]
@@ -1152,10 +1258,28 @@ end
       @info("Relative RMSE on training set: $rel_rms")
    end
 
-   IP = JuLIP.MLIPs.combine(db.basis, c)
-   if Vref != nothing
-      IP = SumIP(Vref, IP)
+   if solver[1] == :itlsq_committee
+      IP = [SumIP(Vref, JuLIP.MLIPs.combine(db.basis, c_mean))]
+      for c_col in eachcol(c)
+         push!(IP, SumIP(Vref, JuLIP.MLIPs.combine(db.basis, c_col)))
+      end
+      infodict = asm_fitinfo(db, IP[1], c_mean, Ibasis, weights,
+      Vref, solver, E0, regularisers, verbose,
+      Itrain, Itest, asmerrs)
+      infodict["kappa"] = κ
+      infodict["p_1"] = p_1
+   else
+      IP = JuLIP.MLIPs.combine(db.basis, c)
+      if Vref != nothing
+         IP = SumIP(Vref, IP)
+      end
+      infodict = asm_fitinfo(db, IP, c, Ibasis, weights,
+      Vref, solver, E0, regularisers, verbose,
+      Itrain, Itest, asmerrs)
+      infodict["kappa"] = κ
+      infodict["p_1"] = p_1
    end
+
 
    infodict = asm_fitinfo(db, IP, c, Ibasis, weights,
                           Vref, solver, E0, regularisers, verbose,
