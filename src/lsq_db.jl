@@ -42,7 +42,7 @@ using JuLIP:                 AbstractCalculator, AbstractAtoms, Atoms, energy, f
 using JuLIP.MLIPs:           IPBasis
 using IPFitting:        Dat, LsqDB, basis, eval_obs, observations,
                              observation, vec_obs, devec_obs,
-                             tfor_observations
+                             tfor_observations, pfor_observations
 using IPFitting.Data:   configtype
 using HDF5:                  h5open, read
 
@@ -246,7 +246,6 @@ end
 #          Ψ_part = localpart(Ψ) 
 #          vec(Ψ_part) .= (1:length(Ψ_part)) .+ 1000*myid()
 #          #Ψ_part .= energy(basis, at.at) / length(at.at)
-   
 #          # add forces to the lsq system
 #          # nf = 3*length(at.at)
 #          # #y[(irow+1):(irow+nf)] = wF * mat(F)[:]

@@ -1,6 +1,6 @@
 
 import Base.iterate
-using IPFitting.Tools: tfor
+using IPFitting.Tools: tfor, pfor
 using Base.Threads: SpinLock, nthreads
 
 
