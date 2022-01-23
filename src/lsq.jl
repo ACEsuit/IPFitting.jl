@@ -369,28 +369,22 @@ function do_qr!(db, Ψ, Y)
    return db
 end
 
-@noinline function lsqfit(db::LsqDB,
-                fit_dict; verbose=true,
+@noinline function lsqfit(db::LsqDB;
+                solver=Dict("solver" => :qr), verbose=true,
                 Ibasis = :,
                 Itrain = :,
                 Itest = nothing,
                 E0 = 0.0,
-                #Vref = nothing, # OneBody(E0),
-                #weights = nothing,
+                Vref = nothing, # OneBody(E0),
+                weights = nothing,
                 sigmas = nothing,
                 regularisers = [],
                 deldb = false,
                 asmerrs = false,
-                lasso = false,
+                #lasso = false,
                 saveqr = nothing,
                 #scal_wgs = false,
                 kwargs...)
-
-   weights = fit_dict["weights"]
-   Vref = fit_dict["Vref"]
-   if haskey(fit_dict, "sigmas")
-      sigmas = fit_dict["sigmas"]
-   end
 
    if !isnothing(weights) && !isnothing(sigmas)
       @error("cannot specify both weights and sigmas")
@@ -421,18 +415,20 @@ end
    GC.gc()
    verbose && _show_free_mem()
 
-   if !haskey(fit_dict, "P")
+   if !haskey(solver, "P")
       P = Diagonal(I, length(Ψ[1,:]))
    else
-      P = fit_dict["P"]
+      @info("Using Laplacian Preconditioning (P)")
+      P = solver["P"]
    end
 
    D_inv = pinv(P)
    mul!(Ψ,Ψ,D_inv)   
 
    #κ, p_1, int_order = 0.0, 0.0, 0.0
-   if fit_dict["solver"] == :qr
-      verbose && @info("Using QR")
+   @info("size of least squares system: $(size(Ψ))")
+   if solver["solver"] == :qr
+      @info("Using QR")
       qrΨ = qr!(Ψ)
       κ = cond(qrΨ.R)
       GC.gc();
@@ -448,34 +444,36 @@ end
 
       qrΨ = nothing
 
-   elseif fit_dict["solver"] == :svd
-      verbose && @info("Using SVD")
+   elseif solver["solver"] == :svd
+      if solver["ndiscard"] ∉ keys(solver)
+         ndiscard = solver["ndiscard"]
+      end
+      @info("Using SVD: ndiscard=$(ndiscard)")
       ndiscard = solver[2]
       F = svd(Ψ)
       c = F.V[:,1:(end-ndiscard)] * (Diagonal(F.S[1:(end-ndiscard)]) \ (F.U' * Y)[1:(end-ndiscard)])
       rel_rms = norm(Ψ * c - Y) / norm(Y)
 
-   elseif fit_dict["solver"] == :rrqr
-      if ["rrqr_tol"] ∉ keys(fit_dict)
-         rrqr_tol = fit_dict["rrqr_tol"]
+   elseif solver["solver"] == :rrqr
+      if ["rrqr_tol"] ∉ keys(solver)
+         rrqr_tol = solver["rrqr_tol"]
       end
-      verbose && @info("Using RRQR")
+      @info("Using RRQR: rrqr_tol=$(rrqr_tol)")
       qrΨ = pqrfact(Ψ, rtol=rrqr_tol)
       verbose && @info("cond(R) = $(cond(qrΨ.R))")
       c = qrΨ \ Y
       rel_rms = norm(Ψ * c - Y) / norm(Y)
-   elseif fit_dict["solver"] == :lsqr
-      @info("Using LSQR")
-      if ["damp", "atol"] ∉ keys(fit_dict)
-         damp = fit_dict["damp"]
-         atol = fit_dict["atol"]
+   elseif solver["solver"] == :lsqr
+      if ["damp", "atol"] ∉ keys(solver)
+         damp = solver["damp"]
+         atol = solver["atol"]
       end
-
+      @info("Using LSQR: damp=$(damp), atol=$(atol)")
       c, lsqrinfo = lsqr(Ψ, Y, damp=damp, atol=atol, log=true)
       println(lsqrinfo)
 
       rel_rms = norm(Ψ * c - Y) / norm(Y)
-   elseif fit_dict["solver"] == :brr
+   elseif solver["solver"] == :brr
       BRR = pyimport("sklearn.linear_model")["BayesianRidge"]
       @info("Using BRR")
 
@@ -487,16 +485,14 @@ end
       lambda = clf.lambda_
       scores = clf.scores_
 
-      @info("Score: $(score)")
-
       rel_rms = norm(Ψ * c - Y) / norm(Y)
-   elseif fit_dict["solver"] == :ard
+   elseif solver["solver"] == :ard
       ARD = pyimport("sklearn.linear_model")["ARDRegression"]
-      if ["ard_tol", "atol"] ∉ keys(fit_dict)
-         ard_tol = fit_dict["ard_tol"]
-         threshold_lambda = fit_dict["threshold_lambda"]
+      if ["ard_tol", "atol"] ∉ keys(solver)
+         ard_tol = solver["ard_tol"]
+         threshold_lambda = solver["threshold_lambda"]
       end
-      @info("Using ARD")
+      @info("Using ARD: ard_tol=$(ard_tol), atol=$(atol)")
 
       clf = ARD(threshold_lambda = threshold_lambda, tol=ard_tol, normalize=true, compute_score=true)
       clf.fit(Ψ, Y)
@@ -509,7 +505,6 @@ end
       non_zero_ind = findall(x -> x != 0.0, c)
 
       @info("Fit complete: keeping $(length(non_zero_ind)) basis functions ($(round(length(non_zero_ind)/length(c), digits=2)*100)%)")
-      @info("Score: $(score)")
 
       rel_rms = norm(Ψ * c - Y) / norm(Y)
    else
@@ -518,10 +513,11 @@ end
 
    c = D_inv * c
 
-   if fit_dict["solver"] in [:brr, :ard]
-      fit_dict["alpha"] = alpha
-      fit_dict["lambda"] = lambda
-      fit_dict["scores"] = scores
+   if solver["solver"] in [:brr, :ard]
+      solver["alpha"] = alpha
+      solver["lambda"] = lambda
+      solver["scores"] = scores
+      @info("alpha=$(alpha), lambda=$(lambda), score=$(scores[end])")
    end
 
    Ψ = nothing
@@ -541,7 +537,7 @@ end
                           Vref, E0, regularisers, verbose,
                           Itrain, Itest, asmerrs)
    GC.gc()
-   return IP, merge(infodict, fit_dict)
+   return IP, merge(infodict, solver)
 end
 
 
