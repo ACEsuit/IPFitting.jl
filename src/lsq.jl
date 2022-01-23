@@ -483,7 +483,8 @@ end
       c = clf.coef_
       alpha = clf.alpha_
       lambda = clf.lambda_
-      scores = clf.scores_
+      score = clf.scores_[end]
+      @info("alpha=$(alpha), lambda=$(lambda), score=$(score)")
 
       rel_rms = norm(Ψ * c - Y) / norm(Y)
    elseif solver["solver"] == :ard
@@ -492,7 +493,7 @@ end
          ard_tol = solver["ard_tol"]
          threshold_lambda = solver["threshold_lambda"]
       end
-      @info("Using ARD: ard_tol=$(ard_tol), atol=$(atol)")
+      @info("Using ARD: ard_tol=$(ard_tol), threshold_lambda=$(threshold_lambda)")
 
       clf = ARD(threshold_lambda = threshold_lambda, tol=ard_tol, normalize=true, compute_score=true)
       clf.fit(Ψ, Y)
@@ -500,11 +501,12 @@ end
       c = clf.coef_
       alpha = clf.alpha_
       lambda = clf.lambda_
-      scores = clf.scores_
+      score = clf.scores_[end]
 
       non_zero_ind = findall(x -> x != 0.0, c)
 
       @info("Fit complete: keeping $(length(non_zero_ind)) basis functions ($(round(length(non_zero_ind)/length(c), digits=2)*100)%)")
+      @info("score=$(score)")
 
       rel_rms = norm(Ψ * c - Y) / norm(Y)
    else
@@ -512,13 +514,6 @@ end
    end
 
    c = D_inv * c
-
-   if solver["solver"] in [:brr, :ard]
-      solver["alpha"] = alpha
-      solver["lambda"] = lambda
-      solver["scores"] = scores
-      @info("alpha=$(alpha), lambda=$(lambda), score=$(scores[end])")
-   end
 
    Ψ = nothing
    GC.gc()
