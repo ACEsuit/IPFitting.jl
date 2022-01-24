@@ -340,7 +340,7 @@ If `Areg = Matrix(R, basis)` then this corresponds to adding
 `|| Areg * x ||²` to the least squares functional.
 * `deldb = false` : experimental - if `true` then the lsq matrix in the `db` is
 deleted after assembling the weighted lsq system
-* `asmerrs = false` : experimental - if `true` then the lsq matrix is used to
+* `error_table = false` : experimental - if `true` then the lsq matrix is used to
 assemble the fitting errors.
 * `saveqr = nothing` : experimental - if `saveqr` is a Dict then the factors
 of the QR factorisation are stored in it for future use outside of this
@@ -380,7 +380,7 @@ end
                 sigmas = nothing,
                 regularisers = [],
                 deldb = false,
-                asmerrs = false,
+                error_table = false,
                 #lasso = false,
                 saveqr = nothing,
                 #scal_wgs = false,
@@ -530,7 +530,7 @@ end
 
    infodict = asm_fitinfo(db, IP, c, Ibasis, weights,
                           Vref, E0, regularisers, verbose,
-                          Itrain, Itest, asmerrs)
+                          Itrain, Itest, error_table)
    GC.gc()
    return IP, merge(infodict, solver)
 end
@@ -538,7 +538,7 @@ end
 
 function asm_fitinfo(db, IP, c, Ibasis, weights,
                      Vref, E0, regularisers, verbose,
-                     Itrain = :, Itest = nothing, asmerrs=true)
+                     Itrain = :, Itest = nothing, error_table=true)
    if Ibasis isa Colon
       Jbasis = collect(1:length(db.basis))
    else
@@ -548,7 +548,7 @@ function asm_fitinfo(db, IP, c, Ibasis, weights,
    cfgtypes = setdiff(unique(configtype.(db.configs)), weights["ignore"])
 
    # compute errors TODO: still need to fix this!
-   # if asmerrs
+   # if error_table
    #    verbose && @info("Assemble errors table")
    #    @warn("new error implementation... redo this part please ")
    #    errs = Err.lsqerrors(db, c, Jbasis;
@@ -560,7 +560,7 @@ function asm_fitinfo(db, IP, c, Ibasis, weights,
    #       errtest = Dict()
    #    end
    # end
-   if asmerrs
+   if error_table
       @info("Assembling Error Table")
       Err.add_fits!(IP, db.configs, fitkey="IP")
       rmse_, rmserel_ = Err.rmse(db.configs; fitkey="IP");
@@ -589,7 +589,7 @@ function asm_fitinfo(db, IP, c, Ibasis, weights,
                   )
    # TODO: fix IPFitting_version retrieval
 
-   if asmerrs
+   if error_table
       infodict["errors"]["rmse"] = rmse_
       infodict["errors"]["relrmse"] = rmserel_
    end
