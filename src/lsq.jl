@@ -468,10 +468,16 @@ end
          damp = solver["damp"]
          atol = solver["atol"]
       end
+      if haskey(solver, "c_init")
+         @info("Using c_init")
+         c_init = solver["c_init"]
+      else
+         c_init = zeros(length(Ψ[1,:]))
+      end
       @info("Using LSQR: damp=$(damp), atol=$(atol)")
-      c, lsqrinfo = lsqr(Ψ, Y, damp=damp, atol=atol, log=true)
+      c, lsqrinfo = lsqr!(c_init, Ψ, Y, damp=damp, atol=atol, log=true)
       println(lsqrinfo)
-
+      
       rel_rms = norm(Ψ * c - Y) / norm(Y)
    elseif solver["solver"] == :brr
       BRR = pyimport("sklearn.linear_model")["BayesianRidge"]
