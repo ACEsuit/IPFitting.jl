@@ -32,23 +32,14 @@ using IPFitting: Dat, LsqDB, weighthook, observations,
                       observation, hasobservation, eval_obs, vec_obs
 using IPFitting.Data: configtype
 using IPFitting.DB: dbpath, _nconfigs, matrows
-
 using LinearAlgebra: lmul!, Diagonal, qr, qr!, cond, norm, svd, I, pinv, mul!, cholesky
 using InteractiveUtils: versioninfo
 using LowRankApprox
 using JuLIP.Utils
 using JuLIP: JVecF
-using GLMNet
-using Roots
-using ACE
-using IterativeSolvers
-using Optim
-using Mmap
-using ACE: z2i, i2z, order
 using PyCall
-using Statistics
-#using GenSPGL
-#using SGDOptim
+using IterativeSolvers
+
 
 const Err = IPFitting.Errors
 
@@ -349,7 +340,7 @@ If `Areg = Matrix(R, basis)` then this corresponds to adding
 `|| Areg * x ||²` to the least squares functional.
 * `deldb = false` : experimental - if `true` then the lsq matrix in the `db` is
 deleted after assembling the weighted lsq system
-* `asmerrs = false` : experimental - if `true` then the lsq matrix is used to
+* `error_table = false` : experimental - if `true` then the lsq matrix is used to
 assemble the fitting errors.
 * `saveqr = nothing` : experimental - if `saveqr` is a Dict then the factors
 of the QR factorisation are stored in it for future use outside of this
@@ -379,20 +370,32 @@ function do_qr!(db, Ψ, Y)
 end
 
 @noinline function lsqfit(db::LsqDB;
-                solver=(:qr, ), verbose=true,
+                solver=Dict("solver" => :qr), verbose=true,
                 Ibasis = :,
                 Itrain = :,
                 Itest = nothing,
                 E0 = 0.0,
                 Vref = nothing, # OneBody(E0),
                 weights = nothing,
+                sigmas = nothing,
                 regularisers = [],
                 deldb = false,
-                asmerrs = false,
-                lasso = false,
+                error_table = false,
+                #lasso = false,
                 saveqr = nothing,
                 #scal_wgs = false,
                 kwargs...)
+
+   if !isnothing(weights) && !isnothing(sigmas)
+      @error("cannot specify both weights and sigmas")
+   elseif !isnothing(sigmas)
+      weights = sigmas
+      for (config, config_weights) in weights
+         for (key, weight) in config_weights
+            config_weights[key] = 1.0/config_weights[key]
+         end
+      end
+   end
    weights = _fix_weights!(weights)
    Jbasis = ((Ibasis == Colon()) ? (1:length(db.basis)) : Ibasis)
 
@@ -412,9 +415,20 @@ end
    GC.gc()
    verbose && _show_free_mem()
 
-   κ, p_1, int_order = 0.0, 0.0, 0.0
-   if (solver[1] == :qr) || (solver == :qr)
-      verbose && @info("solve $(size(Ψ)) LSQ system using QR factorisation")
+   if !haskey(solver, "P")
+      P = Diagonal(I, length(Ψ[1,:]))
+   else
+      @info("Using Laplacian Preconditioning (P)")
+      P = solver["P"]
+   end
+
+   D_inv = pinv(P)
+   mul!(Ψ,Ψ,D_inv)   
+
+   #κ, p_1, int_order = 0.0, 0.0, 0.0
+   @info("size of least squares system: $(size(Ψ))")
+   if solver["solver"] == :qr
+      @info("Using QR")
       qrΨ = qr!(Ψ)
       κ = cond(qrΨ.R)
       GC.gc();
@@ -430,720 +444,83 @@ end
 
       qrΨ = nothing
 
-   elseif solver[1] == :svd
-      verbose && @info("solve $(size(Ψ)) LSQ system using SVD factorisation")
+   elseif solver["solver"] == :svd
+      if solver["ndiscard"] ∉ keys(solver)
+         ndiscard = solver["ndiscard"]
+      end
+      @info("Using SVD: ndiscard=$(ndiscard)")
       ndiscard = solver[2]
       F = svd(Ψ)
       c = F.V[:,1:(end-ndiscard)] * (Diagonal(F.S[1:(end-ndiscard)]) \ (F.U' * Y)[1:(end-ndiscard)])
       rel_rms = norm(Ψ * c - Y) / norm(Y)
 
-   elseif solver[1] == :rrqr
-      verbose && @info("solve $(size(Ψ)) LSQ system using Rank-Revealing QR factorisation")
-      qrΨ = pqrfact(Ψ, rtol=solver[2])
+   elseif solver["solver"] == :rrqr
+      if ["rrqr_tol"] ∉ keys(solver)
+         rrqr_tol = solver["rrqr_tol"]
+      end
+      @info("Using RRQR: rrqr_tol=$(rrqr_tol)")
+      qrΨ = pqrfact(Ψ, rtol=rrqr_tol)
       verbose && @info("cond(R) = $(cond(qrΨ.R))")
       c = qrΨ \ Y
       rel_rms = norm(Ψ * c - Y) / norm(Y)
-   elseif solver[1] == :rid
-      r = solver[2]
-      verbose && @info("solve $(size(Ψ)) LSQ system using Ridge Regression [r = $(r)] ")
-      qrΨ = qr!(Ψ)
-      Nb = size(qrΨ.R, 1)
-      y = (Y' * Matrix(qrΨ.Q))[1:Nb]
-      η0 = norm(Y - Matrix(qrΨ.Q) * y)
-
-      τ = r * η0
-      Γ = Matrix(I, Nb, Nb)
-
-      c = reglsq(Γ = Γ, R = Matrix(qrΨ.R), y=y, τ= τ, η0 = η0 );
-
+   elseif solver["solver"] == :lsqr
+      if ["damp", "atol"] ∉ keys(solver)
+         damp = solver["damp"]
+         atol = solver["atol"]
+      end
+      if haskey(solver, "c_init")
+         @info("Using c_init")
+         c_init = solver["c_init"]
+      else
+         c_init = zeros(length(Ψ[1,:]))
+      end
+      @info("Using LSQR: damp=$(damp), atol=$(atol)")
+      c, lsqrinfo = lsqr!(c_init, Ψ, Y, damp=damp, atol=atol, log=true)
+      println(lsqrinfo)
+      
       rel_rms = norm(Ψ * c - Y) / norm(Y)
-   elseif solver[1] == :brr
+   elseif solver["solver"] == :brr
       BRR = pyimport("sklearn.linear_model")["BayesianRidge"]
-
-      @info("Using BRR Regression")
+      @info("Using BRR")
 
       clf = BRR(normalize=true, compute_score=true)
       clf.fit(Ψ, Y)
 
       c = clf.coef_
-      global alpha = clf.alpha_
-      global beta = clf.lambda_
-      global score = clf.scores_[end]
-
-      @info("Score: $(score)")
+      alpha = clf.alpha_
+      lambda = clf.lambda_
+      score = clf.scores_[end]
+      @info("alpha=$(alpha), lambda=$(lambda), score=$(score)")
 
       rel_rms = norm(Ψ * c - Y) / norm(Y)
-   elseif solver[1] == :ard
-      tol = solver[2]
-      threshold_lambda = solver[3]
-
+   elseif solver["solver"] == :ard
       ARD = pyimport("sklearn.linear_model")["ARDRegression"]
-      @info("Using ARD Regression")
-      @info("Tolerance: $(tol), Threshold lambda: $(threshold_lambda)")
+      if ["ard_tol", "atol"] ∉ keys(solver)
+         ard_tol = solver["ard_tol"]
+         threshold_lambda = solver["threshold_lambda"]
+      end
+      @info("Using ARD: ard_tol=$(ard_tol), threshold_lambda=$(threshold_lambda)")
 
-      clf = ARD(threshold_lambda = threshold_lambda, tol=tol, normalize=true, compute_score=true)
+      clf = ARD(threshold_lambda = threshold_lambda, tol=ard_tol, normalize=true, compute_score=true)
       clf.fit(Ψ, Y)
 
       c = clf.coef_
-      global alpha = clf.alpha_
-      global beta = clf.lambda_
-      global score = clf.scores_[end]
+      alpha = clf.alpha_
+      lambda = clf.lambda_
+      score = clf.scores_[end]
 
-      zero_ind = findall(x -> x == 0.0, c)
       non_zero_ind = findall(x -> x != 0.0, c)
 
       @info("Fit complete: keeping $(length(non_zero_ind)) basis functions ($(round(length(non_zero_ind)/length(c), digits=2)*100)%)")
-      @info("Score: $(score)")
-
-      rel_rms = norm(Ψ * c - Y) / norm(Y)
-   elseif solver[1] == :brr_lap
-      BRR = pyimport("sklearn.linear_model")["BayesianRidge"]
-
-      rlap_scal = solver[2]
-      #a2b = solver[2][2]
-      @info("rlap_scal=$(rlap_scal)")#, a2b=$(a2b)")
-
-      s = ACE.scaling(db.basis.BB[2], rlap_scal)#; a2b = a2b)
-      l = append!(ones(length(db.basis.BB[1])), s)
-      Γ = Diagonal(l)
-
-      D_inv = pinv(Γ)
-      mul!(Ψ,Ψ,D_inv)
-
-      clf = BRR(normalize=true)
-      clf.fit(Ψ, Y)
-
-      creg = clf.coef_
-      score = clf.scores_[end]
-
-      c = D_inv * creg
-
-      rel_rms = norm(Ψ * creg - Y) / norm(Y)
-   elseif solver[1] == :lap
-      rscal = solver[2][1]
-      r = solver[2][2]
-      verbose && @info("solve $(size(Ψ)) LSQ system using Laplacian Regularisation [r = $(r)] ")
-
-      qrΨ = qr!(Ψ)
-      Nb = size(qrΨ.R, 1)
-      y = (Y' * Matrix(qrΨ.Q))[1:Nb]
-      η0 = norm(Y - Matrix(qrΨ.Q) * y)
-
-      τ = r * η0
-
-      s = ACE.scaling(db.basis.BB[2], rscal)
-      l = append!(ones(length(db.basis.BB[1])), s)
-
-      Γ = Diagonal(l)
-
-      c = reglsq(Γ = Γ, R = Matrix(qrΨ.R), y=y, τ= τ, η0 = η0 );
-
-      rel_rms = norm(Ψ * c - Y) / norm(Y)
-   elseif solver[1] == :rrqr_lap
-      r_tol = solver[2]
-      rlap = solver[3]
-
-      s = ACE.scaling(db.basis.BB[2], 2)
-      l = append!(ones(length(db.basis.BB[1])), s)
-      Γ = Diagonal(rlap .* l)
-
-      Ψreg = vcat(Ψ, Γ)
-
-      qrΨreg = pqrfact(Ψreg, rtol=r_tol)
-      Yreg = vcat(Y, zeros(length(l)))
-
-      c = qrΨreg \ Yreg
-
-      rel_rms = norm(qrΨreg * c - Yreg) / norm(Yreg)
-   elseif solver[1] == :rrqr_lap_rescale
-      r_tol = solver[2]
-      rlap = solver[3]
-
-      s = ACE.scaling(db.basis.BB[2], 2)
-      l = append!(ones(length(db.basis.BB[1])), s)
-      Γ = Diagonal(rlap .* l)
-
-      D_inv = pinv(Γ)
-      Ψreg = Ψ * D_inv
-
-      qrΨreg = pqrfact(Ψreg, rtol=r_tol)
-      c = D_inv * (qrΨreg \  Y)
-      rel_rms = norm(Ψreg * c - Y) / norm(Y)
-   elseif solver[1] == :lap_elastic_net_rel
-      rlap_scal = solver[2][1]
-      rtol = solver[2][2]
-      etol = solver[2][3]
-
-      @info("rlap_scal = $(rlap_scal), rrqr_tol=$(rtol), e_tol = $(etol)")
-
-      s = ACE.scaling(db.basis.BB[2], rlap_scal)
-      l = append!(ones(length(db.basis.BB[1])), s)
-      Γ = Diagonal(l)
-
-      D_inv = pinv(Γ)
-      Ψreg = Ψ * D_inv
-
-      non_zero_ind = [j for (j,i) in enumerate(Ψ[1,:]) if sum(i) != 0]
-      zero_ind = [j for (j,i) in enumerate(Ψ[1,:]) if sum(i) == 0]
-
-      Ψreg_red = Ψreg[:, setdiff(1:end, zero_ind)]
-
-      qrΨ = pqrfact(Ψreg_red, rtol=rtol)
-      cred = qrΨ \ Y
-
-      cred_big = zeros(length(Ψreg[1,:]))
-
-      for (i,k) in enumerate(non_zero_ind)
-        cred_big[k] = cred[i]
-      end
-
-      c = D_inv * cred_big
-
-      rel_rms0 = norm(Ψ * c - Y) / norm(Y)
-
-      @info("rel_rms0 = $(rel_rms0)")
-      @info("etol*rel_rms0 = $(etol*rel_rms0)")
-
-      function _f(Ψreg, Y, α; etol=1e-5, rtol=1e-9, return_solution=false)
-          cv = glmnet(Ψreg, Y, alpha=α)
-          theta = cv.betas[:, end]
-
-          non_zero_ind = findall(x -> x != 0.0, theta)
-          zero_ind = findall(x -> x == 0.0, theta)
-
-          Ψreg_red = Ψreg[:, setdiff(1:end, zero_ind)]
-
-          qrΨ = pqrfact(Ψreg_red, rtol=rtol)
-          cred = qrΨ \ Y
-
-          cred_big = zeros(length(Ψreg[1,:]))
-
-          for (i,k) in enumerate(non_zero_ind)
-              cred_big[k] = cred[i]
-          end
-
-          c = D_inv * cred_big
-
-          rel_rms = norm(Ψ * c - Y) / norm(Y)
-          @info("rel_rms=$(rel_rms) and α=$(α), keeping $(length(non_zero_ind)) basis functions ($(round(length(non_zero_ind)/length(theta), digits=2)*100)%)")
-
-          if return_solution
-              return c
-          else
-              return rel_rms - etol
-          end
-      end
-
-      α = find_zero(α -> _f(Ψreg, Y, α, etol=etol*rel_rms0, rtol=rtol), (0,1), Roots.Bisection(), xatol=1E-6)#atol=etol/2) #atol=0.5
-      @info("α found! α=$(α)")
-
-      c = _f(Ψreg, Y, α, return_solution=true)
-      ##
-      s_1 = ACE.scaling(db.basis.BB[2], 1)
-      p_1 = append!(ones(length(db.basis.BB[1])), s_1)
-      #int_order = db.basis.BB[2].pibasis.inner[1].orders
-      ##
-   elseif solver[1] == :lap_rrqr
-      rlap_scal = solver[2][1]
-      rtol = solver[2][2]
-      reduce = false
-      if length(solver[2]) == 3 && solver[2][3] == true
-         reduce = true
-      end
-
-      @info("rlap_scal = $(rlap_scal), rrqr_tol=$(rtol)")
-
-      s = ACE.scaling(db.basis.BB[2], rlap_scal)
-      l = append!(ones(length(db.basis.BB[1])), s)
-      Γ = Diagonal(l)
-
-      D_inv = pinv(Γ)
-      Ψreg = Ψ * D_inv
-
-      if reduce
-         Ψreg = convert.(Float32, Ψreg)
-         Y = convert.(Float32, Y)
-      end
-
-      qrΨ = pqrfact!(Ψreg, rtol=rtol)
-      cred = qrΨ \ Y
-
-      c = D_inv * cred
-
-      rel_rms = norm(Ψ * c - Y) / norm(Y)
-      ##
-      s_1 = ACE.scaling(db.basis.BB[2], 1)
-      p_1 = append!(ones(length(db.basis.BB[1])), s_1)
-      #int_order = db.basis.BB[2].pibasis.inner[1].orders
-      ##
-   elseif solver[1] == :lap_tik
-      rlap_scal = solver[2][1]
-      r_tik = solver[2][2]
-
-      @info("rlap_scal = $(rlap_scal), r_tik=$(r_tik)")
-
-      non_zero_ind = [j for (j,i) in enumerate(Ψ[1,:]) if sum(i) != 0]
-      zero_ind = [j for (j,i) in enumerate(Ψ[1,:]) if sum(i) == 0]
-
-      nbasis_full = length(Ψ[1,:])
-      Ψ = Ψ[:, setdiff(1:end, zero_ind)]
-      nbasis = length(Ψ[1,:])
-      nobs = length(Ψ[:,1])
-
-      s = ACE.scaling(db.basis.BB[2], rlap_scal)
-      l = append!(ones(length(db.basis.BB[1])), s)
-      Γ = Diagonal(l[:, setdiff(1:end, zero_ind)])
-
-      D_inv = pinv(Γ)
-      Ψred = similar(Ψ)
-      mul!(Ψred, Ψ, D_inv)
-      Ψ = nothing
-
-      Ψreg = zeros(nobs + nbasis, nbasis)
-
-      for (i,row) in enumerate(eachrow(Ψred))
-         Ψreg[i,:] = row
-      end
-
-      for i in 1:nbasis
-         Ψreg[nobs+i,i] = r_tik
-      end
-      Ψred = nothing
-
-      Yreg = vcat(Y, zeros(nbasis))
-
-      GC.gc()
-      qrΨreg = qr!(Ψreg)
-      cred = qrΨreg \ Yreg
-
-      cred_small = D_inv * cred
-      c = zeros(nbasis_full)
-
-      for (i,k) in enumerate(non_zero_ind)
-         c[k] = cred_small[i]
-      end
-
-      rel_rms = 0.0
-      ##
-      s_1 = ACE.scaling(db.basis.BB[2], 1)
-      p_1 = append!(ones(length(db.basis.BB[1])), s_1)
-      #int_order = db.basis.BB[2].pibasis.inner[1].orders
-      ##
-   elseif solver[1] == :elastic_net_lsqr
-      damp = solver[2][1]
-      atol = solver[2][2]
-      α = solver[2][3]
-
-      @info("damp=$(damp), lsqr_atol=$(atol), alpha=$(α) | ELNET LSQR")
-
-      cv = glmnet(Ψ, Y, alpha=α)
-      theta = cv.betas[:,end]
-
-      non_zero_ind = findall(x -> x != 0.0, theta)
-      zero_ind = findall(x -> x == 0.0, theta)
-
-      @info("keeping $(length(non_zero_ind)) basis functions ($(round(length(non_zero_ind)/length(theta), digits=2)*100)%)")
-
-      Ψred = Ψ[:, setdiff(1:end, zero_ind)]
-
-      cred, lsqrinfo = lsqr(Ψred, Y, damp=damp, atol=atol, log=true)
-      println(lsqrinfo)
-
-      c = zeros(length(Ψ[1,:]))
-
-      for (i,k) in enumerate(non_zero_ind)
-        c[k] = cred[i]
-      end
-
-      rel_rms = norm(Ψ * c - Y) / norm(Y)
-      #int_order = db.basis.BB[2].pibasis.inner[1].orders
-      ##
-   elseif solver[1] == :elastic_net_lap
-      α = solver[2][1]
-      rlap_scal = solver[2][2]
-      r = solver[2][3]
-      cv = glmnet(Ψ, Y, alpha=α)
-      theta = cv.betas[:,end]
-
-      non_zero_ind = findall(x -> x != 0.0, theta)
-      zero_ind = findall(x -> x == 0.0, theta)
-
-      @info("keeping $(length(non_zero_ind)) basis functions ($(round(length(non_zero_ind)/length(theta), digits=2)*100)%)")
-
-      Ψred = Ψ[:, setdiff(1:end, zero_ind)]
-
-      qrΨred = qr!(Ψred)
-      Nb = size(qrΨred.R, 1)
-      y = (Y' * Matrix(qrΨred.Q))[1:Nb]
-      η0 = norm(Y - Matrix(qrΨred.Q) * y)
-
-      τ = r * η0
-
-      s = ACE.scaling(db.basis.BB[2], rlap_scal)
-      l = append!(ones(length(db.basis.BB[1])), s)
-      lred = [l[i] for i in non_zero_ind]
-      Γ = Diagonal(lred)
-
-      cred = reglsq(Γ = Γ, R = Matrix(qrΨred.R), y=y, τ= τ, η0 = η0 );
-
-      c = zeros(length(Ψ[1,:]))
-
-      for (i,k) in enumerate(non_zero_ind)
-        c[k] = cred[i]
-      end
-
-      rel_rms = norm(Ψ * c - Y) / norm(Y)
-   elseif solver[1] == :lap_elastic_net_lap
-      α = solver[2][1]
-      rlap_scal = solver[2][2]
-      r = solver[2][3]
-
-      s = ACE.scaling(db.basis.BB[2], rlap_scal)
-      l = append!(ones(length(db.basis.BB[1])), s)
-      Γ = Diagonal(l)
-
-      D_inv = pinv(Γ)
-      Ψreg = Ψ * D_inv
-
-      cv = glmnet(Ψreg, Y, alpha=α)
-      theta = cv.betas[:,end]
-
-      non_zero_ind = findall(x -> x != 0.0, theta)
-      zero_ind = findall(x -> x == 0.0, theta)
-
-      Ψred = Ψreg[:, setdiff(1:end, zero_ind)]
-
-      qrΨred = qr!(Ψred)
-      Nb = size(qrΨred.R, 1)
-      y = (Y' * Matrix(qrΨred.Q))[1:Nb]
-      η0 = norm(Y - Matrix(qrΨred.Q) * y)
-
-      τ = r * η0
-
-      s = ACE.scaling(db.basis.BB[2], rlap_scal)
-      l = append!(ones(length(db.basis.BB[1])), s)
-      lred = [l[i] for i in non_zero_ind]
-      Γ = Diagonal(lred)
-
-      cred = reglsq(Γ = Γ, R = Matrix(qrΨred.R), y=y, τ= τ, η0 = η0 );
-
-      cred_big = zeros(length(Ψ[1,:]))
-
-      for (i,k) in enumerate(non_zero_ind)
-        cred_big[k] = cred[i]
-      end
-
-      c = D_inv * cred_big
-
-      rel_rms = norm(Ψ * c - Y) / norm(Y)
-   elseif solver[1] == :gd_reg
-      λ = solver[2][1]
-      rlap_scal = solver[2][2]
-
-      s = ACE.scaling(db.basis.BB[2], rlap_scal)
-      l = append!(ones(length(db.basis.BB[1])), s)
-      Γ = Diagonal(l)
-
-      D_inv = pinv(Γ)
-      Ψreg = Ψ * D_inv
-
-      function error(c, y, Ψ, λ)
-         ŷ = Ψ*c
-         loss = mean((y .- ŷ).^2) + λ*norm(c)
-         return loss
-     end
-
-      res = optimize(c -> error(c, Y, Ψreg, λ), zeros(length(Ψ[1,:])), GradientDescent())
-
-      creg = Optim.minimizer(res)
-
-      c = D_inv * creg
-
-      rel_rms = norm(Ψ * c - Y) / norm(Y)
-   elseif solver[1] == :lbfgs_reg
-      λ = solver[2][1]
-      rlap_scal = solver[2][2]
-
-      s = ACE.scaling(db.basis.BB[2], rlap_scal)
-      l = append!(ones(length(db.basis.BB[1])), s)
-      Γ = Diagonal(l)
-
-      D_inv = pinv(Γ)
-      Ψreg = Ψ * D_inv
-
-      function _error(c, y, Ψ, λ)
-         ŷ = Ψ*c
-         loss = mean((y .- ŷ).^2) + λ*norm(c)
-         return loss
-      end
-
-      res = optimize(c -> _error(c, Y, Ψreg, λ), zeros(length(Ψ[1,:])), LBFGS())
-
-      creg = Optim.minimizer(res)
-
-      c = D_inv * creg
-      rel_rms = norm(Ψ * c - Y) / norm(Y)
-   elseif solver[1] == :itlsq
-      damp = solver[2][1]
-      rlap_scal = solver[2][2]
-      atol = solver[2][3]
-      a2b = solver[2][4]
-      if length(solver[2]) == 5
-         maxiter, c_init = solver[2][5]
-         @info("Using a given approximate solution c, maxiter=$(maxiter)")
-      else
-         c_init = zeros(length(db.Ψ[1,:]))
-         maxiter=100000
-      end
-      @info("damp=$(damp), rlap_scal=$(rlap_scal), lsqr_atol=$(atol), a2b=$(a2b)")
-
-      s = ACE.scaling(db.basis.BB[2], rlap_scal; a2b = a2b)
-      l = append!(ones(length(db.basis.BB[1])), s)
-      Γ = Diagonal(l)
-
-      D_inv = pinv(Γ)
-      mul!(Ψ,Ψ,D_inv)
-
-      creg, lsqrinfo = lsqr!(c_init, Ψ, Y, damp=damp, atol=atol, maxiter=maxiter, log=true)
-      println(lsqrinfo)
-
-      c = D_inv * creg
-
-      rel_rms = norm(Ψ * creg - Y) / norm(Y)
-   elseif solver[1] == :itlsq_lap2b
-      damp = solver[2][1]
-      rlap_scal = solver[2][2]
-      atol = solver[2][3]
-      @info("damp=$(damp), rlap_scal=$(rlap_scal), lsqr_atol=$(atol) | scaling 2B ONLY")
-
-      s = ACE.scaling(db.basis.BB[1], rlap_scal)#; a2b = a2b)
-      l = append!(s, ones(length(db.basis.BB[2])))
-      Γ = Diagonal(l)
-
-      D_inv = pinv(Γ)
-      mul!(Ψ,Ψ,D_inv)
-
-      creg, lsqrinfo = lsqr(Ψ, Y, damp=damp, atol=atol, log=true)
-      println(lsqrinfo)
-
-      c = D_inv * creg
-
-      rel_rms = norm(Ψ * creg - Y) / norm(Y)
-   elseif solver[1] == :lap2b_rid
-      r = solver[2][1]
-      rlap_scal = solver[2][2]
-      @info("r=$(r), rlap_scal=$(rlap_scal) | scaling 2B ONLY")
-
-      s = ACE.scaling(db.basis.BB[1], rlap_scal)#; a2b = a2b)
-      l = append!(s, ones(length(db.basis.BB[2])))
-      Γ = Diagonal(l)
-
-      D_inv = pinv(Γ)
-      mul!(Ψ,Ψ,D_inv)
-
-      qrΨ = qr!(Ψ)
-      Nb = size(qrΨ.R, 1)
-      y = (Y' * Matrix(qrΨ.Q))[1:Nb]
-      η0 = norm(Y - Matrix(qrΨ.Q) * y)
-
-      τ = r * η0
-      Γ = Matrix(I, length(l), length(l))
-
-      creg = reglsq(Γ = Γ, R = Matrix(qrΨ.R), y=y, τ= τ, η0 = η0 );
-
-      c = D_inv * creg
-
-      rel_rms = norm(Ψ * c - Y) / norm(Y)
-   elseif solver[1] == :lsqr
-      damp = solver[2][1]
-      atol = solver[2][2]
-      @info("damp=$(damp), lsqr_atol=$(atol) | SIMPLE LSQR")
-
-      c, lsqrinfo = lsqr(Ψ, Y, damp=damp, atol=atol, log=true)
-      println(lsqrinfo)
-
-      rel_rms = norm(Ψ * c - Y) / norm(Y)
-   elseif solver[1] == :itlsq_Nw
-      damp = solver[2][1]
-      rlap_scal = solver[2][2]
-      atol = solver[2][3]
-      Nweight = solver[2][4]
-      @info("damp=$(damp), rlap_scal=$(rlap_scal), lsqr_atol=$(atol)")
-
-      V2scal = Nweight["2B"] .* ACE.scaling(db.basis.BB[1], rlap_scal)
-      NBscal = ACE.scaling(db.basis.BB[2], rlap_scal)
-      RegDiag = vcat(V2scal, NBscal)
-      Γ = Diagonal(RegDiag)
-
-      D_inv = pinv(Γ)
-      mul!(Ψ,Ψ,D_inv)
-
-      creg, lsqrinfo = lsqr(Ψ, Y, damp=damp, atol=atol, log=true)
-      println(lsqrinfo)
-
-      c = D_inv * creg
-
-      rel_rms = norm(Ψ * creg - Y) / norm(Y)
-   elseif solver[1] == :elastic_net_itlsq
-      α = solver[2][1]
-      damp = solver[2][2]
-      rlap_scal = solver[2][3]
-      atol = solver[2][4]
-      a2b = solver[2][5]
-      @info("α=$(α), damp=$(damp), rlap_scal=$(rlap_scal), lsqr_atol=$(atol), a2b=$(a2b)")
-
-      s = ACE.scaling(db.basis.BB[2], rlap_scal; a2b = a2b)
-      l = append!(ones(length(db.basis.BB[1])), s)
-      Γ = Diagonal(l)
-
-      D_inv = pinv(Γ)
-      mul!(Ψ,Ψ,D_inv)
-
-      cv = glmnet(Ψ, Y, alpha=α)
-      theta = cv.betas[:,end]
-
-      non_zero_ind = findall(x -> x != 0.0, theta)
-      zero_ind = findall(x -> x == 0.0, theta)
-
-      @info("α=$(α), keeping $(length(non_zero_ind)) basis functions ($(round(length(non_zero_ind)/length(theta), digits=2)*100)%)")
-      Ψ = Ψ[:, setdiff(1:end, zero_ind)]
-
-      cred, lsqrinfo = lsqr(Ψ, Y, damp=damp, atol=atol, log=true)
-      println(lsqrinfo)
-
-      cred_big = zeros(length(l))
-
-      for (i,k) in enumerate(non_zero_ind)
-        cred_big[k] = cred[i]
-      end
-
-      c = D_inv * cred_big
-
-      rel_rms = norm(Ψ * cred - Y) / norm(Y)
-      #rel_rms = 0.0
-      rel_rms = norm(Ψ * cred - Y) / norm(Y)
-   elseif solver[1] == :no2b_itlsq
-      damp = solver[2][1]
-      rlap_scal = solver[2][2]
-      atol = solver[2][3]
-      @info("Not keeping ACE 2B, damp=$(damp), rlap_scal=$(rlap_scal), lsqr_atol=$(atol)")
-
-      len_pair = length(db.basis.BB[1])
-      len_ace = length(db.basis.BB[2])
-
-      s = ACE.scaling(db.basis.BB[2], rlap_scal)
-      l = append!(ones(len_pair), s)
-      Γ = Diagonal(l)
-
-      D_inv = pinv(Γ)
-      mul!(Ψ,Ψ,D_inv)
-
-      I_ord2 = findall(get_orders(db.basis.BB[2]) .== 1);
-
-      zero_ind = I_ord2 .+ len_pair
-      non_zero_ind = []
-      for i in 1:(len_pair+len_ace)
-          if i ∉ zero_ind
-              append!(non_zero_ind, i)
-          end
-      end
-
-      #theta = append!(ones(length(db.basis.BB[1])), cs)
-
-      #non_zero_ind = findall(x -> x != 0.0, theta)
-      #zero_ind = findall(x -> x == 0.0, theta)
-
-      @info("keeping $(length(non_zero_ind)) basis functions ($(round(length(non_zero_ind)/(len_pair+len_ace), digits=2)*100)%)")
-      Ψ = Ψ[:, setdiff(1:end, zero_ind)]
-
-      cred, lsqrinfo = lsqr(Ψ, Y, damp=damp, atol=atol, log=true)
-      println(lsqrinfo)
-
-      cred_big = zeros(length(l))
-
-      for (i,k) in enumerate(non_zero_ind)
-        cred_big[k] = cred[i]
-      end
-
-      c = D_inv * cred_big
-
-      rel_rms = norm(Ψ * cred - Y) / norm(Y)
-      #rel_rms = 0.0
-      rel_rms = norm(Ψ * cred - Y) / norm(Y)
-   elseif solver[1] == :elastic_net_lap_manual
-      α = solver[2][1]
-      rscal = solver[2][2]
-      lap_pen = solver[2][3]
-
-      cv = glmnet(Ψ, Y, alpha=α)
-      theta = cv.betas[:,end]
-
-      non_zero_ind = findall(x -> x != 0.0, theta)
-      zero_ind = findall(x -> x == 0.0, theta)
-
-      @info("keeping $(length(non_zero_ind)) basis functions ($(round(length(non_zero_ind)/length(theta), digits=2)*100)%)")
-
-      Ψred = Ψ[:, setdiff(1:end, zero_ind)]
-
-      s = ACE.scaling(db.basis.BB[2], rscal)
-      l = append!(ones(length(db.basis.BB[1])), s)
-
-      lred = [l[i] for i in non_zero_ind]
-      Γ = Diagonal(lap_pen .* lred)
-
-      Ψreg = vcat(Ψred, collect(Γ))
-      Yreg = vcat(Y, zeros(length(lred)))
-
-      #qrΨreg = qr!(Ψreg)
-      cred = Ψreg \ Yreg
-
-      c = zeros(length(Ψ[1,:]))
-
-      for (i,k) in enumerate(non_zero_ind)
-        c[k] = cred[i]
-      end
-
-      rel_rms = norm(Ψ * c - Y) / norm(Y)
-   elseif solver[1] == :spgl_lap_rrqr
-      it = solver[2][1]
-      rlap_scal = solver[2][2]
-      rtol = solver[2][3]
-
-      s = ACE.scaling(db.basis.BB[2], rlap_scal)
-      l = append!(ones(length(db.basis.BB[1])), s)
-      Γ = Diagonal(l)
-
-      D_inv = pinv(Γ)
-      Ψreg = Ψ * D_inv
-
-      opts = spgOptions(iterations = it)
-      theta, r, g, info = spgl1(Ψ, Y, sigma = 1e-5, options=opts)
-
-      non_zero_ind = findall(x -> x != 0.0, theta)
-      zero_ind = findall(x -> x == 0.0, theta)
-
-      Ψred = Ψreg[:, setdiff(1:end, zero_ind)]
-
-      qrΨ = pqrfact!(Ψred, rtol=rtol)
-      cred = qrΨ \ Y
-
-      cred_big = zeros(length(Ψ[1,:]))
-
-      @show length(cred_big)
-      @show length(zero_ind)
-
-      for (i,k) in enumerate(non_zero_ind)
-        cred_big[k] = cred[i]
-      end
-
-      c = D_inv * cred_big
+      @info("score=$(score)")
 
       rel_rms = norm(Ψ * c - Y) / norm(Y)
    else
       error("unknown `solver` in `lsqfit`")
    end
 
-   # delete the lsq system and gc again
+   c = D_inv * c
+
    Ψ = nothing
    GC.gc()
    verbose && _show_free_mem()
@@ -1158,24 +535,16 @@ end
    end
 
    infodict = asm_fitinfo(db, IP, c, Ibasis, weights,
-                          Vref, solver, E0, regularisers, verbose,
-                          Itrain, Itest, asmerrs)
-   infodict["kappa"] = κ
-   infodict["p_1"] = p_1
-   if solver[1] == :brr || solver[1] == :brr_lap || solver[1] == :ard
-         infodict["score"] = score
-         infodict["alpha"] = alpha
-         infodict["beta"] = beta
-   end
-   #infodict["int_order"] = int_order
+                          Vref, E0, regularisers, verbose,
+                          Itrain, Itest, error_table)
    GC.gc()
-   return IP, infodict
+   return IP, merge(infodict, solver)
 end
 
 
 function asm_fitinfo(db, IP, c, Ibasis, weights,
-                     Vref, solver, E0, regularisers, verbose,
-                     Itrain = :, Itest = nothing, asmerrs=true)
+                     Vref, E0, regularisers, verbose,
+                     Itrain = :, Itest = nothing, error_table=true)
    if Ibasis isa Colon
       Jbasis = collect(1:length(db.basis))
    else
@@ -1185,17 +554,23 @@ function asm_fitinfo(db, IP, c, Ibasis, weights,
    cfgtypes = setdiff(unique(configtype.(db.configs)), weights["ignore"])
 
    # compute errors TODO: still need to fix this!
-   if asmerrs
-      verbose && @info("Assemble errors table")
-      @warn("new error implementation... redo this part please ")
-      errs = Err.lsqerrors(db, c, Jbasis;
-               cfgtypes=cfgtypes, Vref=Vref, Icfg=Itrain)
-      if Itest != nothing
-         errtest = Err.lsqerrors(db, c, Jbasis;
-                  cfgtypes=cfgtypes, Vref=Vref, Icfg=Itest)
-      else
-         errtest = Dict()
-      end
+   # if error_table
+   #    verbose && @info("Assemble errors table")
+   #    @warn("new error implementation... redo this part please ")
+   #    errs = Err.lsqerrors(db, c, Jbasis;
+   #             cfgtypes=cfgtypes, Vref=Vref, Icfg=Itrain)
+   #    if Itest != nothing
+   #       errtest = Err.lsqerrors(db, c, Jbasis;
+   #                cfgtypes=cfgtypes, Vref=Vref, Icfg=Itest)
+   #    else
+   #       errtest = Dict()
+   #    end
+   # end
+   if error_table
+      @info("Assembling Error Table")
+      Err.add_fits!(IP, db.configs, fitkey="IP")
+      rmse_, rmserel_ = Err.rmse(db.configs; fitkey="IP");
+      Err.rmse_table(rmse_, rmserel_)
    end
    # --------------------------------------------------------------------
    # ASSEMBLE INFO DICT
@@ -1205,23 +580,24 @@ function asm_fitinfo(db, IP, c, Ibasis, weights,
    # Julia Version Info
    iob = IOBuffer()
    versioninfo(iob)
-   juliainfo = String(take!(iob))
+   #juliainfo = String(take!(iob))
 
-   infodict = Dict("solver" => String(solver[1]),
+   infodict = Dict(#"solver" => String(solver[1]),
                    "E0"     => E0,
                    "Ibasis" => Vector{Int}(Jbasis),
                    "c"      => c,
                    "dbpath" => dbpath(db),
                    "weights" => weights,
                    "regularisers"  => Dict.(regularisers),
-                   "juliaversion"  => juliainfo,
+                   #"juliaversion"  => juliainfo,
+                   "errors" => Dict(),
                    "IPFitting_version" => "na", # get_pkg_info("IPFitting"),
                   )
    # TODO: fix IPFitting_version retrieval
 
-   if asmerrs
-      infodict["errors"] = errs
-      infodict["errtest"] = errtest
+   if error_table
+      infodict["errors"]["rmse"] = rmse_
+      infodict["errors"]["relrmse"] = rmserel_
    end
    # --------------------------------------------------------------------
    return infodict
@@ -1255,7 +631,6 @@ function _fix_weights!(weights::Dict)
    end
    return weights
 end
-
 
 
 
@@ -1364,6 +739,740 @@ end
 
 
 end
+
+#############
+# κ, p_1, int_order = 0.0, 0.0, 0.0
+#    if (solver[1] == :qr) || (solver == :qr)
+#       verbose && @info("solve $(size(Ψ)) LSQ system using QR factorisation")
+#       qrΨ = qr!(Ψ)
+#       κ = cond(qrΨ.R)
+#       GC.gc();
+#       verbose && @info("cond(R) = $(cond(qrΨ.R))")
+#       c = qrΨ \ Y
+#       rel_rms = norm(qrΨ.Q * (qrΨ.R * c) - Y) / norm(Y)
+
+#       if saveqr isa Dict
+#          saveqr["Q"] = qrΨ.Q
+#          saveqr["R"] = qrΨ.R
+#          saveqr["Y"] = Y
+#       end
+
+#       qrΨ = nothing
+
+#    elseif solver[1] == :svd
+#       verbose && @info("solve $(size(Ψ)) LSQ system using SVD factorisation")
+#       ndiscard = solver[2]
+#       F = svd(Ψ)
+#       c = F.V[:,1:(end-ndiscard)] * (Diagonal(F.S[1:(end-ndiscard)]) \ (F.U' * Y)[1:(end-ndiscard)])
+#       rel_rms = norm(Ψ * c - Y) / norm(Y)
+
+#    elseif solver[1] == :rrqr
+#       verbose && @info("solve $(size(Ψ)) LSQ system using Rank-Revealing QR factorisation")
+#       qrΨ = pqrfact(Ψ, rtol=solver[2])
+#       verbose && @info("cond(R) = $(cond(qrΨ.R))")
+#       c = qrΨ \ Y
+#       rel_rms = norm(Ψ * c - Y) / norm(Y)
+#    elseif solver[1] == :rid
+#       r = solver[2]
+#       verbose && @info("solve $(size(Ψ)) LSQ system using Ridge Regression [r = $(r)] ")
+#       qrΨ = qr!(Ψ)
+#       Nb = size(qrΨ.R, 1)
+#       y = (Y' * Matrix(qrΨ.Q))[1:Nb]
+#       η0 = norm(Y - Matrix(qrΨ.Q) * y)
+
+#       τ = r * η0
+#       Γ = Matrix(I, Nb, Nb)
+
+#       c = reglsq(Γ = Γ, R = Matrix(qrΨ.R), y=y, τ= τ, η0 = η0 );
+
+#       rel_rms = norm(Ψ * c - Y) / norm(Y)
+#    elseif solver[1] == :brr
+#       BRR = pyimport("sklearn.linear_model")["BayesianRidge"]
+
+#       @info("Using BRR Regression")
+
+#       clf = BRR(normalize=true, compute_score=true)
+#       clf.fit(Ψ, Y)
+
+#       c = clf.coef_
+#       global alpha = clf.alpha_
+#       global beta = clf.lambda_
+#       global score = clf.scores_[end]
+
+#       @info("Score: $(score)")
+
+#       rel_rms = norm(Ψ * c - Y) / norm(Y)
+#    elseif solver[1] == :ard
+#       tol = solver[2]
+#       threshold_lambda = solver[3]
+
+#       ARD = pyimport("sklearn.linear_model")["ARDRegression"]
+#       @info("Using ARD Regression")
+#       @info("Tolerance: $(tol), Threshold lambda: $(threshold_lambda)")
+
+#       clf = ARD(threshold_lambda = threshold_lambda, tol=tol, normalize=true, compute_score=true)
+#       clf.fit(Ψ, Y)
+
+#       c = clf.coef_
+#       global alpha = clf.alpha_
+#       global beta = clf.lambda_
+#       global score = clf.scores_[end]
+
+#       zero_ind = findall(x -> x == 0.0, c)
+#       non_zero_ind = findall(x -> x != 0.0, c)
+
+#       @info("Fit complete: keeping $(length(non_zero_ind)) basis functions ($(round(length(non_zero_ind)/length(c), digits=2)*100)%)")
+#       @info("Score: $(score)")
+
+#       rel_rms = norm(Ψ * c - Y) / norm(Y)
+#    elseif solver[1] == :brr_lap
+#       BRR = pyimport("sklearn.linear_model")["BayesianRidge"]
+
+#       rlap_scal = solver[2]
+#       #a2b = solver[2][2]
+#       @info("rlap_scal=$(rlap_scal)")#, a2b=$(a2b)")
+
+#       s = ACE.scaling(db.basis.BB[2], rlap_scal)#; a2b = a2b)
+#       l = append!(ones(length(db.basis.BB[1])), s)
+#       Γ = Diagonal(l)
+
+#       D_inv = pinv(Γ)
+#       mul!(Ψ,Ψ,D_inv)
+
+#       clf = BRR(normalize=true)
+#       clf.fit(Ψ, Y)
+
+#       creg = clf.coef_
+#       score = clf.scores_[end]
+
+#       c = D_inv * creg
+
+#       rel_rms = norm(Ψ * creg - Y) / norm(Y)
+#    elseif solver[1] == :lap
+#       rscal = solver[2][1]
+#       r = solver[2][2]
+#       verbose && @info("solve $(size(Ψ)) LSQ system using Laplacian Regularisation [r = $(r)] ")
+
+#       qrΨ = qr!(Ψ)
+#       Nb = size(qrΨ.R, 1)
+#       y = (Y' * Matrix(qrΨ.Q))[1:Nb]
+#       η0 = norm(Y - Matrix(qrΨ.Q) * y)
+
+#       τ = r * η0
+
+#       s = ACE.scaling(db.basis.BB[2], rscal)
+#       l = append!(ones(length(db.basis.BB[1])), s)
+
+#       Γ = Diagonal(l)
+
+#       c = reglsq(Γ = Γ, R = Matrix(qrΨ.R), y=y, τ= τ, η0 = η0 );
+
+#       rel_rms = norm(Ψ * c - Y) / norm(Y)
+#    elseif solver[1] == :rrqr_lap
+#       r_tol = solver[2]
+#       rlap = solver[3]
+
+#       s = ACE.scaling(db.basis.BB[2], 2)
+#       l = append!(ones(length(db.basis.BB[1])), s)
+#       Γ = Diagonal(rlap .* l)
+
+#       Ψreg = vcat(Ψ, Γ)
+
+#       qrΨreg = pqrfact(Ψreg, rtol=r_tol)
+#       Yreg = vcat(Y, zeros(length(l)))
+
+#       c = qrΨreg \ Yreg
+
+#       rel_rms = norm(qrΨreg * c - Yreg) / norm(Yreg)
+#    elseif solver[1] == :rrqr_lap_rescale
+#       r_tol = solver[2]
+#       rlap = solver[3]
+
+#       s = ACE.scaling(db.basis.BB[2], 2)
+#       l = append!(ones(length(db.basis.BB[1])), s)
+#       Γ = Diagonal(rlap .* l)
+
+#       D_inv = pinv(Γ)
+#       Ψreg = Ψ * D_inv
+
+#       qrΨreg = pqrfact(Ψreg, rtol=r_tol)
+#       c = D_inv * (qrΨreg \  Y)
+#       rel_rms = norm(Ψreg * c - Y) / norm(Y)
+#    elseif solver[1] == :lap_elastic_net_rel
+#       rlap_scal = solver[2][1]
+#       rtol = solver[2][2]
+#       etol = solver[2][3]
+
+#       @info("rlap_scal = $(rlap_scal), rrqr_tol=$(rtol), e_tol = $(etol)")
+
+#       s = ACE.scaling(db.basis.BB[2], rlap_scal)
+#       l = append!(ones(length(db.basis.BB[1])), s)
+#       Γ = Diagonal(l)
+
+#       D_inv = pinv(Γ)
+#       Ψreg = Ψ * D_inv
+
+#       non_zero_ind = [j for (j,i) in enumerate(Ψ[1,:]) if sum(i) != 0]
+#       zero_ind = [j for (j,i) in enumerate(Ψ[1,:]) if sum(i) == 0]
+
+#       Ψreg_red = Ψreg[:, setdiff(1:end, zero_ind)]
+
+#       qrΨ = pqrfact(Ψreg_red, rtol=rtol)
+#       cred = qrΨ \ Y
+
+#       cred_big = zeros(length(Ψreg[1,:]))
+
+#       for (i,k) in enumerate(non_zero_ind)
+#         cred_big[k] = cred[i]
+#       end
+
+#       c = D_inv * cred_big
+
+#       rel_rms0 = norm(Ψ * c - Y) / norm(Y)
+
+#       @info("rel_rms0 = $(rel_rms0)")
+#       @info("etol*rel_rms0 = $(etol*rel_rms0)")
+
+#       function _f(Ψreg, Y, α; etol=1e-5, rtol=1e-9, return_solution=false)
+#           cv = glmnet(Ψreg, Y, alpha=α)
+#           theta = cv.betas[:, end]
+
+#           non_zero_ind = findall(x -> x != 0.0, theta)
+#           zero_ind = findall(x -> x == 0.0, theta)
+
+#           Ψreg_red = Ψreg[:, setdiff(1:end, zero_ind)]
+
+#           qrΨ = pqrfact(Ψreg_red, rtol=rtol)
+#           cred = qrΨ \ Y
+
+#           cred_big = zeros(length(Ψreg[1,:]))
+
+#           for (i,k) in enumerate(non_zero_ind)
+#               cred_big[k] = cred[i]
+#           end
+
+#           c = D_inv * cred_big
+
+#           rel_rms = norm(Ψ * c - Y) / norm(Y)
+#           @info("rel_rms=$(rel_rms) and α=$(α), keeping $(length(non_zero_ind)) basis functions ($(round(length(non_zero_ind)/length(theta), digits=2)*100)%)")
+
+#           if return_solution
+#               return c
+#           else
+#               return rel_rms - etol
+#           end
+#       end
+
+#       α = find_zero(α -> _f(Ψreg, Y, α, etol=etol*rel_rms0, rtol=rtol), (0,1), Roots.Bisection(), xatol=1E-6)#atol=etol/2) #atol=0.5
+#       @info("α found! α=$(α)")
+
+#       c = _f(Ψreg, Y, α, return_solution=true)
+#       ##
+#       s_1 = ACE.scaling(db.basis.BB[2], 1)
+#       p_1 = append!(ones(length(db.basis.BB[1])), s_1)
+#       #int_order = db.basis.BB[2].pibasis.inner[1].orders
+#       ##
+#    elseif solver[1] == :lap_rrqr
+#       rlap_scal = solver[2][1]
+#       rtol = solver[2][2]
+#       reduce = false
+#       if length(solver[2]) == 3 && solver[2][3] == true
+#          reduce = true
+#       end
+
+#       @info("rlap_scal = $(rlap_scal), rrqr_tol=$(rtol)")
+
+#       s = ACE.scaling(db.basis.BB[2], rlap_scal)
+#       l = append!(ones(length(db.basis.BB[1])), s)
+#       Γ = Diagonal(l)
+
+#       D_inv = pinv(Γ)
+#       Ψreg = Ψ * D_inv
+
+#       if reduce
+#          Ψreg = convert.(Float32, Ψreg)
+#          Y = convert.(Float32, Y)
+#       end
+
+#       qrΨ = pqrfact!(Ψreg, rtol=rtol)
+#       cred = qrΨ \ Y
+
+#       c = D_inv * cred
+
+#       rel_rms = norm(Ψ * c - Y) / norm(Y)
+#       ##
+#       s_1 = ACE.scaling(db.basis.BB[2], 1)
+#       p_1 = append!(ones(length(db.basis.BB[1])), s_1)
+#       #int_order = db.basis.BB[2].pibasis.inner[1].orders
+#       ##
+#    elseif solver[1] == :lap_tik
+#       rlap_scal = solver[2][1]
+#       r_tik = solver[2][2]
+
+#       @info("rlap_scal = $(rlap_scal), r_tik=$(r_tik)")
+
+#       non_zero_ind = [j for (j,i) in enumerate(Ψ[1,:]) if sum(i) != 0]
+#       zero_ind = [j for (j,i) in enumerate(Ψ[1,:]) if sum(i) == 0]
+
+#       nbasis_full = length(Ψ[1,:])
+#       Ψ = Ψ[:, setdiff(1:end, zero_ind)]
+#       nbasis = length(Ψ[1,:])
+#       nobs = length(Ψ[:,1])
+
+#       s = ACE.scaling(db.basis.BB[2], rlap_scal)
+#       l = append!(ones(length(db.basis.BB[1])), s)
+#       Γ = Diagonal(l[:, setdiff(1:end, zero_ind)])
+
+#       D_inv = pinv(Γ)
+#       Ψred = similar(Ψ)
+#       mul!(Ψred, Ψ, D_inv)
+#       Ψ = nothing
+
+#       Ψreg = zeros(nobs + nbasis, nbasis)
+
+#       for (i,row) in enumerate(eachrow(Ψred))
+#          Ψreg[i,:] = row
+#       end
+
+#       for i in 1:nbasis
+#          Ψreg[nobs+i,i] = r_tik
+#       end
+#       Ψred = nothing
+
+#       Yreg = vcat(Y, zeros(nbasis))
+
+#       GC.gc()
+#       qrΨreg = qr!(Ψreg)
+#       cred = qrΨreg \ Yreg
+
+#       cred_small = D_inv * cred
+#       c = zeros(nbasis_full)
+
+#       for (i,k) in enumerate(non_zero_ind)
+#          c[k] = cred_small[i]
+#       end
+
+#       rel_rms = 0.0
+#       ##
+#       s_1 = ACE.scaling(db.basis.BB[2], 1)
+#       p_1 = append!(ones(length(db.basis.BB[1])), s_1)
+#       #int_order = db.basis.BB[2].pibasis.inner[1].orders
+#       ##
+#    elseif solver[1] == :elastic_net_lsqr
+#       damp = solver[2][1]
+#       atol = solver[2][2]
+#       α = solver[2][3]
+
+#       @info("damp=$(damp), lsqr_atol=$(atol), alpha=$(α) | ELNET LSQR")
+
+#       cv = glmnet(Ψ, Y, alpha=α)
+#       theta = cv.betas[:,end]
+
+#       non_zero_ind = findall(x -> x != 0.0, theta)
+#       zero_ind = findall(x -> x == 0.0, theta)
+
+#       @info("keeping $(length(non_zero_ind)) basis functions ($(round(length(non_zero_ind)/length(theta), digits=2)*100)%)")
+
+#       Ψred = Ψ[:, setdiff(1:end, zero_ind)]
+
+#       cred, lsqrinfo = lsqr(Ψred, Y, damp=damp, atol=atol, log=true)
+#       println(lsqrinfo)
+
+#       c = zeros(length(Ψ[1,:]))
+
+#       for (i,k) in enumerate(non_zero_ind)
+#         c[k] = cred[i]
+#       end
+
+#       rel_rms = norm(Ψ * c - Y) / norm(Y)
+#       #int_order = db.basis.BB[2].pibasis.inner[1].orders
+#       ##
+#    elseif solver[1] == :elastic_net_lap
+#       α = solver[2][1]
+#       rlap_scal = solver[2][2]
+#       r = solver[2][3]
+#       cv = glmnet(Ψ, Y, alpha=α)
+#       theta = cv.betas[:,end]
+
+#       non_zero_ind = findall(x -> x != 0.0, theta)
+#       zero_ind = findall(x -> x == 0.0, theta)
+
+#       @info("keeping $(length(non_zero_ind)) basis functions ($(round(length(non_zero_ind)/length(theta), digits=2)*100)%)")
+
+#       Ψred = Ψ[:, setdiff(1:end, zero_ind)]
+
+#       qrΨred = qr!(Ψred)
+#       Nb = size(qrΨred.R, 1)
+#       y = (Y' * Matrix(qrΨred.Q))[1:Nb]
+#       η0 = norm(Y - Matrix(qrΨred.Q) * y)
+
+#       τ = r * η0
+
+#       s = ACE.scaling(db.basis.BB[2], rlap_scal)
+#       l = append!(ones(length(db.basis.BB[1])), s)
+#       lred = [l[i] for i in non_zero_ind]
+#       Γ = Diagonal(lred)
+
+#       cred = reglsq(Γ = Γ, R = Matrix(qrΨred.R), y=y, τ= τ, η0 = η0 );
+
+#       c = zeros(length(Ψ[1,:]))
+
+#       for (i,k) in enumerate(non_zero_ind)
+#         c[k] = cred[i]
+#       end
+
+#       rel_rms = norm(Ψ * c - Y) / norm(Y)
+#    elseif solver[1] == :lap_elastic_net_lap
+#       α = solver[2][1]
+#       rlap_scal = solver[2][2]
+#       r = solver[2][3]
+
+#       s = ACE.scaling(db.basis.BB[2], rlap_scal)
+#       l = append!(ones(length(db.basis.BB[1])), s)
+#       Γ = Diagonal(l)
+
+#       D_inv = pinv(Γ)
+#       Ψreg = Ψ * D_inv
+
+#       cv = glmnet(Ψreg, Y, alpha=α)
+#       theta = cv.betas[:,end]
+
+#       non_zero_ind = findall(x -> x != 0.0, theta)
+#       zero_ind = findall(x -> x == 0.0, theta)
+
+#       Ψred = Ψreg[:, setdiff(1:end, zero_ind)]
+
+#       qrΨred = qr!(Ψred)
+#       Nb = size(qrΨred.R, 1)
+#       y = (Y' * Matrix(qrΨred.Q))[1:Nb]
+#       η0 = norm(Y - Matrix(qrΨred.Q) * y)
+
+#       τ = r * η0
+
+#       s = ACE.scaling(db.basis.BB[2], rlap_scal)
+#       l = append!(ones(length(db.basis.BB[1])), s)
+#       lred = [l[i] for i in non_zero_ind]
+#       Γ = Diagonal(lred)
+
+#       cred = reglsq(Γ = Γ, R = Matrix(qrΨred.R), y=y, τ= τ, η0 = η0 );
+
+#       cred_big = zeros(length(Ψ[1,:]))
+
+#       for (i,k) in enumerate(non_zero_ind)
+#         cred_big[k] = cred[i]
+#       end
+
+#       c = D_inv * cred_big
+
+#       rel_rms = norm(Ψ * c - Y) / norm(Y)
+#    elseif solver[1] == :gd_reg
+#       λ = solver[2][1]
+#       rlap_scal = solver[2][2]
+
+#       s = ACE.scaling(db.basis.BB[2], rlap_scal)
+#       l = append!(ones(length(db.basis.BB[1])), s)
+#       Γ = Diagonal(l)
+
+#       D_inv = pinv(Γ)
+#       Ψreg = Ψ * D_inv
+
+#       function error(c, y, Ψ, λ)
+#          ŷ = Ψ*c
+#          loss = mean((y .- ŷ).^2) + λ*norm(c)
+#          return loss
+#      end
+
+#       res = optimize(c -> error(c, Y, Ψreg, λ), zeros(length(Ψ[1,:])), GradientDescent())
+
+#       creg = Optim.minimizer(res)
+
+#       c = D_inv * creg
+
+#       rel_rms = norm(Ψ * c - Y) / norm(Y)
+#    elseif solver[1] == :lbfgs_reg
+#       λ = solver[2][1]
+#       rlap_scal = solver[2][2]
+
+#       s = ACE.scaling(db.basis.BB[2], rlap_scal)
+#       l = append!(ones(length(db.basis.BB[1])), s)
+#       Γ = Diagonal(l)
+
+#       D_inv = pinv(Γ)
+#       Ψreg = Ψ * D_inv
+
+#       function _error(c, y, Ψ, λ)
+#          ŷ = Ψ*c
+#          loss = mean((y .- ŷ).^2) + λ*norm(c)
+#          return loss
+#       end
+
+#       res = optimize(c -> _error(c, Y, Ψreg, λ), zeros(length(Ψ[1,:])), LBFGS())
+
+#       creg = Optim.minimizer(res)
+
+#       c = D_inv * creg
+#       rel_rms = norm(Ψ * c - Y) / norm(Y)
+#    elseif solver[1] == :itlsq
+#       damp = solver[2][1]
+#       rlap_scal = solver[2][2]
+#       atol = solver[2][3]
+#       a2b = solver[2][4]
+#       if length(solver[2]) == 5
+#          maxiter, c_init = solver[2][5]
+#          @info("Using a given approximate solution c, maxiter=$(maxiter)")
+#       else
+#          c_init = zeros(length(db.Ψ[1,:]))
+#          maxiter=100000
+#       end
+#       @info("damp=$(damp), rlap_scal=$(rlap_scal), lsqr_atol=$(atol), a2b=$(a2b)")
+
+#       s = ACE.scaling(db.basis.BB[2], rlap_scal; a2b = a2b)
+#       l = append!(ones(length(db.basis.BB[1])), s)
+#       Γ = Diagonal(l)
+
+#       D_inv = pinv(Γ)
+#       mul!(Ψ,Ψ,D_inv)
+
+#       creg, lsqrinfo = lsqr!(c_init, Ψ, Y, damp=damp, atol=atol, maxiter=maxiter, log=true)
+#       println(lsqrinfo)
+
+#       c = D_inv * creg
+
+#       rel_rms = norm(Ψ * creg - Y) / norm(Y)
+#    elseif solver[1] == :itlsq_lap2b
+#       damp = solver[2][1]
+#       rlap_scal = solver[2][2]
+#       atol = solver[2][3]
+#       @info("damp=$(damp), rlap_scal=$(rlap_scal), lsqr_atol=$(atol) | scaling 2B ONLY")
+
+#       s = ACE.scaling(db.basis.BB[1], rlap_scal)#; a2b = a2b)
+#       l = append!(s, ones(length(db.basis.BB[2])))
+#       Γ = Diagonal(l)
+
+#       D_inv = pinv(Γ)
+#       mul!(Ψ,Ψ,D_inv)
+
+#       creg, lsqrinfo = lsqr(Ψ, Y, damp=damp, atol=atol, log=true)
+#       println(lsqrinfo)
+
+#       c = D_inv * creg
+
+#       rel_rms = norm(Ψ * creg - Y) / norm(Y)
+#    elseif solver[1] == :lap2b_rid
+#       r = solver[2][1]
+#       rlap_scal = solver[2][2]
+#       @info("r=$(r), rlap_scal=$(rlap_scal) | scaling 2B ONLY")
+
+#       s = ACE.scaling(db.basis.BB[1], rlap_scal)#; a2b = a2b)
+#       l = append!(s, ones(length(db.basis.BB[2])))
+#       Γ = Diagonal(l)
+
+#       D_inv = pinv(Γ)
+#       mul!(Ψ,Ψ,D_inv)
+
+#       qrΨ = qr!(Ψ)
+#       Nb = size(qrΨ.R, 1)
+#       y = (Y' * Matrix(qrΨ.Q))[1:Nb]
+#       η0 = norm(Y - Matrix(qrΨ.Q) * y)
+
+#       τ = r * η0
+#       Γ = Matrix(I, length(l), length(l))
+
+#       creg = reglsq(Γ = Γ, R = Matrix(qrΨ.R), y=y, τ= τ, η0 = η0 );
+
+#       c = D_inv * creg
+
+#       rel_rms = norm(Ψ * c - Y) / norm(Y)
+#    elseif solver[1] == :lsqr
+#       damp = solver[2][1]
+#       atol = solver[2][2]
+#       @info("damp=$(damp), lsqr_atol=$(atol) | SIMPLE LSQR")
+
+#       c, lsqrinfo = lsqr(Ψ, Y, damp=damp, atol=atol, log=true)
+#       println(lsqrinfo)
+
+#       rel_rms = norm(Ψ * c - Y) / norm(Y)
+#    elseif solver[1] == :itlsq_Nw
+#       damp = solver[2][1]
+#       rlap_scal = solver[2][2]
+#       atol = solver[2][3]
+#       Nweight = solver[2][4]
+#       @info("damp=$(damp), rlap_scal=$(rlap_scal), lsqr_atol=$(atol)")
+
+#       V2scal = Nweight["2B"] .* ACE.scaling(db.basis.BB[1], rlap_scal)
+#       NBscal = ACE.scaling(db.basis.BB[2], rlap_scal)
+#       RegDiag = vcat(V2scal, NBscal)
+#       Γ = Diagonal(RegDiag)
+
+#       D_inv = pinv(Γ)
+#       mul!(Ψ,Ψ,D_inv)
+
+#       creg, lsqrinfo = lsqr(Ψ, Y, damp=damp, atol=atol, log=true)
+#       println(lsqrinfo)
+
+#       c = D_inv * creg
+
+#       rel_rms = norm(Ψ * creg - Y) / norm(Y)
+#    elseif solver[1] == :elastic_net_itlsq
+#       α = solver[2][1]
+#       damp = solver[2][2]
+#       rlap_scal = solver[2][3]
+#       atol = solver[2][4]
+#       a2b = solver[2][5]
+#       @info("α=$(α), damp=$(damp), rlap_scal=$(rlap_scal), lsqr_atol=$(atol), a2b=$(a2b)")
+
+#       s = ACE.scaling(db.basis.BB[2], rlap_scal; a2b = a2b)
+#       l = append!(ones(length(db.basis.BB[1])), s)
+#       Γ = Diagonal(l)
+
+#       D_inv = pinv(Γ)
+#       mul!(Ψ,Ψ,D_inv)
+
+#       cv = glmnet(Ψ, Y, alpha=α)
+#       theta = cv.betas[:,end]
+
+#       non_zero_ind = findall(x -> x != 0.0, theta)
+#       zero_ind = findall(x -> x == 0.0, theta)
+
+#       @info("α=$(α), keeping $(length(non_zero_ind)) basis functions ($(round(length(non_zero_ind)/length(theta), digits=2)*100)%)")
+#       Ψ = Ψ[:, setdiff(1:end, zero_ind)]
+
+#       cred, lsqrinfo = lsqr(Ψ, Y, damp=damp, atol=atol, log=true)
+#       println(lsqrinfo)
+
+#       cred_big = zeros(length(l))
+
+#       for (i,k) in enumerate(non_zero_ind)
+#         cred_big[k] = cred[i]
+#       end
+
+#       c = D_inv * cred_big
+
+#       rel_rms = norm(Ψ * cred - Y) / norm(Y)
+#       #rel_rms = 0.0
+#       rel_rms = norm(Ψ * cred - Y) / norm(Y)
+#    elseif solver[1] == :no2b_itlsq
+#       damp = solver[2][1]
+#       rlap_scal = solver[2][2]
+#       atol = solver[2][3]
+#       @info("Not keeping ACE 2B, damp=$(damp), rlap_scal=$(rlap_scal), lsqr_atol=$(atol)")
+
+#       len_pair = length(db.basis.BB[1])
+#       len_ace = length(db.basis.BB[2])
+
+#       s = ACE.scaling(db.basis.BB[2], rlap_scal)
+#       l = append!(ones(len_pair), s)
+#       Γ = Diagonal(l)
+
+#       D_inv = pinv(Γ)
+#       mul!(Ψ,Ψ,D_inv)
+
+#       I_ord2 = findall(get_orders(db.basis.BB[2]) .== 1);
+
+#       zero_ind = I_ord2 .+ len_pair
+#       non_zero_ind = []
+#       for i in 1:(len_pair+len_ace)
+#           if i ∉ zero_ind
+#               append!(non_zero_ind, i)
+#           end
+#       end
+
+#       #theta = append!(ones(length(db.basis.BB[1])), cs)
+
+#       #non_zero_ind = findall(x -> x != 0.0, theta)
+#       #zero_ind = findall(x -> x == 0.0, theta)
+
+#       @info("keeping $(length(non_zero_ind)) basis functions ($(round(length(non_zero_ind)/(len_pair+len_ace), digits=2)*100)%)")
+#       Ψ = Ψ[:, setdiff(1:end, zero_ind)]
+
+#       cred, lsqrinfo = lsqr(Ψ, Y, damp=damp, atol=atol, log=true)
+#       println(lsqrinfo)
+
+#       cred_big = zeros(length(l))
+
+#       for (i,k) in enumerate(non_zero_ind)
+#         cred_big[k] = cred[i]
+#       end
+
+#       c = D_inv * cred_big
+
+#       rel_rms = norm(Ψ * cred - Y) / norm(Y)
+#       #rel_rms = 0.0
+#       rel_rms = norm(Ψ * cred - Y) / norm(Y)
+#    elseif solver[1] == :elastic_net_lap_manual
+#       α = solver[2][1]
+#       rscal = solver[2][2]
+#       lap_pen = solver[2][3]
+
+#       cv = glmnet(Ψ, Y, alpha=α)
+#       theta = cv.betas[:,end]
+
+#       non_zero_ind = findall(x -> x != 0.0, theta)
+#       zero_ind = findall(x -> x == 0.0, theta)
+
+#       @info("keeping $(length(non_zero_ind)) basis functions ($(round(length(non_zero_ind)/length(theta), digits=2)*100)%)")
+
+#       Ψred = Ψ[:, setdiff(1:end, zero_ind)]
+
+#       s = ACE.scaling(db.basis.BB[2], rscal)
+#       l = append!(ones(length(db.basis.BB[1])), s)
+
+#       lred = [l[i] for i in non_zero_ind]
+#       Γ = Diagonal(lap_pen .* lred)
+
+#       Ψreg = vcat(Ψred, collect(Γ))
+#       Yreg = vcat(Y, zeros(length(lred)))
+
+#       #qrΨreg = qr!(Ψreg)
+#       cred = Ψreg \ Yreg
+
+#       c = zeros(length(Ψ[1,:]))
+
+#       for (i,k) in enumerate(non_zero_ind)
+#         c[k] = cred[i]
+#       end
+
+#       rel_rms = norm(Ψ * c - Y) / norm(Y)
+#    elseif solver[1] == :spgl_lap_rrqr
+#       it = solver[2][1]
+#       rlap_scal = solver[2][2]
+#       rtol = solver[2][3]
+
+#       s = ACE.scaling(db.basis.BB[2], rlap_scal)
+#       l = append!(ones(length(db.basis.BB[1])), s)
+#       Γ = Diagonal(l)
+
+#       D_inv = pinv(Γ)
+#       Ψreg = Ψ * D_inv
+
+#       opts = spgOptions(iterations = it)
+#       theta, r, g, info = spgl1(Ψ, Y, sigma = 1e-5, options=opts)
+
+#       non_zero_ind = findall(x -> x != 0.0, theta)
+#       zero_ind = findall(x -> x == 0.0, theta)
+
+#       Ψred = Ψreg[:, setdiff(1:end, zero_ind)]
+
+#       qrΨ = pqrfact!(Ψred, rtol=rtol)
+#       cred = qrΨ \ Y
+
+#       cred_big = zeros(length(Ψ[1,:]))
+
+#       @show length(cred_big)
+#       @show length(zero_ind)
+
+#       for (i,k) in enumerate(non_zero_ind)
+#         cred_big[k] = cred[i]
+#       end
+
+#       c = D_inv * cred_big
+
+#       rel_rms = norm(Ψ * c - Y) / norm(Y)
+#    else
+#       error("unknown `solver` in `lsqfit`")
+#    end
+
+
 
 # @noinline function onb(db::LsqDB;
 #                          solver=(:qr, ), verbose=true,
@@ -1484,3 +1593,4 @@ end
 # s_1 = scaling(db.basis.BB[2], 1)
 # p_1 = append!(ones(length(db.basis.BB[1])), s_1)
 # ##
+
