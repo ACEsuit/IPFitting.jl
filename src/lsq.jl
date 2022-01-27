@@ -373,7 +373,7 @@ end
                 solver=Dict("solver" => :qr), verbose=true,
                 Ibasis = :,
                 Itrain = :,
-                Itest = nothing,
+                #Itest = nothing,
                 E0 = 0.0,
                 Vref = nothing, # OneBody(E0),
                 weights = nothing,
@@ -426,7 +426,7 @@ end
    mul!(Ψ,Ψ,D_inv)   
 
    #κ, p_1, int_order = 0.0, 0.0, 0.0
-   @info("size of least squares system: $(size(Ψ))")
+   @info("Size of least squares system: $(size(Ψ))")
    if solver["solver"] == :qr
       @info("Using QR")
       qrΨ = qr!(Ψ)
@@ -443,47 +443,44 @@ end
       end
 
       qrΨ = nothing
-
    elseif solver["solver"] == :svd
-      if solver["ndiscard"] ∉ keys(solver)
-         ndiscard = solver["ndiscard"]
-      end
-      @info("Using SVD: ndiscard=$(ndiscard)")
-      ndiscard = solver[2]
+      @assert haskey(solver, "svd_ndiscard")
+      svd_ndiscard = solver["svd_ndiscard"]
+      @info("Using SVD: svd_ndiscard=$(svd_ndiscard)")
       F = svd(Ψ)
-      c = F.V[:,1:(end-ndiscard)] * (Diagonal(F.S[1:(end-ndiscard)]) \ (F.U' * Y)[1:(end-ndiscard)])
+      c = F.V[:,1:(end-svd_ndiscard)] * (Diagonal(F.S[1:(end-svd_ndiscard)]) \ (F.U' * Y)[1:(end-svd_ndiscard)])
       rel_rms = norm(Ψ * c - Y) / norm(Y)
-
    elseif solver["solver"] == :rrqr
-      if ["rrqr_tol"] ∉ keys(solver)
-         rrqr_tol = solver["rrqr_tol"]
-      end
+      @assert haskey(solver, "rrqr_tol")
+      rrqr_tol = solver["rrqr_tol"]
       @info("Using RRQR: rrqr_tol=$(rrqr_tol)")
       qrΨ = pqrfact(Ψ, rtol=rrqr_tol)
       verbose && @info("cond(R) = $(cond(qrΨ.R))")
       c = qrΨ \ Y
       rel_rms = norm(Ψ * c - Y) / norm(Y)
    elseif solver["solver"] == :lsqr
-      if ["damp", "atol"] ∉ keys(solver)
-         damp = solver["damp"]
-         atol = solver["atol"]
-      end
+      @assert haskey(solver, "lsqr_damp")
+      @assert haskey(solver, "lsqr_atol")
+      lsqr_damp = solver["lsqr_damp"]
+      lsqr_atol = solver["lsqr_atol"]
       if haskey(solver, "c_init")
          @info("Using c_init")
          c_init = solver["c_init"]
       else
          c_init = zeros(length(Ψ[1,:]))
       end
-      @info("Using LSQR: damp=$(damp), atol=$(atol)")
-      c, lsqrinfo = lsqr!(c_init, Ψ, Y, damp=damp, atol=atol, log=true)
+      @info("Using LSQR: lsqr_damp=$(lsqr_damp), lsqr_atol=$(lsqr_atol)")
+      c, lsqrinfo = lsqr!(c_init, Ψ, Y, damp=lsqr_damp, atol=lsqr_atol, log=true)
       println(lsqrinfo)
       
       rel_rms = norm(Ψ * c - Y) / norm(Y)
    elseif solver["solver"] == :brr
       BRR = pyimport("sklearn.linear_model")["BayesianRidge"]
-      @info("Using BRR")
+      @assert haskey(solver, "brr_tol")
+      brr_tol = solver["brr_tol"]
+      @info("Using BRR: brr_tol=$(brr_tol)")
 
-      clf = BRR(normalize=true, compute_score=true)
+      clf = BRR(tol=brr_tol, normalize=true, compute_score=true)
       clf.fit(Ψ, Y)
 
       c = clf.coef_
@@ -495,13 +492,13 @@ end
       rel_rms = norm(Ψ * c - Y) / norm(Y)
    elseif solver["solver"] == :ard
       ARD = pyimport("sklearn.linear_model")["ARDRegression"]
-      if ["ard_tol", "atol"] ∉ keys(solver)
-         ard_tol = solver["ard_tol"]
-         threshold_lambda = solver["threshold_lambda"]
-      end
-      @info("Using ARD: ard_tol=$(ard_tol), threshold_lambda=$(threshold_lambda)")
+      @assert haskey(solver, "ard_threshold_lambda")
+      @assert haskey(solver, "ard_tol")
+      ard_threshold_lambda = solver["ard_threshold_lambda"]
+      ard_tol = solver["ard_tol"]
+      @info("Using ARD: ard_tol=$(ard_tol), ard_threshold_lambda=$(ard_threshold_lambda)")
 
-      clf = ARD(threshold_lambda = threshold_lambda, tol=ard_tol, normalize=true, compute_score=true)
+      clf = ARD(threshold_lambda = ard_threshold_lambda, tol=ard_tol, normalize=true, compute_score=true)
       clf.fit(Ψ, Y)
 
       c = clf.coef_
@@ -536,7 +533,8 @@ end
 
    infodict = asm_fitinfo(db, IP, c, Ibasis, weights,
                           Vref, E0, regularisers, verbose,
-                          Itrain, Itest, error_table)
+                          #Itrain, Itest, 
+                          error_table)
    GC.gc()
    return IP, merge(infodict, solver)
 end
@@ -544,7 +542,8 @@ end
 
 function asm_fitinfo(db, IP, c, Ibasis, weights,
                      Vref, E0, regularisers, verbose,
-                     Itrain = :, Itest = nothing, error_table=true)
+                     #Itrain = :, Itest = nothing, 
+                     error_table=true)
    if Ibasis isa Colon
       Jbasis = collect(1:length(db.basis))
    else
@@ -570,7 +569,8 @@ function asm_fitinfo(db, IP, c, Ibasis, weights,
       @info("Assembling Error Table")
       Err.add_fits!(IP, db.configs, fitkey="IP")
       rmse_, rmserel_ = Err.rmse(db.configs; fitkey="IP");
-      Err.rmse_table(rmse_, rmserel_)
+      errs = Dict("rmse" => rmse_,
+                  "relrmse" => rmserel_)
    end
    # --------------------------------------------------------------------
    # ASSEMBLE INFO DICT
@@ -596,8 +596,8 @@ function asm_fitinfo(db, IP, c, Ibasis, weights,
    # TODO: fix IPFitting_version retrieval
 
    if error_table
-      infodict["errors"]["rmse"] = rmse_
-      infodict["errors"]["relrmse"] = rmserel_
+      infodict["errors"] = errs
+      #infodict["errtest"] = errtest
    end
    # --------------------------------------------------------------------
    return infodict
