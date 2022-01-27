@@ -99,7 +99,7 @@ for solve_met in [Dict("solver" => :qr), Dict("solver" => :rrqr, "rrqr_tol" => 1
                    :rms_F => err_frms )
 
    display(df)
-   (@test minimum(err_erms) < 1e-6) |> print_tf
+   (@test minimum(err_erms) < 5e-6) |> print_tf
    (@test minimum(err_frms) < 2e-4) |> print_tf
    (@test minimum(err_eunif) < 5e-5) |> print_tf
    (@test minimum(err_funif) < 1e-4) |> print_tf
