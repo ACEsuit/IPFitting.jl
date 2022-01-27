@@ -7,8 +7,6 @@ using BenchmarkTools
    @testset "LsqDB" begin include("test_lsq_db.jl") end
    @testset "Fitting" begin include("test_fit.jl") end
    @testset "Tfor" begin include("test_tfor.jl") end
+   @testset "Errors" begin include("test_errors.jl") end
+   @testset "Lsq" begin include("test_lsq.jl") end
 end
-
-# TODO: fix these tests or delete; 
-# @testset "Lsq" begin include("test_lsq.jl") end
-# @testset "Errors" begin include("test_errors.jl") end
