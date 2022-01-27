@@ -39,10 +39,10 @@ db = LsqDB("", B, data)
 IP, fitinfo = lsqfit( db,
                       Vref = OneBody(:Si => 0.0),
                       weights = Dict("default" => Dict("E"=>100.0, "F"=>1.0),
-                                       "rand2" => Dict("E"=>50.0, "F"=>0.5) )
+                                       "rand2" => Dict("E"=>50.0, "F"=>0.5)),
                       verbose=true,
                       solver = (:rrqr, 1e-5),
-                      error_talbe=true )
+                      error_table=true )
 # note we are using RRQR here to make sure the fit is well-conditioned!
 
 # IPf = fast(IP)
