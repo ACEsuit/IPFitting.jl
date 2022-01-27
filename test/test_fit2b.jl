@@ -96,8 +96,9 @@ for solve_met in [(:qr,), (:rrqr, 1e-12)]
                    :rms_F => err_frms )
 
    display(df)
-   (@test minimum(err_erms) < 1e-6) |> println
-   (@test minimum(err_frms) < 2e-4) |> println
-   (@test minimum(err_eunif) < 2e-5) |> println
-   (@test minimum(err_funif) < 1e-4) |> println
+   (@test minimum(err_erms) < 1e-6) |> print_tf
+   (@test minimum(err_frms) < 2e-4) |> print_tf
+   (@test minimum(err_eunif) < 2e-5) |> print_tf
+   (@test minimum(err_funif) < 1e-4) |> print_tf
+   println() 
 end
