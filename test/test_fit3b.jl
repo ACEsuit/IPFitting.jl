@@ -2,11 +2,12 @@
 using JuLIP, Test, IPFitting, DataFrames
 using JuLIP.Potentials: evaluate_d
 using JuLIP.MLIPs: IPSuperBasis
-using ACE
+using ACE1
 using IPFitting: Dat, LsqDB
 Lsq = IPFitting.Lsq
 Err = IPFitting.Errors
 using LinearAlgebra: norm
+using Random
 
 # generate random data
 function generate_data(species, L, rmax, N, calc)
@@ -44,7 +45,7 @@ for deg in degrees
    IP, fitinfo = Lsq.lsqfit( db,
                          E0 = 0.0,
              weights = Dict("default" => Dict("E" => 100.0, "F" => 1.0)),
-                         asmerrs = true )
+                         error_table = true )
    push!(err_erms, fitinfo["errors"]["relrmse"]["set"]["E"])
    push!(err_frms, fitinfo["errors"]["relrmse"]["set"]["F"])
 end
