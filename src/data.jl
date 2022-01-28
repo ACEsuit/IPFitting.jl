@@ -15,7 +15,6 @@ as a `Vector{Dat}`. This can then be stored using `JLD` or `JLD2`.
 If `d::Dat`, then one can call `energy(d), forces(d)`, etc to extract the
 loaded information.
 """
-__precompile__()
 module Data
 
 using JuLIP, ProgressMeter, FileIO, Printf, StatsBase, PrettyTables, DataFrames

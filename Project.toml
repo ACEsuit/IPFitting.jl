@@ -3,6 +3,7 @@ uuid = "3002bd4c-79e4-52ce-b924-91256dde4e52"
 version = "0.10.0"
 
 [deps]
+ACE1 = "e3f9bc04-086e-409a-ba78-e9769fe067bb"
 ASE = "51974c44-a7ed-5088-b8be-3e78c8ba416c"
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
@@ -35,7 +36,8 @@ JuLIP = "≥ 0.9.3"
 julia = "1"
 
 [extras]
+ACE1 = "e3f9bc04-086e-409a-ba78-e9769fe067bb"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test"]
+test = ["Test", "ACE1"]

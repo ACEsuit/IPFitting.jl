@@ -1,6 +1,7 @@
 
 using IPFitting, JuLIP, Random, Test
 using IPFitting: observations, tfor_observations
+using JuLIP.Testing: print_tf 
 
 function generate_data(species, L, rmax, N, calc)
    data = Dat[]
@@ -33,6 +34,6 @@ tfor_observations(data,
    end)
 
 for (okey, cfg, _) in observations(data)
-   print(@test(cfg.info["for_$okey"] == cfg.info["tfor_$okey"]))
+   print_tf(@test(cfg.info["for_$okey"] == cfg.info["tfor_$okey"]))
 end
 println()

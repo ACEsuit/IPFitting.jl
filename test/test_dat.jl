@@ -4,7 +4,7 @@ using IPFitting
 using IPFitting: Dat
 using IPFitting.Data: configtype
 using JuLIP: write_dict, read_dict
-
+using JuLIP.Testing: print_tf 
 ##
 
 @info("Testing Dat:")
@@ -19,12 +19,14 @@ dat = Dat(at, "test"; E = energy(lj, at),
                       F = forces(lj, at),
                       V = virial(lj, at) )
 
-println(@test(configtype(dat) == "test"))
-println(@test(energy(dat) == energy(lj, at)))
-println(@test(forces(dat) == forces(lj, at)))
-println(@test(virial(dat) ≈ virial(lj, at)))
+print_tf(@test(configtype(dat) == "test"))
+print_tf(@test(energy(dat) == energy(lj, at)))
+print_tf(@test(forces(dat) == forces(lj, at)))
+print_tf(@test(virial(dat) ≈ virial(lj, at)))
+println() 
 
 ##
 
 @info("Test (de-)serialisation of det")
-println(@test all(JuLIP.Testing.test_fio(dat)))
+print_tf(@test all(JuLIP.Testing.test_fio(dat)))
+println() 

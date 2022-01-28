@@ -1,6 +1,6 @@
 
 using JuLIP, Test, IPFitting, DataFrames
-using ACE
+using ACE1
 using JuLIP.Potentials: evaluate_d
 using IPFitting: Dat, LsqDB
 Lsq = IPFitting.Lsq
@@ -32,15 +32,12 @@ end
 data = generate_data(:Cu, 3, 0.25*r0, 70, calc)
 rcut2 = cutoff(calc)
 
-pairbasis(deg) = rpi_basis(species = :Cu, N = 1, maxdeg = deg,
-                           r0 = r0, rcut = rcut2, rin = r0/2)
-
 ##
 degrees = [4, 7, 10, 13, 16, 19]
 
 IPt = nothing
 
-for solve_met in [(:qr,), (:rrqr, 1e-12)]
+for solve_met in [Dict("solver" => :qr), Dict("solver" => :rrqr, "rrqr_tol" => 1e-12)]
    global err_eunif = Float64[]
    global err_funif = Float64[]
    global err_erms = Float64[]
@@ -55,31 +52,37 @@ for solve_met in [(:qr,), (:rrqr, 1e-12)]
       global err_erms
       global err_frms
       global degrees
-      local B2
       local db
-      B2 = pairbasis(d)
+      
+      B2 = pair_basis(species = :Cu,
+                  r0 = r0,
+                  maxdeg = d,
+                  rcut = 7.0,
+                  pcut = 1,
+                  pin = 0)
+      
       @show length(B2)
       db = LsqDB("", B2, data)
       Itrain, Itest = splittraintest(db)
       @test isempty(intersect(Itrain, Itest))
       @test sort(union(Itrain, Itest)) == 1:length(db.configs)
 
-      IP, fitinfo = Lsq.lsqfit(db, E0 = 0.0,
-                               Itrain = Itrain,
-                               Itest = Itest,
+      IP, fitinfo = Lsq.lsqfit(db, Vref=OneBody(:Cu => 0.0),#E0 = 0.0,
+                               #Itrain = Itrain,
+                               #Itest = Itest,
                 weights = Dict("default" => Dict("E" => 100.0, "F" => 1.0)),
                                solver = solve_met,
-                               asmerrs = true )
+                               error_table=true )
       @info("done fitting...")
       errs = fitinfo["errors"]
-      errs_test = fitinfo["errtest"]
+      #errs_test = fitinfo["errtest"]
       @info("done assembling errors")
       @info("Training Errors")
       Err.rmse_table(rmse(errs)...)
       @info("Test Errors")
-      Err.rmse_table(rmse(errs_test)...)
-      V2 = r -> JuLIP.Potentials.evaluate(IP, [r*JVec(1.0,0.0,0.0)], [z0,], z0)
-      dV2 = r -> JuLIP.Potentials.evaluate_d(IP, [r*JVec(1.0,0.0,0.0)], [z0,], z0)[1][1]
+      #Err.rmse_table(rmse(errs_test)...)
+      V2 = r -> JuLIP.Potentials.evaluate(IP.components[2], [r*JVec(1.0,0.0,0.0)], [z0,], z0)
+      dV2 = r -> JuLIP.Potentials.evaluate_d(IP.components[2], [r*JVec(1.0,0.0,0.0)], [z0,], z0)[1][1]
       ev2 = norm(V2.(rr) - 0.5 * calc.(rr), Inf)
       dev2 = norm(dV2.(rr) - 0.5 * evaluate_d.(Ref(calc), rr), Inf)
       println("   V2 - uniform error = ", ev2, " | ", dev2)
@@ -96,8 +99,9 @@ for solve_met in [(:qr,), (:rrqr, 1e-12)]
                    :rms_F => err_frms )
 
    display(df)
-   (@test minimum(err_erms) < 1e-6) |> println
-   (@test minimum(err_frms) < 2e-4) |> println
-   (@test minimum(err_eunif) < 2e-5) |> println
-   (@test minimum(err_funif) < 1e-4) |> println
+   (@test minimum(err_erms) < 5e-6) |> print_tf
+   (@test minimum(err_frms) < 2e-4) |> print_tf
+   (@test minimum(err_eunif) < 5e-5) |> print_tf
+   (@test minimum(err_funif) < 1e-4) |> print_tf
+   println() 
 end
