@@ -55,5 +55,6 @@ end
             )
 
 ##
-println(@test Y ≈ Y_man)
-println(@test Ψ ≈ Ψ_man)
+print_tf(@test Y ≈ Y_man)
+print_tf(@test Ψ ≈ Ψ_man)
+println() 

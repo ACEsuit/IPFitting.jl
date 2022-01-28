@@ -2,6 +2,7 @@
 using JuLIP, IPFitting, ACE1, Printf
 using IPFitting: Dat, LsqDB
 using JuLIP.MLIPs: IPSuperBasis
+using JuLIP.Testing: print_tf 
 using Test
 using LinearAlgebra: norm
 
@@ -65,7 +66,7 @@ for cn in keys(errs)
       #          cn, ot,
       #          errs[cn][ot], olderrs["rmse"][cn][ot],
       #          errsrel[cn][ot], olderrs["relrmse"][cn][ot] )
-      println(@test errs[cn][ot] ≈ olderrs["rmse"][cn][ot])
-      println(@test errsrel[cn][ot] ≈ olderrs["relrmse"][cn][ot])
+      print_tf(@test errs[cn][ot] ≈ olderrs["rmse"][cn][ot])
+      print_tf(@test errsrel[cn][ot] ≈ olderrs["relrmse"][cn][ot])
    end
 end
