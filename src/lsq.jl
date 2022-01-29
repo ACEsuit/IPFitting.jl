@@ -513,10 +513,15 @@ end
    elseif solver["solver"] == :brr
       BRR = pyimport("sklearn.linear_model")["BayesianRidge"]
       @assert haskey(solver, "brr_tol")
+      if !haskey(solver, "brr_fit_intercept")
+         fit_intercept=true
+      else
+         fit_intercept=solver["brr_fit_intercept"]
+      end
       brr_tol = solver["brr_tol"]
       @info("Using BRR: brr_tol=$(brr_tol)")
 
-      clf = BRR(tol=brr_tol, normalize=true, compute_score=true)
+      clf = BRR(tol=brr_tol, fit_intercept=fit_intercept, normalize=true, compute_score=true)
       clf.fit(Ψ, Y)
 
       c = clf.coef_
@@ -530,11 +535,16 @@ end
       ARD = pyimport("sklearn.linear_model")["ARDRegression"]
       @assert haskey(solver, "ard_threshold_lambda")
       @assert haskey(solver, "ard_tol")
+      if !haskey(solver, "ard_fit_intercept")
+         fit_intercept=true
+      else
+         fit_intercept=solver["ard_fit_intercept"]
+      end
       ard_threshold_lambda = solver["ard_threshold_lambda"]
       ard_tol = solver["ard_tol"]
       @info("Using ARD: ard_tol=$(ard_tol), ard_threshold_lambda=$(ard_threshold_lambda)")
 
-      clf = ARD(threshold_lambda = ard_threshold_lambda, tol=ard_tol, normalize=true, compute_score=true)
+      clf = ARD(threshold_lambda = ard_threshold_lambda, tol=ard_tol, fit_intercept=fit_intercept, normalize=true, compute_score=true)
       clf.fit(Ψ, Y)
 
       c = clf.coef_
