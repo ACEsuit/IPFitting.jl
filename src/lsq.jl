@@ -558,6 +558,15 @@ end
       @info("score=$(score)")
 
       rel_rms = norm(Ψ * c - Y) / norm(Y)
+   elseif solver["solver"] == :xgboost
+      XGBoost = pyimport("xgboost")["XGBRegressor"]
+
+      model = XGBoost(booster="gblinear")
+      model.fit(Ψ, Y)
+
+      c = model.coef_
+
+      rel_rms = norm(Ψ * c - Y) / norm(Y)
    else
       error("unknown `solver` in `lsqfit`")
    end
