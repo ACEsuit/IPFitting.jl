@@ -423,7 +423,11 @@ end
    end
 
    D_inv = pinv(P)
-   mul!(Ψ,Ψ,D_inv)   
+   mul!(Ψ,Ψ,D_inv)
+   
+   if haskey(solver, "P")
+      delete!(solver, "P")
+   end
 
    #κ, p_1, int_order = 0.0, 0.0, 0.0
    @info("Size of least squares system: $(size(Ψ))")
