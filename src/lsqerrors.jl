@@ -226,7 +226,7 @@ function _err_table_mu(errs, relerrs, title, configtypes=:)
 
    header = ["config type" "MU[Debye]" "MU [%]"]
 
-   pretty_table(datf, header, formatters = ft_printf("%5.3f"), body_hlines = [length(datf[!, 1])-1])
+   pretty_table(datf, header, formatters = ft_printf("%5.4f"), body_hlines = [length(datf[!, 1])-1])
 end
 
 # ---------------------------------------------------------------------
