@@ -72,25 +72,25 @@ function tfor(f, rg; verbose=true, msg="tfor", costs = ones(Int, length(rg)),
    return nothing
 end
 
-function pfor(db, f, rg; verbose=true, msg="tfor", costs = ones(Int, length(rg)),
-                     maxprocs=nprocs()-1)
-   nprcs = max(1, min(nprocs() - 1, maxprocs))
-
-   function fill_row(i)
-      return f(rg[i])
-   end
-   @everywhere function fill_row(i)
-      return f(rg[i])
-   end
-
-   res = @showprogress pmap(fill_row, rg, batch_size=100)
-
-   for x in res
-      db.Ψ[x[1],:] = x[2]
-   end
-
-   return nothing
-end
+#function pfor(db, f, rg; verbose=true, msg="tfor", costs = ones(Int, length(rg)),
+#                     maxprocs=nprocs()-1)
+#   nprcs = max(1, min(nprocs() - 1, maxprocs))
+#
+#   function fill_row(i)
+#      return f(rg[i])
+#   end
+#   @everywhere function fill_row(i)
+#      return f(rg[i])
+#   end
+#
+#   res = @showprogress pmap(fill_row, rg, batch_size=100)
+#
+#   for x in res
+#      db.Ψ[x[1],:] = x[2]
+#   end
+#
+#   return nothing
+#end
 
 #function pfor(db, f, rg; verbose=true, msg="tfor", costs = ones(Int, length(rg)),
 #                     maxprocs=nprocs()-1)

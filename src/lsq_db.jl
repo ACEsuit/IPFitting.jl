@@ -42,7 +42,7 @@ using JuLIP:                 AbstractCalculator, AbstractAtoms, Atoms, energy, f
 using JuLIP.MLIPs:           IPBasis
 using IPFitting:        Dat, LsqDB, basis, eval_obs, observations,
                              observation, vec_obs, devec_obs,
-                             tfor_observations, pfor_observations
+                             tfor_observations
 using IPFitting.Data:   configtype
 using HDF5:                  h5open, read
 
@@ -204,16 +204,50 @@ function LsqDB_dist(dbpath::AbstractString,
                configs::AbstractVector{Dat};
                verbose=true,
                maxprocs=nprocs()-1)
-   # assign indices, count observations and allocate a matrix
-   Ψ = _alloc_lsq_matrix(configs, basis)
-   # create the struct where everything is stored
-   db = LsqDB(basis, configs, Ψ, dbpath)
-   # parallel assembly of the LSQ matrix
-   pfor_observations(db, configs,
-      (n, okey, cfg) -> procs_append!(db, cfg, okey),
-      msg = "Assemble LSQ blocks",
-      verbose=verbose,
-      maxprocs=maxprocs )
+
+   # set matrix rows on main process
+   nrows = 0
+   for (okey, d, _) in observations(configs)
+      len = length(observation(d, okey))
+      set_matrows!(d, okey, collect(nrows .+ (1:len)))
+      nrows += len
+   end
+
+   # distribute configs across workers
+   dconfigs = distribute(configs)
+
+   # define the function to be called by each worker
+   function generate_submatrix()
+      idats = Int[]; sizehint!(idats, 3*length(localpart(dconfigs)))
+      okeys = String[]; sizehint!(okeys, 3*length(localpart(dconfigs)))
+      nrows = 0
+      for (okey, dat, idat) in observations(localpart(dconfigs))
+         len = length(observation(dat, okey))
+         set_matrows!(dat, okey, collect(nrows .+ (1:len)))
+         nrows += len
+         push!(idats, idat)
+         push!(okeys, okey)
+      end
+      Ψ = zeros(Float64, nrows, length(basis))
+      for i=1:length(idats)
+         lsqrow = eval_obs(okeys[i], basis, localpart(dconfigs)[idats[i]])
+         vec_lsqrow = vec_obs(okeys[i], lsqrow)
+         irows = matrows(localpart(dconfigs)[idats[i]], okeys[i])
+         Ψ[irows,:] = vec_lsqrow;
+      end
+      return Ψ
+   end
+
+   println("spawning work")
+   @time Ψ = [@spawnat w generate_submatrix() for w in workers()]
+   println("creating DArray")
+   @time Ψ = DArray(reshape(Ψ, (nworkers(),1)))
+   println("converting DArray to Array on main process")
+   @time Ψ = convert(Array, Ψ)
+   println("finished matrix assembly")
+
+   db = LsqDB(basis, configs, Ψ, dbpath);
+
    # save to file
    if dbpath != ""
       verbose && @info("Writing db to disk...")
@@ -280,20 +314,20 @@ function _alloc_lsq_matrix(configs, basis)
    return zeros(Float64, nrows, length(basis))
 end
 
-function _alloc_lsq_matrix_dist(configs, basis, nprocs)
-   # the indices associated with the basis are simply the indices within
-   # the array - there is nothing else to do here
-   #
-   # loop through all observations and assign indices
-   nrows = 0
-   for (okey, d, _) in observations(configs)
-      len = length(observation(d, okey))
-      set_matrows!(d, okey, collect(nrows .+ (1:len)))
-      nrows += len
-   end
-   # allocate and return the matrix
-   return dzeros((nrows,length(basis)), workers()[1:nprocs], [1,nprocs])
-end
+#function _alloc_lsq_matrix_dist(configs, basis, nprocs)
+#   # the indices associated with the basis are simply the indices within
+#   # the array - there is nothing else to do here
+#   #
+#   # loop through all observations and assign indices
+#   nrows = 0
+#   for (okey, d, _) in observations(configs)
+#      len = length(observation(d, okey))
+#      set_matrows!(d, okey, collect(nrows .+ (1:len)))
+#      nrows += len
+#   end
+#   # allocate and return the matrix
+#   return dzeros((nrows,length(basis)), workers()[1:nprocs], [1,nprocs])
+#end
 
 
 function safe_append!(db::LsqDB, db_lock, cfg, okey)

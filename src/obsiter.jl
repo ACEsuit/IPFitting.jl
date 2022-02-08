@@ -1,6 +1,6 @@
 
 import Base.iterate
-using IPFitting.Tools: tfor, pfor
+using IPFitting.Tools: tfor
 using Base.Threads: SpinLock, nthreads
 
 
@@ -106,29 +106,29 @@ function tfor_observations(configs::Vector{Dat}, callback;
 end
 
 
-function pfor_observations(db, configs::Vector{Dat}, callback;
-                           verbose=true,
-                           msg = "Loop over observations",
-                           maxprocs=nprocs())
-
-   # collect a complete list of observations
-   idats = Int[]; sizehint!(idats, 3*length(configs))
-   okeys = String[]; sizehint!(okeys, 3*length(configs))
-   for (okey, _, idat) in observations(configs)
-      push!(idats, idat)
-      push!(okeys, okey)
-   end
-   # a rough cost estimate
-   costs = [ length(configs[i]) for i in idats ]
-
-   # start a loop in diff workers
-
-   pfor( db,
-         n -> callback(n, okeys[n], configs[idats[n]]),
-         1:length(idats),
-         verbose=verbose, msg = msg,
-         costs = costs,
-         maxprocs=maxprocs )
-
-   return nothing
-end
+#function pfor_observations(db, configs::Vector{Dat}, callback;
+#                           verbose=true,
+#                           msg = "Loop over observations",
+#                           maxprocs=nprocs())
+#
+#   # collect a complete list of observations
+#   idats = Int[]; sizehint!(idats, 3*length(configs))
+#   okeys = String[]; sizehint!(okeys, 3*length(configs))
+#   for (okey, _, idat) in observations(configs)
+#      push!(idats, idat)
+#      push!(okeys, okey)
+#   end
+#   # a rough cost estimate
+#   costs = [ length(configs[i]) for i in idats ];
+#
+#   # start a loop in diff workers
+#
+#   pfor( db,
+#         n -> callback(n, okeys[n], configs[idats[n]]),
+#         1:length(idats),
+#         verbose=verbose, msg = msg,
+#         costs = costs,
+#         maxprocs=maxprocs )
+#
+#   return nothing
+#end
