@@ -517,7 +517,7 @@ end
       brr_tol = solver["brr_tol"]
       @info("Using BRR: brr_tol=$(brr_tol)")
 
-      clf = BRR(tol=brr_tol, normalize=true, compute_score=true)
+      clf = BRR(tol=brr_tol, fit_intercept=false, compute_score=true)
       clf.fit(Ψ, Y)
 
       c = clf.coef_
@@ -535,7 +535,7 @@ end
       ard_tol = solver["ard_tol"]
       @info("Using ARD: ard_tol=$(ard_tol), ard_threshold_lambda=$(ard_threshold_lambda)")
 
-      clf = ARD(threshold_lambda = ard_threshold_lambda, tol=ard_tol, normalize=true, compute_score=true)
+      clf = ARD(threshold_lambda = ard_threshold_lambda, tol=ard_tol, fit_intercept=false, compute_score=true)
       clf.fit(Ψ, Y)
 
       c = clf.coef_
