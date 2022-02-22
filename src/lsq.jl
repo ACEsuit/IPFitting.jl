@@ -43,7 +43,7 @@ using IterativeSolvers
 
 const Err = IPFitting.Errors
 
-export lsqfit, onb
+export lsqfit, onb, stepwise_fit
 
 """
 `collect_observations(db::LsqDB, weights::Dict, Vref) -> Y, W, Icfg
@@ -367,6 +367,38 @@ function do_qr!(db, Ψ, Y)
    flush_qr(db)
 
    return db
+end
+
+"""
+`stepwise_fit()`
+
+Function fitting first dB1, than using the fit as a baseline fitting dB2
+Can be used for example to fit a 2B first, and than an ACE afterwards, not fitting them together
+
+Returns sumIP of Vref, basis1 and basis2. 
+"""
+
+@noinline function stepwise_fit(dB1::LsqDB, 
+                              solver1 = Dict("solver" => :qr),
+                              dB2::LsqDB,    
+                              solver2 = solver1, 
+                              Vref = nothing,
+                              weights = nothing;
+                              error_table = false,
+                              verbose = true)
+   IP_1, lsqinfo1 = lsqfit(dB1, 
+                           solver=solver1,
+                           Vref = Vref,
+                           weights = weights,
+                           error_table = error_table,
+                           verbose=verbose)
+   IP_2, lsqinfo2 = lsqfit(dB2, 
+                           solver=solver2,
+                           Vref = IP_1,
+                           weights = weights,
+                           error_table = error_table,
+                           verbose=verbose)
+   return IP_2, lsqinfo2
 end
 
 @noinline function lsqfit(db::LsqDB;
