@@ -379,11 +379,11 @@ Returns sumIP of Vref, basis1 and basis2.
 """
 
 @noinline function stepwise_fit(dB1::LsqDB, 
-                              solver1 = Dict("solver" => :qr),
-                              dB2::LsqDB,    
+                              dB2::LsqDB;
+                              solver1 = Dict("solver" => :qr),    
                               solver2 = solver1, 
                               Vref = nothing,
-                              weights = nothing;
+                              weights = nothing,
                               error_table = false,
                               verbose = true)
    IP_1, lsqinfo1 = lsqfit(dB1, 
@@ -398,7 +398,8 @@ Returns sumIP of Vref, basis1 and basis2.
                            weights = weights,
                            error_table = error_table,
                            verbose=verbose)
-   return IP_2, lsqinfo2
+   IP = SumIP(Vref, IP_1.components[2], IP_2.components[2])
+   return IP, lsqinfo2
 end
 
 @noinline function lsqfit(db::LsqDB;
