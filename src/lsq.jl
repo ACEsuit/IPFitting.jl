@@ -398,8 +398,7 @@ Returns sumIP of Vref, basis1 and basis2.
                            weights = weights,
                            error_table = error_table,
                            verbose=verbose)
-   IP = SumIP(Vref, IP_1.components[2], IP_2.components[2])
-   return IP, lsqinfo2
+   return IP_2, lsqinfo2
 end
 
 @noinline function lsqfit(db::LsqDB;
