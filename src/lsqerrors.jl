@@ -169,7 +169,7 @@ function _err_table(errs, relerrs, title, configtypes=:)
 
    header = ["config type" "E [meV]" "F [eV/A]" "F [%]" "V[meV]"]
 
-   pretty_table(datf, header, formatters = ft_printf("%5.3f"), body_hlines = [length(datf[!, 1])-1])
+   pretty_table(datf, header, formatters = ft_printf("%5.3f"), crop = :horizontal, body_hlines = [length(datf[!, 1])-1])
 
    # print("┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓\n")
    # print("┃ "); printstyled(title; bold=true);

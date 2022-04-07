@@ -215,7 +215,7 @@ function read_xyz(fname; energy_key = "dft_energy", force_key = "dft_force", vir
    push!(ct_datf_trans, vcat(["total", totals]...))
    push!(ct_datf_trans, vcat(["missing", missings]...))
 
-   pretty_table(ct_datf_trans, body_hlines = [length(ct_datf_trans[!, 1])-2])
+   pretty_table(ct_datf_trans, crop = :horizontal, body_hlines = [length(ct_datf_trans[!, 1])-2])
    #
    # totals = [0,0,0,0,0]
    #
