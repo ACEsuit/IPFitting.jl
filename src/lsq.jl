@@ -603,7 +603,7 @@ function asm_fitinfo(db, IP, c, Ibasis, weights,
    # end
    if error_table
       @info("Assembling Error Table")
-      Err.add_fits!(IP, db.configs, fitkey="IP")
+      Err.add_fits_serial!(IP, db.configs, fitkey="IP")
       rmse_, rmserel_ = Err.rmse(db.configs; fitkey="IP");
       errs = Dict("rmse" => rmse_,
                   "relrmse" => rmserel_)
