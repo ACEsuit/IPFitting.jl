@@ -508,11 +508,16 @@ end
       else
          c_init = zeros(length(Ψ[1,:]))
       end
-      @info("Using LSQR: lsqr_damp=$(lsqr_damp), lsqr_atol=$(lsqr_atol), conlim=$(lsqr_conlim)")
-      c, lsqrinfo = lsqr!(c_init, Ψ, Y, damp=lsqr_damp, atol=lsqr_atol, conlim=lsqr_conlim,
+      @info("Using LSQR: damp=$(lsqr_damp), atol=$(lsqr_atol), conlim=$(lsqr_conlim), maxiter=$(lsqr_maxiter)")
+      c, ch = lsqr!(c_init, Ψ, Y, damp=lsqr_damp, atol=lsqr_atol, conlim=lsqr_conlim,
                           maxiter=lsqr_maxiter, verbose=lsqr_verbose, log=true)
-      println(lsqrinfo)
-      
+
+      if ch[:anorm][end] > lsqr_atol
+         print("\n\n")
+         @warn "LSQR did not converge (atol=$(lsqr_atol) but anorm=$(ch[:anorm][end])). Consider increasing conlim or maxiter."
+         print("\n\n")
+      end
+
       rel_rms = norm(Ψ * c - Y) / norm(Y)
    elseif solver["solver"] == :brr
       BRR = pyimport("sklearn.linear_model")["BayesianRidge"]
