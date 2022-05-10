@@ -39,7 +39,7 @@ using JuLIP.Utils
 using JuLIP: JVecF
 using PyCall
 using IterativeSolvers
-
+using Printf
 
 const Err = IPFitting.Errors
 
@@ -513,9 +513,9 @@ end
                           maxiter=lsqr_maxiter, verbose=lsqr_verbose, log=true)
 
       if ch[:anorm][end] > lsqr_atol
-         print("\n\n")
-         @warn "LSQR did not converge (atol=$(lsqr_atol) but anorm=$(ch[:anorm][end])). Consider increasing conlim or maxiter."
-         print("\n\n")
+         println()
+         @warn @sprintf "LSQR did not converge (atol=%.2e but anorm=%.2e). Consider increasing conlim or maxiter." lsqr_atol ch[:anorm][end]
+         println()
       end
 
       rel_rms = norm(Ψ * c - Y) / norm(Y)
