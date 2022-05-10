@@ -534,7 +534,9 @@ end
       clf = BRR(n_iter=brr_n_iter, tol=brr_tol, fit_intercept=fit_intercept, normalize=true, compute_score=true)
       clf.fit(Ψ, Y)
 
-      if length(clf.scores_) >= brr_n_iter
+      if length(clf.scores_) < brr_n_iter
+         @info "BRR converged to brr_tol=$(brr_tol) after $(length(clf.scores_)) iterations."
+      else
          println()
          @warn "BRR did not converge to brr_tol=$(brr_tol) after brr_n_iter=$(brr_n_iter) iterations."
          println()
@@ -563,7 +565,9 @@ end
       clf = ARD(n_iter=ard_n_iter, threshold_lambda = ard_threshold_lambda, tol=ard_tol, fit_intercept=fit_intercept, normalize=true, compute_score=true)
       clf.fit(Ψ, Y)
 
-      if length(clf.scores_) >= ard_n_iter
+      if length(clf.scores_) < ard_n_iter
+         @info "ARD converged to ard_tol=$(ard_tol) after $(length(clf.scores_)) iterations."
+      else
          println()
          @warn "ARD did not converge to ard_tol=$(ard_tol) after ard_n_iter=$(ard_n_iter) iterations."
          println()
