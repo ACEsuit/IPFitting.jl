@@ -499,14 +499,18 @@ end
       @assert haskey(solver, "lsqr_atol")
       lsqr_damp = solver["lsqr_damp"]
       lsqr_atol = solver["lsqr_atol"]
+      lsqr_conlim = haskey(solver,"lsqr_conlim")   ? solver["lsqr_conlim"]  : 1e8
+      lsqr_maxiter = haskey(solver,"lsqr_maxiter") ? solver["lsqr_maxiter"] : maximum(size(Ψ))
+      lsqr_verbose = haskey(solver,"lsqr_verbose") ? solver["lsqr_verbose"] : false
       if haskey(solver, "c_init")
          @info("Using c_init")
          c_init = solver["c_init"]
       else
          c_init = zeros(length(Ψ[1,:]))
       end
-      @info("Using LSQR: lsqr_damp=$(lsqr_damp), lsqr_atol=$(lsqr_atol)")
-      c, lsqrinfo = lsqr!(c_init, Ψ, Y, damp=lsqr_damp, atol=lsqr_atol, log=true)
+      @info("Using LSQR: lsqr_damp=$(lsqr_damp), lsqr_atol=$(lsqr_atol), conlim=$(lsqr_conlim)")
+      c, lsqrinfo = lsqr!(c_init, Ψ, Y, damp=lsqr_damp, atol=lsqr_atol, conlim=lsqr_conlim,
+                          maxiter=lsqr_maxiter, verbose=lsqr_verbose, log=true)
       println(lsqrinfo)
       
       rel_rms = norm(Ψ * c - Y) / norm(Y)
