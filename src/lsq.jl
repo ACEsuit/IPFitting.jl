@@ -534,7 +534,7 @@ end
       clf = BRR(n_iter=brr_n_iter, tol=brr_tol, fit_intercept=fit_intercept, normalize=true, compute_score=true)
       clf.fit(Ψ, Y)
 
-      if length(clf.scores_) == brr_n_iter+1
+      if length(clf.scores_) >= brr_n_iter
          println()
          @warn "BRR did not converge to brr_tol=$(brr_tol) after brr_n_iter=$(brr_n_iter) iterations."
          println()
@@ -555,13 +555,19 @@ end
       else
          fit_intercept=solver["ard_fit_intercept"]
       end
+      ard_n_iter = haskey(solver,"ard_n_iter") ? solver["ard_n_iter"] : 300
       ard_threshold_lambda = solver["ard_threshold_lambda"]
       ard_tol = solver["ard_tol"]
-      @info("Using ARD: ard_tol=$(ard_tol), ard_threshold_lambda=$(ard_threshold_lambda)")
+      @info("Using ARD: ard_n_iter=$(ard_n_iter), ard_tol=$(ard_tol), ard_threshold_lambda=$(ard_threshold_lambda)")
 
-      clf = ARD(threshold_lambda = ard_threshold_lambda, tol=ard_tol, fit_intercept=fit_intercept, normalize=true, compute_score=true)
+      clf = ARD(n_iter=ard_n_iter, threshold_lambda = ard_threshold_lambda, tol=ard_tol, fit_intercept=fit_intercept, normalize=true, compute_score=true)
       clf.fit(Ψ, Y)
 
+      if length(clf.scores_) >= ard_n_iter
+         println()
+         @warn "ARD did not converge to ard_tol=$(ard_tol) after ard_n_iter=$(ard_n_iter) iterations."
+         println()
+      end
       c = clf.coef_
       alpha = clf.alpha_
       lambda = clf.lambda_
