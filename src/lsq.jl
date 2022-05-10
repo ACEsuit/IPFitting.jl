@@ -527,12 +527,18 @@ end
       else
          fit_intercept=solver["brr_fit_intercept"]
       end
+      brr_n_iter = haskey(solver,"brr_n_iter") ? solver["brr_n_iter"] : 300
       brr_tol = solver["brr_tol"]
-      @info("Using BRR: brr_tol=$(brr_tol)")
+      @info("Using BRR: brr_n_iter=$(brr_n_iter), brr_tol=$(brr_tol)")
 
-      clf = BRR(tol=brr_tol, fit_intercept=fit_intercept, normalize=true, compute_score=true)
+      clf = BRR(n_iter=brr_n_iter, tol=brr_tol, fit_intercept=fit_intercept, normalize=true, compute_score=true)
       clf.fit(Ψ, Y)
 
+      if length(clf.scores_) == brr_n_iter+1
+         println()
+         @warn "BRR did not converge to brr_tol=$(brr_tol) after brr_n_iter=$(brr_n_iter) iterations."
+         println()
+      end
       c = clf.coef_
       alpha = clf.alpha_
       lambda = clf.lambda_
