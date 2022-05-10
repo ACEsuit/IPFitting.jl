@@ -514,7 +514,7 @@ end
 
       if ch[:anorm][end] > lsqr_atol
          println()
-         @warn @sprintf "LSQR did not converge (atol=%.2e but anorm=%.2e). Consider increasing conlim or maxiter." lsqr_atol ch[:anorm][end]
+         @warn @sprintf "LSQR did not converge (anorm=%.1e > atol=%.1e). Consider increasing conlim or maxiter." ch[:anorm][end] lsqr_atol
          println()
       end
 
