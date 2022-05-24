@@ -512,12 +512,6 @@ end
       c, ch = lsqr!(c_init, Ψ, Y, damp=lsqr_damp, atol=lsqr_atol, conlim=lsqr_conlim,
                           maxiter=lsqr_maxiter, verbose=lsqr_verbose, log=true)
 
-      if ch[:anorm][end] > lsqr_atol
-         println()
-         @warn @sprintf "LSQR did not converge (anorm=%.1e > atol=%.1e). Consider increasing conlim or maxiter." ch[:anorm][end] lsqr_atol
-         println()
-      end
-
       rel_rms = norm(Ψ * c - Y) / norm(Y)
    elseif solver["solver"] == :brr
       BRR = pyimport("sklearn.linear_model")["BayesianRidge"]
