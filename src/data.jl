@@ -58,7 +58,8 @@ end
 function read_forces(atpy, force_key)
    for key in keys(atpy.arrays)
       if lowercase(key) == lowercase(force_key)
-         return atpy.arrays[key]' |> vecs
+         F = collect(vecs(collect(atpy.arrays[key]')))
+         return F
       end
    end
    return nothing
@@ -99,13 +100,12 @@ function truncate_string(s, n)
    return "$(s[1:n1])..$(s[end-n2+1:end])"
 end
 
-function count_scalars(obs)
-   if obs == nothing
-      return 0
-   else
-      return length(hcat(obs...))
-   end
-end
+count_scalars(::Nothing) = 0 
+count_scalars(::Number) = 1 
+count_scalars(x::AbstractArray{<:Number}) = length(x)
+count_scalars(x::AbstractArray{<: AbstractArray{<: Number}}) = 
+      sum(count_scalars, x)
+
 
 function keys_info(key_dict)
    s = "keys found: "
