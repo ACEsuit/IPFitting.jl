@@ -1,6 +1,6 @@
 name = "IPFitting"
 uuid = "3002bd4c-79e4-52ce-b924-91256dde4e52"
-version = "0.10.2"
+version = "0.10.3"
 
 [deps]
 ASE = "51974c44-a7ed-5088-b8be-3e78c8ba416c"
