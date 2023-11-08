@@ -199,6 +199,72 @@ function LsqDB(dbpath::AbstractString,
    return db
 end
 
+function LsqDB_dist(dbpath::AbstractString,
+               basis::IPBasis,
+               configs::AbstractVector{Dat};
+               verbose=true,
+               maxprocs=nprocs()-1)
+
+   # set matrix rows on main process
+   nrows = 0
+   for (okey, d, _) in observations(configs)
+      len = length(observation(d, okey))
+      set_matrows!(d, okey, collect(nrows .+ (1:len)))
+      nrows += len
+   end
+
+   # distribute configs across workers
+   dconfigs = distribute(configs)
+
+   # define the function to be called by each worker
+   function generate_submatrix()
+      idats = Int[]; sizehint!(idats, 3*length(localpart(dconfigs)))
+      okeys = String[]; sizehint!(okeys, 3*length(localpart(dconfigs)))
+      nrows = 0
+      for (okey, dat, idat) in observations(localpart(dconfigs))
+         len = length(observation(dat, okey))
+         set_matrows!(dat, okey, collect(nrows .+ (1:len)))
+         nrows += len
+         push!(idats, idat)
+         push!(okeys, okey)
+      end
+      Ψ = zeros(Float64, nrows, length(basis))
+      for i=1:length(idats)
+         lsqrow = eval_obs(okeys[i], basis, localpart(dconfigs)[idats[i]])
+         vec_lsqrow = vec_obs(okeys[i], lsqrow)
+         irows = matrows(localpart(dconfigs)[idats[i]], okeys[i])
+         Ψ[irows,:] = vec_lsqrow;
+      end
+      return Ψ
+   end
+
+   println("spawning work")
+   @time Ψ = [@spawnat w generate_submatrix() for w in workers()]
+   println("creating DArray")
+   @time Ψ = DArray(reshape(Ψ, (nworkers(),1)))
+   println("converting DArray to Array on main process")
+   @time Ψ = convert(Array, Ψ)
+   println("finished matrix assembly")
+
+   db = LsqDB(basis, configs, Ψ, dbpath);
+
+   # save to file
+   if dbpath != ""
+      verbose && @info("Writing db to disk...")
+      try
+         flush(db)
+      catch
+         @warn("""something went wrong trying to save the db to disk, but the data
+               should be ok; if it is crucial to keep it, try to save manually.""")
+      end
+      verbose && @info("... done")
+   else
+      verbose && @info("db is not written to disk since `dbpath` is empty.")
+   end
+   return db
+end
+
+
 # function LsqDB_dist(basis::IPBasis,
 #                      configs::AbstractVector{Dat})
 #       # assign indices, count observations and allocate a matrix
@@ -214,7 +280,6 @@ end
 #          Ψ_part = localpart(Ψ) 
 #          vec(Ψ_part) .= (1:length(Ψ_part)) .+ 1000*myid()
 #          #Ψ_part .= energy(basis, at.at) / length(at.at)
-   
 #          # add forces to the lsq system
 #          # nf = 3*length(at.at)
 #          # #y[(irow+1):(irow+nf)] = wF * mat(F)[:]
@@ -249,20 +314,20 @@ function _alloc_lsq_matrix(configs, basis)
    return zeros(Float64, nrows, length(basis))
 end
 
-function _alloc_lsq_matrix_dist(configs, basis, nprocs)
-   # the indices associated with the basis are simply the indices within
-   # the array - there is nothing else to do here
-   #
-   # loop through all observations and assign indices
-   nrows = 0
-   for (okey, d, _) in observations(configs)
-      len = length(observation(d, okey))
-      set_matrows!(d, okey, collect(nrows .+ (1:len)))
-      nrows += len
-   end
-   # allocate and return the matrix
-   return dzeros((nrows,length(basis)), workers()[1:nprocs], [1,nprocs])
-end
+#function _alloc_lsq_matrix_dist(configs, basis, nprocs)
+#   # the indices associated with the basis are simply the indices within
+#   # the array - there is nothing else to do here
+#   #
+#   # loop through all observations and assign indices
+#   nrows = 0
+#   for (okey, d, _) in observations(configs)
+#      len = length(observation(d, okey))
+#      set_matrows!(d, okey, collect(nrows .+ (1:len)))
+#      nrows += len
+#   end
+#   # allocate and return the matrix
+#   return dzeros((nrows,length(basis)), workers()[1:nprocs], [1,nprocs])
+#end
 
 
 function safe_append!(db::LsqDB, db_lock, cfg, okey)
@@ -275,6 +340,15 @@ function safe_append!(db::LsqDB, db_lock, cfg, okey)
    db.Ψ[irows, :] = vec_lsqrow
    unlock(db_lock)
    return nothing
+end
+
+function procs_append!(db::LsqDB, cfg, okey)
+   # computing the lsq blocks ("rows") can be done in parallel,
+   lsqrow = eval_obs(okey, basis(db), cfg)
+   vec_lsqrow = vec_obs(okey, lsqrow)
+   irows = matrows(cfg, okey)
+   # we don't write, but return so the main process can write 
+   return(irows, vec_lsqrow)
 end
 
 
